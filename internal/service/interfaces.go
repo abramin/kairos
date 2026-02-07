@@ -61,5 +61,5 @@ type ReplanService interface {
 type TemplateService interface {
 	List(ctx context.Context) ([]domain.Template, error)
 	Get(ctx context.Context, name string) (*domain.Template, error)
-	InitProject(ctx context.Context, templateName string, projectName string, startDate string, dueDate *string, vars map[string]string) (*domain.Project, error)
+	InitProject(ctx context.Context, templateName string, projectName string, shortID string, startDate string, dueDate *string, vars map[string]string) (*domain.Project, error)
 }

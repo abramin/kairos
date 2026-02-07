@@ -4,6 +4,7 @@ import "time"
 
 type Project struct {
 	ID         string
+	ShortID    string
 	Name       string
 	Domain     string
 	StartDate  time.Time

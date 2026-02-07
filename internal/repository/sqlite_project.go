@@ -22,10 +22,11 @@ func NewSQLiteProjectRepo(db *sql.DB) *SQLiteProjectRepo {
 const dateLayout = "2006-01-02"
 
 func (r *SQLiteProjectRepo) Create(ctx context.Context, p *domain.Project) error {
-	query := `INSERT INTO projects (id, name, domain, start_date, target_date, status, archived_at, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO projects (id, short_id, name, domain, start_date, target_date, status, archived_at, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := r.db.ExecContext(ctx, query,
 		p.ID,
+		p.ShortID,
 		p.Name,
 		p.Domain,
 		p.StartDate.Format(dateLayout),
@@ -42,19 +43,26 @@ func (r *SQLiteProjectRepo) Create(ctx context.Context, p *domain.Project) error
 }
 
 func (r *SQLiteProjectRepo) GetByID(ctx context.Context, id string) (*domain.Project, error) {
-	query := `SELECT id, name, domain, start_date, target_date, status, archived_at, created_at, updated_at
+	query := `SELECT id, short_id, name, domain, start_date, target_date, status, archived_at, created_at, updated_at
 		FROM projects WHERE id = ?`
 	row := r.db.QueryRowContext(ctx, query, id)
+	return r.scanProject(row)
+}
+
+func (r *SQLiteProjectRepo) GetByShortID(ctx context.Context, shortID string) (*domain.Project, error) {
+	query := `SELECT id, short_id, name, domain, start_date, target_date, status, archived_at, created_at, updated_at
+		FROM projects WHERE UPPER(short_id) = UPPER(?)`
+	row := r.db.QueryRowContext(ctx, query, shortID)
 	return r.scanProject(row)
 }
 
 func (r *SQLiteProjectRepo) List(ctx context.Context, includeArchived bool) ([]*domain.Project, error) {
 	var query string
 	if includeArchived {
-		query = `SELECT id, name, domain, start_date, target_date, status, archived_at, created_at, updated_at
+		query = `SELECT id, short_id, name, domain, start_date, target_date, status, archived_at, created_at, updated_at
 			FROM projects ORDER BY created_at`
 	} else {
-		query = `SELECT id, name, domain, start_date, target_date, status, archived_at, created_at, updated_at
+		query = `SELECT id, short_id, name, domain, start_date, target_date, status, archived_at, created_at, updated_at
 			FROM projects WHERE archived_at IS NULL ORDER BY created_at`
 	}
 	rows, err := r.db.QueryContext(ctx, query)
@@ -78,9 +86,10 @@ func (r *SQLiteProjectRepo) List(ctx context.Context, includeArchived bool) ([]*
 }
 
 func (r *SQLiteProjectRepo) Update(ctx context.Context, p *domain.Project) error {
-	query := `UPDATE projects SET name = ?, domain = ?, start_date = ?, target_date = ?, status = ?, updated_at = ?
+	query := `UPDATE projects SET short_id = ?, name = ?, domain = ?, start_date = ?, target_date = ?, status = ?, updated_at = ?
 		WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, query,
+		p.ShortID,
 		p.Name,
 		p.Domain,
 		p.StartDate.Format(dateLayout),
@@ -131,7 +140,7 @@ func (r *SQLiteProjectRepo) scanProject(row *sql.Row) (*domain.Project, error) {
 	var targetDateStr, archivedAtStr sql.NullString
 
 	err := row.Scan(
-		&p.ID, &p.Name, &p.Domain,
+		&p.ID, &p.ShortID, &p.Name, &p.Domain,
 		&startDateStr, &targetDateStr,
 		&statusStr, &archivedAtStr,
 		&createdAtStr, &updatedAtStr,
@@ -172,7 +181,7 @@ func (r *SQLiteProjectRepo) scanProjectFromRows(rows *sql.Rows) (*domain.Project
 	var targetDateStr, archivedAtStr sql.NullString
 
 	err := rows.Scan(
-		&p.ID, &p.Name, &p.Domain,
+		&p.ID, &p.ShortID, &p.Name, &p.Domain,
 		&startDateStr, &targetDateStr,
 		&statusStr, &archivedAtStr,
 		&createdAtStr, &updatedAtStr,

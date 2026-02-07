@@ -1,12 +1,14 @@
 package cli
 
 import (
+	"github.com/alexanderramin/kairos/internal/intelligence"
 	"github.com/alexanderramin/kairos/internal/service"
 	"github.com/spf13/cobra"
 )
 
 // App holds references to all service interfaces used by CLI commands.
 type App struct {
+	// v1 services
 	Projects  service.ProjectService
 	Nodes     service.NodeService
 	WorkItems service.WorkItemService
@@ -15,6 +17,11 @@ type App struct {
 	Status    service.StatusService
 	Replan    service.ReplanService
 	Templates service.TemplateService
+
+	// v2 intelligence services (nil when LLM disabled)
+	Intent        intelligence.IntentService
+	Explain       intelligence.ExplainService
+	TemplateDraft intelligence.TemplateDraftService
 }
 
 // NewRootCmd creates the top-level "kairos" command and registers all
@@ -34,6 +41,10 @@ func NewRootCmd(app *App) *cobra.Command {
 		newStatusCmd(app),
 		newReplanCmd(app),
 		newTemplateCmd(app),
+		// v2 intelligence commands
+		newAskCmd(app),
+		newExplainCmd(app),
+		newReviewCmd(app),
 	)
 
 	return root

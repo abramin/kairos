@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/repository"
@@ -58,7 +59,11 @@ func (s *templateService) List(ctx context.Context) ([]domain.Template, error) {
 }
 
 func (s *templateService) Get(ctx context.Context, name string) (*domain.Template, error) {
-	path := filepath.Join(s.templateDir, name+".json")
+	path, err := s.resolveTemplatePath(name)
+	if err != nil {
+		return nil, err
+	}
+
 	schema, err := tmpl.LoadSchema(path)
 	if err != nil {
 		return nil, fmt.Errorf("template '%s' not found: %w", name, err)
@@ -74,8 +79,12 @@ func (s *templateService) Get(ctx context.Context, name string) (*domain.Templat
 	}, nil
 }
 
-func (s *templateService) InitProject(ctx context.Context, templateName, projectName, startDate string, dueDate *string, vars map[string]string) (*domain.Project, error) {
-	path := filepath.Join(s.templateDir, templateName+".json")
+func (s *templateService) InitProject(ctx context.Context, templateName, projectName, shortID, startDate string, dueDate *string, vars map[string]string) (*domain.Project, error) {
+	path, err := s.resolveTemplatePath(templateName)
+	if err != nil {
+		return nil, err
+	}
+
 	schema, err := tmpl.LoadSchema(path)
 	if err != nil {
 		return nil, fmt.Errorf("template '%s' not found: %w", templateName, err)
@@ -85,6 +94,9 @@ func (s *templateService) InitProject(ctx context.Context, templateName, project
 	if err != nil {
 		return nil, fmt.Errorf("executing template: %w", err)
 	}
+
+	// Set short ID on generated project
+	generated.Project.ShortID = shortID
 
 	// Persist project
 	if err := s.projects.Create(ctx, generated.Project); err != nil {
@@ -113,4 +125,45 @@ func (s *templateService) InitProject(ctx context.Context, templateName, project
 	}
 
 	return generated.Project, nil
+}
+
+func (s *templateService) resolveTemplatePath(name string) (string, error) {
+	input := strings.TrimSpace(name)
+	if input == "" {
+		return "", fmt.Errorf("template '%s' not found: empty template name", name)
+	}
+
+	// Fast path: treat input as file stem (current behavior).
+	stemPath := filepath.Join(s.templateDir, input+".json")
+	if schema, err := tmpl.LoadSchema(stemPath); err == nil && schema != nil {
+		return stemPath, nil
+	}
+
+	// Also allow passing an explicit .json filename.
+	if strings.HasSuffix(strings.ToLower(input), ".json") {
+		filenamePath := filepath.Join(s.templateDir, input)
+		if schema, err := tmpl.LoadSchema(filenamePath); err == nil && schema != nil {
+			return filenamePath, nil
+		}
+	}
+
+	// Fallback: resolve by schema ID or display name (case-insensitive).
+	files, err := filepath.Glob(filepath.Join(s.templateDir, "*.json"))
+	if err != nil {
+		return "", fmt.Errorf("template '%s' not found: listing templates: %w", name, err)
+	}
+
+	for _, file := range files {
+		schema, err := tmpl.LoadSchema(file)
+		if err != nil {
+			continue
+		}
+
+		fileStem := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
+		if strings.EqualFold(fileStem, input) || strings.EqualFold(schema.ID, input) || strings.EqualFold(schema.Name, input) {
+			return file, nil
+		}
+	}
+
+	return "", fmt.Errorf("template '%s' not found: open %s: no such file or directory", name, stemPath)
 }

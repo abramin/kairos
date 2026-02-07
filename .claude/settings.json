@@ -1,0 +1,11 @@
+// Add to .claude/settings.json
+{
+  "hooks": {
+    "postToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "command": "if [[ \"$CLAUDE_FILE\" == *.ts || \"$CLAUDE_FILE\" == *.tsx ]]; then npx tsc --noEmit 2>&1 | head -20; fi"
+      }
+    ]
+  }
+}

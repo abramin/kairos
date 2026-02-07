@@ -22,6 +22,7 @@ type SchedulableCandidate struct {
 type ProjectRepo interface {
 	Create(ctx context.Context, p *domain.Project) error
 	GetByID(ctx context.Context, id string) (*domain.Project, error)
+	GetByShortID(ctx context.Context, shortID string) (*domain.Project, error)
 	List(ctx context.Context, includeArchived bool) ([]*domain.Project, error)
 	Update(ctx context.Context, p *domain.Project) error
 	Archive(ctx context.Context, id string) error

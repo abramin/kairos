@@ -3,12 +3,18 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 )
 
 // Migrate runs all schema migrations.
 func Migrate(db *sql.DB) error {
 	for i, stmt := range migrations {
 		if _, err := db.Exec(stmt); err != nil {
+			// Tolerate "duplicate column name" errors from ALTER TABLE
+			// since the migration system re-runs all statements.
+			if strings.Contains(err.Error(), "duplicate column name") {
+				continue
+			}
 			return fmt.Errorf("migration %d: %w", i, err)
 		}
 	}
@@ -110,4 +116,8 @@ var migrations = []string{
 
 	// Seed default user profile
 	`INSERT OR IGNORE INTO user_profile (id) VALUES ('default')`,
+
+	// Add short_id column to projects
+	`ALTER TABLE projects ADD COLUMN short_id TEXT NOT NULL DEFAULT ''`,
+	`CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_short_id ON projects(short_id) WHERE short_id != ''`,
 }

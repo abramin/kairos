@@ -20,6 +20,75 @@ Kairos is for you if you:
 - Explains why it made each recommendation
 - Replans only when you ask (no noisy background auto-changes)
 
+## Install and run the CLI
+
+### Prerequisites
+
+- Go 1.25+ installed
+- macOS/Linux terminal
+
+### 1) Build Kairos
+
+From the project root:
+
+```bash
+make build
+```
+
+This creates a local executable: `./kairos`
+
+### 2) Point Kairos to local data and templates
+
+For easiest local setup:
+
+```bash
+export KAIROS_DB="$PWD/.kairos/kairos.db"
+export KAIROS_TEMPLATES="$PWD/templates"
+```
+
+### 3) Run it
+
+```bash
+./kairos --help
+./kairos template list
+```
+
+Optional: install globally so you can run `kairos` from anywhere:
+
+```bash
+make install
+```
+
+## First-time walkthrough
+
+Create a project from a template:
+
+```bash
+./kairos project init \
+  --template ou_module_weekly \
+  --name "Philosophy OU" \
+  --start 2026-02-07
+```
+
+Check your projects:
+
+```bash
+./kairos project list
+./kairos status
+```
+
+Ask what to do with your next 45 minutes:
+
+```bash
+./kairos what-now --minutes 45
+```
+
+Log what you actually did:
+
+```bash
+./kairos session log --work-item <WORK_ITEM_ID> --minutes 45 --units-done 1 --note "Focused reading"
+```
+
 ## Simple mental model
 
 ```mermaid
@@ -38,7 +107,7 @@ flowchart TD
 You run:
 
 ```bash
-kairos what-now --minutes 45
+./kairos what-now --minutes 45
 ```
 
 Kairos may suggest:
@@ -68,8 +137,8 @@ flowchart LR
 At the start of the week, you check status and then ask for a work block:
 
 ```bash
-kairos status
-kairos what-now --minutes 60
+./kairos status
+./kairos what-now --minutes 60
 ```
 
 Kairos shows which projects are:
@@ -90,26 +159,17 @@ Kairos tries to avoid unrealistic plans by respecting session limits:
 
 So if a task needs at least 25 minutes, it will not suggest it in a 10-minute window.
 
-## Project status
-
-Current state: design/specification phase.
-
-What exists today:
-
-- product requirements in `docs/prd.md`
-- operation contracts in `docs/contracts.md`
-- build orchestration notes in `docs/orchestrator.md`
-
-Implementation is planned as a Go CLI application.
-
-## Planned core commands
+## Core commands
 
 ```bash
-kairos project add
-kairos project update
-kairos status
-kairos what-now --minutes 60
-kairos replan
+./kairos project add
+./kairos project init
+./kairos work add
+./kairos session log
+./kairos status
+./kairos what-now --minutes 60
+./kairos replan
+./kairos template list
 ```
 
 ## Documentation map

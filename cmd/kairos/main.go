@@ -7,6 +7,8 @@ import (
 
 	"github.com/alexanderramin/kairos/internal/cli"
 	"github.com/alexanderramin/kairos/internal/db"
+	"github.com/alexanderramin/kairos/internal/intelligence"
+	"github.com/alexanderramin/kairos/internal/llm"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/alexanderramin/kairos/internal/service"
 )
@@ -64,6 +66,18 @@ func run() error {
 		Status:    service.NewStatusService(projectRepo, workItemRepo, sessionRepo, profileRepo),
 		Replan:    service.NewReplanService(projectRepo, workItemRepo, sessionRepo, profileRepo),
 		Templates: service.NewTemplateService(templateDir, projectRepo, nodeRepo, workItemRepo, depRepo),
+	}
+
+	// Wire v2 intelligence services (only when LLM is enabled)
+	llmCfg := llm.LoadConfig()
+	if llmCfg.Enabled {
+		observer := llm.NewLogObserver(os.Stderr)
+		llmClient := llm.NewOllamaClient(llmCfg, observer)
+		policy := intelligence.DefaultConfirmationPolicy(llmCfg.ConfidenceThreshold)
+
+		app.Intent = intelligence.NewIntentService(llmClient, observer, policy)
+		app.Explain = intelligence.NewExplainService(llmClient, observer)
+		app.TemplateDraft = intelligence.NewTemplateDraftService(llmClient, observer)
 	}
 
 	// Execute root command

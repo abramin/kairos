@@ -1,11 +1,16 @@
 package testutil
 
 import (
+	"fmt"
+	"strings"
+	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/alexanderramin/kairos/internal/domain"
+	"github.com/google/uuid"
 )
+
+var testShortIDCounter atomic.Int64
 
 // Project options
 type ProjectOption func(*domain.Project)
@@ -28,10 +33,32 @@ func WithProjectDomain(d string) ProjectOption {
 	}
 }
 
+func WithShortID(id string) ProjectOption {
+	return func(p *domain.Project) {
+		p.ShortID = id
+	}
+}
+
+func defaultShortID(name string) string {
+	upper := strings.ToUpper(name)
+	var letters []byte
+	for i := 0; i < len(upper) && len(letters) < 3; i++ {
+		if upper[i] >= 'A' && upper[i] <= 'Z' {
+			letters = append(letters, upper[i])
+		}
+	}
+	for len(letters) < 3 {
+		letters = append(letters, 'X')
+	}
+	n := testShortIDCounter.Add(1)
+	return fmt.Sprintf("%s%02d", string(letters), n)
+}
+
 func NewTestProject(name string, opts ...ProjectOption) *domain.Project {
 	now := time.Now().UTC()
 	p := &domain.Project{
 		ID:        uuid.New().String(),
+		ShortID:   defaultShortID(name),
 		Name:      name,
 		Domain:    "test",
 		StartDate: now.AddDate(0, -1, 0),

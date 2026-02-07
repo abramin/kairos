@@ -12,6 +12,48 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func resolveProjectID(ctx context.Context, app *App, input string) (string, error) {
+	if input == "" {
+		return "", fmt.Errorf("project ID is required")
+	}
+
+	projects, err := app.Projects.List(ctx, true)
+	if err != nil {
+		return "", err
+	}
+
+	// 1. Exact short ID match (case-insensitive)
+	for _, p := range projects {
+		if strings.EqualFold(p.ShortID, input) {
+			return p.ID, nil
+		}
+	}
+
+	// 2. Exact UUID match
+	for _, p := range projects {
+		if p.ID == input {
+			return p.ID, nil
+		}
+	}
+
+	// 3. UUID prefix match
+	var matches []string
+	for _, p := range projects {
+		if strings.HasPrefix(p.ID, input) {
+			matches = append(matches, p.ID)
+		}
+	}
+
+	switch len(matches) {
+	case 0:
+		return "", fmt.Errorf("project not found: %q", input)
+	case 1:
+		return matches[0], nil
+	default:
+		return "", fmt.Errorf("project ID prefix %q is ambiguous (%d matches)", input, len(matches))
+	}
+}
+
 func newProjectCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "project",
@@ -33,7 +75,7 @@ func newProjectCmd(app *App) *cobra.Command {
 }
 
 func newProjectAddCmd(app *App) *cobra.Command {
-	var name, domainStr, start, due string
+	var name, domainStr, start, due, shortID string
 
 	cmd := &cobra.Command{
 		Use:   "add",
@@ -46,6 +88,7 @@ func newProjectAddCmd(app *App) *cobra.Command {
 
 			p := &domain.Project{
 				ID:        uuid.New().String(),
+				ShortID:   strings.ToUpper(shortID),
 				Name:      name,
 				Domain:    domainStr,
 				StartDate: startDate,
@@ -66,15 +109,17 @@ func newProjectAddCmd(app *App) *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("Created project %s (%s)\n", p.Name, p.ID)
+			fmt.Printf("Created project %s [%s]\n", p.Name, p.ShortID)
 			return nil
 		},
 	}
 
+	cmd.Flags().StringVar(&shortID, "id", "", "Short ID (3-6 uppercase letters + 2-4 digits, e.g. PHI01)")
 	cmd.Flags().StringVar(&name, "name", "", "Project name")
 	cmd.Flags().StringVar(&domainStr, "domain", "", "Project domain")
 	cmd.Flags().StringVar(&start, "start", "", "Start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&due, "due", "", "Target due date (YYYY-MM-DD)")
+	_ = cmd.MarkFlagRequired("id")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("domain")
 	_ = cmd.MarkFlagRequired("start")
@@ -107,7 +152,7 @@ func newProjectListCmd(app *App) *cobra.Command {
 					dueStr = p.TargetDate.Format("2006-01-02")
 				}
 				rows = append(rows, []string{
-					p.ID[:8],
+					p.ShortID,
 					p.Name,
 					p.Domain,
 					string(p.Status),
@@ -132,13 +177,19 @@ func newProjectInspectCmd(app *App) *cobra.Command {
 		Short: "Show project details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			p, err := app.Projects.GetByID(context.Background(), args[0])
+			ctx := context.Background()
+			projectID, err := resolveProjectID(ctx, app, args[0])
+			if err != nil {
+				return err
+			}
+			p, err := app.Projects.GetByID(ctx, projectID)
 			if err != nil {
 				return err
 			}
 
 			fmt.Println(formatter.Header("Project"))
-			fmt.Printf("  ID:      %s\n", p.ID)
+			fmt.Printf("  ID:      %s\n", p.ShortID)
+			fmt.Printf("  UUID:    %s\n", formatter.Dim(p.ID))
 			fmt.Printf("  Name:    %s\n", formatter.Bold(p.Name))
 			fmt.Printf("  Domain:  %s\n", p.Domain)
 			fmt.Printf("  Status:  %s\n", string(p.Status))
@@ -158,7 +209,7 @@ func newProjectInspectCmd(app *App) *cobra.Command {
 }
 
 func newProjectUpdateCmd(app *App) *cobra.Command {
-	var name, domainStr, due, status string
+	var name, domainStr, due, status, shortID string
 
 	cmd := &cobra.Command{
 		Use:   "update ID",
@@ -166,11 +217,18 @@ func newProjectUpdateCmd(app *App) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			p, err := app.Projects.GetByID(ctx, args[0])
+			projectID, err := resolveProjectID(ctx, app, args[0])
+			if err != nil {
+				return err
+			}
+			p, err := app.Projects.GetByID(ctx, projectID)
 			if err != nil {
 				return err
 			}
 
+			if cmd.Flags().Changed("id") {
+				p.ShortID = strings.ToUpper(shortID)
+			}
 			if cmd.Flags().Changed("name") {
 				p.Name = name
 			}
@@ -193,11 +251,12 @@ func newProjectUpdateCmd(app *App) *cobra.Command {
 				return err
 			}
 
-			fmt.Printf("Updated project %s\n", p.ID)
+			fmt.Printf("Updated project %s [%s]\n", p.Name, p.ShortID)
 			return nil
 		},
 	}
 
+	cmd.Flags().StringVar(&shortID, "id", "", "Short ID (3-6 uppercase letters + 2-4 digits)")
 	cmd.Flags().StringVar(&name, "name", "", "Project name")
 	cmd.Flags().StringVar(&domainStr, "domain", "", "Project domain")
 	cmd.Flags().StringVar(&due, "due", "", "Target due date (YYYY-MM-DD)")
@@ -212,10 +271,15 @@ func newProjectArchiveCmd(app *App) *cobra.Command {
 		Short: "Archive a project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := app.Projects.Archive(context.Background(), args[0]); err != nil {
+			ctx := context.Background()
+			projectID, err := resolveProjectID(ctx, app, args[0])
+			if err != nil {
 				return err
 			}
-			fmt.Printf("Archived project %s\n", args[0])
+			if err := app.Projects.Archive(ctx, projectID); err != nil {
+				return err
+			}
+			fmt.Printf("Archived project %s\n", projectID)
 			return nil
 		},
 	}
@@ -227,10 +291,15 @@ func newProjectUnarchiveCmd(app *App) *cobra.Command {
 		Short: "Unarchive a project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := app.Projects.Unarchive(context.Background(), args[0]); err != nil {
+			ctx := context.Background()
+			projectID, err := resolveProjectID(ctx, app, args[0])
+			if err != nil {
 				return err
 			}
-			fmt.Printf("Unarchived project %s\n", args[0])
+			if err := app.Projects.Unarchive(ctx, projectID); err != nil {
+				return err
+			}
+			fmt.Printf("Unarchived project %s\n", projectID)
 			return nil
 		},
 	}
@@ -244,10 +313,15 @@ func newProjectRemoveCmd(app *App) *cobra.Command {
 		Short: "Remove a project",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := app.Projects.Delete(context.Background(), args[0], force); err != nil {
+			ctx := context.Background()
+			projectID, err := resolveProjectID(ctx, app, args[0])
+			if err != nil {
 				return err
 			}
-			fmt.Printf("Removed project %s\n", args[0])
+			if err := app.Projects.Delete(ctx, projectID, force); err != nil {
+				return err
+			}
+			fmt.Printf("Removed project %s\n", projectID)
 			return nil
 		},
 	}
@@ -258,7 +332,7 @@ func newProjectRemoveCmd(app *App) *cobra.Command {
 }
 
 func newProjectInitCmd(app *App) *cobra.Command {
-	var templateName, name, start, due string
+	var templateName, name, shortID, start, due string
 	var vars []string
 
 	cmd := &cobra.Command{
@@ -279,21 +353,23 @@ func newProjectInitCmd(app *App) *cobra.Command {
 				duePtr = &due
 			}
 
-			p, err := app.Templates.InitProject(context.Background(), templateName, name, start, duePtr, varMap)
+			p, err := app.Templates.InitProject(context.Background(), templateName, name, strings.ToUpper(shortID), start, duePtr, varMap)
 			if err != nil {
 				return err
 			}
 
-			fmt.Printf("Initialized project %s (%s) from template %q\n", p.Name, p.ID, templateName)
+			fmt.Printf("Initialized project %s [%s] from template %q\n", p.Name, p.ShortID, templateName)
 			return nil
 		},
 	}
 
+	cmd.Flags().StringVar(&shortID, "id", "", "Short ID (3-6 uppercase letters + 2-4 digits, e.g. PHI01)")
 	cmd.Flags().StringVar(&templateName, "template", "", "Template name")
 	cmd.Flags().StringVar(&name, "name", "", "Project name")
 	cmd.Flags().StringVar(&start, "start", "", "Start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&due, "due", "", "Target due date (YYYY-MM-DD)")
 	cmd.Flags().StringArrayVar(&vars, "var", nil, "Template variables (key=value)")
+	_ = cmd.MarkFlagRequired("id")
 	_ = cmd.MarkFlagRequired("template")
 	_ = cmd.MarkFlagRequired("name")
 	_ = cmd.MarkFlagRequired("start")
