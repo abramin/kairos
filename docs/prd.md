@@ -268,9 +268,7 @@ Views required:
    * proposed block(s), duration, explanation
 
 Recommended stack:
-
-* Python: `typer` + `rich` + `textual` optional later
-  or Go: `cobra` + colored table/tree library
+ Go: `cobra` + colored table/tree library
 
 ---
 

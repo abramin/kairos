@@ -1,0 +1,469 @@
+{
+  "id": "dele_b1_modules",
+  "name": "DELE B1 Exam Prep",
+  "version": "1.0.0",
+  "description": "DELE B1 exam preparation across 4 skill modules, each with 5 study sections.",
+  "domain": "language",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 20,
+      "max_session_min": 60,
+      "default_session_min": 30,
+      "splittable": true
+    },
+    "buffer_pct": 0.20
+  },
+  "project": {
+    "target_date_mode": "optional",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [],
+  "nodes": [
+    {
+      "id": "lectura",
+      "title": "Comprension de lectura",
+      "kind": "module",
+      "parent_id": null,
+      "order": "1"
+    },
+    {
+      "id": "lectura_vocab",
+      "title": "Vocabulario",
+      "kind": "section",
+      "parent_id": "lectura",
+      "order": "1"
+    },
+    {
+      "id": "lectura_gram",
+      "title": "Gramatica",
+      "kind": "section",
+      "parent_id": "lectura",
+      "order": "2"
+    },
+    {
+      "id": "lectura_practica",
+      "title": "Practica",
+      "kind": "section",
+      "parent_id": "lectura",
+      "order": "3"
+    },
+    {
+      "id": "lectura_simulacro",
+      "title": "Simulacro",
+      "kind": "section",
+      "parent_id": "lectura",
+      "order": "4"
+    },
+    {
+      "id": "lectura_repaso",
+      "title": "Repaso",
+      "kind": "section",
+      "parent_id": "lectura",
+      "order": "5"
+    },
+    {
+      "id": "auditiva",
+      "title": "Comprension auditiva",
+      "kind": "module",
+      "parent_id": null,
+      "order": "2"
+    },
+    {
+      "id": "auditiva_vocab",
+      "title": "Vocabulario",
+      "kind": "section",
+      "parent_id": "auditiva",
+      "order": "1"
+    },
+    {
+      "id": "auditiva_gram",
+      "title": "Gramatica",
+      "kind": "section",
+      "parent_id": "auditiva",
+      "order": "2"
+    },
+    {
+      "id": "auditiva_practica",
+      "title": "Practica",
+      "kind": "section",
+      "parent_id": "auditiva",
+      "order": "3"
+    },
+    {
+      "id": "auditiva_simulacro",
+      "title": "Simulacro",
+      "kind": "section",
+      "parent_id": "auditiva",
+      "order": "4"
+    },
+    {
+      "id": "auditiva_repaso",
+      "title": "Repaso",
+      "kind": "section",
+      "parent_id": "auditiva",
+      "order": "5"
+    },
+    {
+      "id": "escritas",
+      "title": "Expresion e interaccion escritas",
+      "kind": "module",
+      "parent_id": null,
+      "order": "3"
+    },
+    {
+      "id": "escritas_vocab",
+      "title": "Vocabulario",
+      "kind": "section",
+      "parent_id": "escritas",
+      "order": "1"
+    },
+    {
+      "id": "escritas_gram",
+      "title": "Gramatica",
+      "kind": "section",
+      "parent_id": "escritas",
+      "order": "2"
+    },
+    {
+      "id": "escritas_practica",
+      "title": "Practica",
+      "kind": "section",
+      "parent_id": "escritas",
+      "order": "3"
+    },
+    {
+      "id": "escritas_simulacro",
+      "title": "Simulacro",
+      "kind": "section",
+      "parent_id": "escritas",
+      "order": "4"
+    },
+    {
+      "id": "escritas_repaso",
+      "title": "Repaso",
+      "kind": "section",
+      "parent_id": "escritas",
+      "order": "5"
+    },
+    {
+      "id": "orales",
+      "title": "Expresion e interaccion orales",
+      "kind": "module",
+      "parent_id": null,
+      "order": "4"
+    },
+    {
+      "id": "orales_vocab",
+      "title": "Vocabulario",
+      "kind": "section",
+      "parent_id": "orales",
+      "order": "1"
+    },
+    {
+      "id": "orales_gram",
+      "title": "Gramatica",
+      "kind": "section",
+      "parent_id": "orales",
+      "order": "2"
+    },
+    {
+      "id": "orales_practica",
+      "title": "Practica",
+      "kind": "section",
+      "parent_id": "orales",
+      "order": "3"
+    },
+    {
+      "id": "orales_simulacro",
+      "title": "Simulacro",
+      "kind": "section",
+      "parent_id": "orales",
+      "order": "4"
+    },
+    {
+      "id": "orales_repaso",
+      "title": "Repaso",
+      "kind": "section",
+      "parent_id": "orales",
+      "order": "5"
+    }
+  ],
+  "work_items": [
+    {
+      "id": "lectura_vocab_study",
+      "node_id": "lectura_vocab",
+      "title": "Vocabulario Study",
+      "type": "study",
+      "planned_min": 60,
+      "units": { "kind": "exercises", "total": 10 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "lectura_gram_study",
+      "node_id": "lectura_gram",
+      "title": "Gramatica Study",
+      "type": "study",
+      "planned_min": 60,
+      "units": { "kind": "exercises", "total": 10 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "lectura_practica_ex",
+      "node_id": "lectura_practica",
+      "title": "Practica Exercises",
+      "type": "practice",
+      "planned_min": 45,
+      "session_policy": {
+        "min_session_min": 30,
+        "max_session_min": 45,
+        "default_session_min": 45,
+        "splittable": false
+      },
+      "units": { "kind": "exercises", "total": 5 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "lectura_mock",
+      "node_id": "lectura_simulacro",
+      "title": "Mock Exam",
+      "type": "practice",
+      "duration_mode": "fixed",
+      "planned_min": 45,
+      "session_policy": {
+        "min_session_min": 45,
+        "max_session_min": 45,
+        "default_session_min": 45,
+        "splittable": false
+      },
+      "estimate_confidence": 1.0
+    },
+    {
+      "id": "lectura_review",
+      "node_id": "lectura_repaso",
+      "title": "Review Session",
+      "type": "study",
+      "planned_min": 30,
+      "session_policy": {
+        "min_session_min": 15,
+        "max_session_min": 30,
+        "default_session_min": 30,
+        "splittable": false
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "auditiva_vocab_study",
+      "node_id": "auditiva_vocab",
+      "title": "Vocabulario Study",
+      "type": "study",
+      "planned_min": 60,
+      "units": { "kind": "exercises", "total": 10 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "auditiva_gram_study",
+      "node_id": "auditiva_gram",
+      "title": "Gramatica Study",
+      "type": "study",
+      "planned_min": 60,
+      "units": { "kind": "exercises", "total": 10 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "auditiva_practica_ex",
+      "node_id": "auditiva_practica",
+      "title": "Listening Exercises",
+      "type": "practice",
+      "planned_min": 45,
+      "session_policy": {
+        "min_session_min": 30,
+        "max_session_min": 45,
+        "default_session_min": 45,
+        "splittable": false
+      },
+      "units": { "kind": "exercises", "total": 5 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "auditiva_mock",
+      "node_id": "auditiva_simulacro",
+      "title": "Mock Listening Exam",
+      "type": "practice",
+      "duration_mode": "fixed",
+      "planned_min": 45,
+      "session_policy": {
+        "min_session_min": 45,
+        "max_session_min": 45,
+        "default_session_min": 45,
+        "splittable": false
+      },
+      "estimate_confidence": 1.0
+    },
+    {
+      "id": "auditiva_review",
+      "node_id": "auditiva_repaso",
+      "title": "Review Session",
+      "type": "study",
+      "planned_min": 30,
+      "session_policy": {
+        "min_session_min": 15,
+        "max_session_min": 30,
+        "default_session_min": 30,
+        "splittable": false
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "escritas_vocab_study",
+      "node_id": "escritas_vocab",
+      "title": "Vocabulario Study",
+      "type": "study",
+      "planned_min": 60,
+      "units": { "kind": "exercises", "total": 10 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "escritas_gram_study",
+      "node_id": "escritas_gram",
+      "title": "Gramatica Study",
+      "type": "study",
+      "planned_min": 60,
+      "units": { "kind": "exercises", "total": 10 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "escritas_practica_ex",
+      "node_id": "escritas_practica",
+      "title": "Writing Exercises",
+      "type": "practice",
+      "planned_min": 60,
+      "session_policy": {
+        "min_session_min": 30,
+        "max_session_min": 60,
+        "default_session_min": 45,
+        "splittable": false
+      },
+      "units": { "kind": "exercises", "total": 3 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "escritas_mock",
+      "node_id": "escritas_simulacro",
+      "title": "Mock Writing Exam",
+      "type": "practice",
+      "duration_mode": "fixed",
+      "planned_min": 60,
+      "session_policy": {
+        "min_session_min": 60,
+        "max_session_min": 60,
+        "default_session_min": 60,
+        "splittable": false
+      },
+      "estimate_confidence": 1.0
+    },
+    {
+      "id": "escritas_review",
+      "node_id": "escritas_repaso",
+      "title": "Review Session",
+      "type": "study",
+      "planned_min": 30,
+      "session_policy": {
+        "min_session_min": 15,
+        "max_session_min": 30,
+        "default_session_min": 30,
+        "splittable": false
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "orales_vocab_study",
+      "node_id": "orales_vocab",
+      "title": "Vocabulario Study",
+      "type": "study",
+      "planned_min": 60,
+      "units": { "kind": "exercises", "total": 10 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "orales_gram_study",
+      "node_id": "orales_gram",
+      "title": "Gramatica Study",
+      "type": "study",
+      "planned_min": 60,
+      "units": { "kind": "exercises", "total": 10 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "orales_practica_ex",
+      "node_id": "orales_practica",
+      "title": "Speaking Exercises",
+      "type": "practice",
+      "planned_min": 45,
+      "session_policy": {
+        "min_session_min": 30,
+        "max_session_min": 45,
+        "default_session_min": 45,
+        "splittable": false
+      },
+      "units": { "kind": "exercises", "total": 3 },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "orales_mock",
+      "node_id": "orales_simulacro",
+      "title": "Mock Speaking Exam",
+      "type": "practice",
+      "duration_mode": "fixed",
+      "planned_min": 30,
+      "session_policy": {
+        "min_session_min": 30,
+        "max_session_min": 30,
+        "default_session_min": 30,
+        "splittable": false
+      },
+      "estimate_confidence": 1.0
+    },
+    {
+      "id": "orales_review",
+      "node_id": "orales_repaso",
+      "title": "Review Session",
+      "type": "study",
+      "planned_min": 30,
+      "session_policy": {
+        "min_session_min": 15,
+        "max_session_min": 30,
+        "default_session_min": 30,
+        "splittable": false
+      },
+      "estimate_confidence": 0.6
+    }
+  ],
+  "dependencies": [
+    { "predecessor": "lectura_vocab_study", "successor": "lectura_practica_ex" },
+    { "predecessor": "lectura_gram_study", "successor": "lectura_practica_ex" },
+    { "predecessor": "lectura_practica_ex", "successor": "lectura_mock" },
+    { "predecessor": "lectura_mock", "successor": "lectura_review" },
+    { "predecessor": "auditiva_vocab_study", "successor": "auditiva_practica_ex" },
+    { "predecessor": "auditiva_gram_study", "successor": "auditiva_practica_ex" },
+    { "predecessor": "auditiva_practica_ex", "successor": "auditiva_mock" },
+    { "predecessor": "auditiva_mock", "successor": "auditiva_review" },
+    { "predecessor": "escritas_vocab_study", "successor": "escritas_practica_ex" },
+    { "predecessor": "escritas_gram_study", "successor": "escritas_practica_ex" },
+    { "predecessor": "escritas_practica_ex", "successor": "escritas_mock" },
+    { "predecessor": "escritas_mock", "successor": "escritas_review" },
+    { "predecessor": "orales_vocab_study", "successor": "orales_practica_ex" },
+    { "predecessor": "orales_gram_study", "successor": "orales_practica_ex" },
+    { "predecessor": "orales_practica_ex", "successor": "orales_mock" },
+    { "predecessor": "orales_mock", "successor": "orales_review" }
+  ],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}

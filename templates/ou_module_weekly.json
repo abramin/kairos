@@ -1,0 +1,228 @@
+{
+  "id": "ou_module_weekly",
+  "name": "OU Module Weekly",
+  "version": "1.0.0",
+  "description": "Open University module with weekly reading/activities and 3 TMAs.",
+  "domain": "education",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 30,
+      "max_session_min": 90,
+      "default_session_min": 60,
+      "splittable": true
+    },
+    "buffer_pct": 0.20
+  },
+  "project": {
+    "target_date_mode": "required",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [
+    {
+      "key": "study_weeks",
+      "type": "int",
+      "required": false,
+      "default": 30,
+      "min": 1
+    },
+    {
+      "key": "tma_count",
+      "type": "int",
+      "required": false,
+      "default": 3,
+      "min": 1
+    },
+    {
+      "key": "pages_per_week",
+      "type": "int",
+      "required": false,
+      "default": 40,
+      "min": 1
+    },
+    {
+      "key": "exercises_per_week",
+      "type": "int",
+      "required": false,
+      "default": 5,
+      "min": 1
+    }
+  ],
+  "nodes": [
+    {
+      "id": "study_root",
+      "title": "Study Plan",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "1"
+    },
+    {
+      "id": "week_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "study_weeks"
+      },
+      "title": "Week {i}",
+      "kind": "week",
+      "parent_id": "study_root",
+      "order": "{i}",
+      "constraints": {
+        "not_before_offset_days": "{(i-1)*7}",
+        "not_after_offset_days": "{i*7-1}",
+        "due_date_offset_days": "{i*7}"
+      }
+    },
+    {
+      "id": "tma_root",
+      "title": "Assessments",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "2"
+    },
+    {
+      "id": "tma_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "tma_count"
+      },
+      "title": "TMA0{i}",
+      "kind": "stage",
+      "parent_id": "tma_root",
+      "order": "{i}",
+      "constraints": {
+        "due_date_offset_days": "{i*70}"
+      }
+    }
+  ],
+  "work_items": [
+    {
+      "id": "w{i}_reading",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "study_weeks"
+      },
+      "node_id": "week_{i}",
+      "title": "Week {i} Reading",
+      "type": "reading",
+      "duration_mode": "estimate",
+      "planned_min": 120,
+      "session_policy": {
+        "min_session_min": 30,
+        "max_session_min": 90,
+        "default_session_min": 60,
+        "splittable": true
+      },
+      "units": {
+        "kind": "pages",
+        "total": 40
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "w{i}_activities",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "study_weeks"
+      },
+      "node_id": "week_{i}",
+      "title": "Week {i} Activities",
+      "type": "activity",
+      "duration_mode": "estimate",
+      "planned_min": 60,
+      "session_policy": {
+        "min_session_min": 20,
+        "max_session_min": 60,
+        "default_session_min": 30,
+        "splittable": true
+      },
+      "units": {
+        "kind": "exercises",
+        "total": 5
+      },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "tma{i}_draft",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "tma_count"
+      },
+      "node_id": "tma_{i}",
+      "title": "TMA0{i} Draft",
+      "type": "assignment",
+      "duration_mode": "estimate",
+      "planned_min": 180,
+      "session_policy": {
+        "min_session_min": 45,
+        "max_session_min": 120,
+        "default_session_min": 90,
+        "splittable": true
+      },
+      "estimate_confidence": 0.5
+    },
+    {
+      "id": "tma{i}_review",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "tma_count"
+      },
+      "node_id": "tma_{i}",
+      "title": "TMA0{i} Review",
+      "type": "review",
+      "duration_mode": "estimate",
+      "planned_min": 60,
+      "session_policy": {
+        "min_session_min": 30,
+        "max_session_min": 60,
+        "default_session_min": 45,
+        "splittable": false
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "tma{i}_submit",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "tma_count"
+      },
+      "node_id": "tma_{i}",
+      "title": "TMA0{i} Submit",
+      "type": "submission",
+      "duration_mode": "fixed",
+      "planned_min": 30,
+      "session_policy": {
+        "min_session_min": 15,
+        "max_session_min": 30,
+        "default_session_min": 30,
+        "splittable": false
+      },
+      "estimate_confidence": 1.0
+    }
+  ],
+  "dependencies": [
+    {
+      "predecessor": "tma{i}_draft",
+      "successor": "tma{i}_review"
+    },
+    {
+      "predecessor": "tma{i}_review",
+      "successor": "tma{i}_submit"
+    }
+  ],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}

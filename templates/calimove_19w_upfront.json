@@ -1,0 +1,109 @@
+{
+  "id": "calimove_19w_upfront",
+  "name": "Calimove 19-Week Program",
+  "version": "1.0.0",
+  "description": "Generates 19 weeks upfront with training session work items.",
+  "domain": "fitness",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 35,
+      "max_session_min": 60,
+      "default_session_min": 45,
+      "splittable": false
+    },
+    "buffer_pct": 0.15
+  },
+  "project": {
+    "target_date_mode": "optional",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [
+    {
+      "key": "weeks",
+      "type": "int",
+      "required": false,
+      "default": 19,
+      "min": 1
+    },
+    {
+      "key": "sessions_per_week",
+      "type": "int",
+      "required": false,
+      "default": 3,
+      "min": 1
+    }
+  ],
+  "nodes": [
+    {
+      "id": "root",
+      "title": "Calimove Program",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "1"
+    },
+    {
+      "id": "week_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "weeks"
+      },
+      "title": "Week {i}",
+      "kind": "week",
+      "parent_id": "root",
+      "order": "{i}",
+      "constraints": {
+        "not_before_offset_days": "{(i-1)*7}",
+        "not_after_offset_days": "{i*7-1}"
+      },
+      "budgets": {
+        "planned_min_budget": 180
+      }
+    }
+  ],
+  "work_items": [
+    {
+      "id": "w{i}_s{j}",
+      "repeat": [
+        {
+          "var": "i",
+          "from": 1,
+          "to_var": "weeks"
+        },
+        {
+          "var": "j",
+          "from": 1,
+          "to_var": "sessions_per_week"
+        }
+      ],
+      "node_id": "week_{i}",
+      "title": "Session {j}",
+      "type": "training",
+      "status": "todo",
+      "duration_mode": "estimate",
+      "planned_min": 45,
+      "session_policy": {
+        "min_session_min": 35,
+        "max_session_min": 60,
+        "default_session_min": 45,
+        "splittable": false
+      },
+      "units": {
+        "kind": "drills",
+        "total": 1
+      },
+      "estimate_confidence": 0.7
+    }
+  ],
+  "dependencies": [],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}
