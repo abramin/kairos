@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Kairos is a single-user CLI project planner and session recommender. It answers: "I have X minutes now, what should I do?" by recommending work sessions across multiple projects, respecting hard deadlines, on-track status, anti-cram spacing, and cross-project variation.
 
-**Status**: Core v1 packages (domain, contracts, repository, scheduler, services) and v2 intelligence layer (LLM-backed NL parsing, explanations, template drafting) are implemented. CLI is fully wired with Cobra.
+**Status**: Core v1 packages (domain, contracts, repository, scheduler, services) and v2 intelligence layer (LLM-backed NL parsing, explanations, template drafting, interactive help, guided draft wizard) are implemented. CLI is fully wired with Cobra.
 
 **Requires**: Go 1.25+
 
@@ -53,7 +53,7 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 
 ### Key Packages
 
-**`internal/domain`** — Value objects and enums. All timestamps are `time.Time` (UTC). Nullable fields use pointers. String UUIDs for IDs.
+**`internal/domain`** — Value objects and enums. All timestamps are `time.Time` (UTC). Nullable fields use pointers. String UUIDs for IDs. `Project` has a `ShortID` field for human-friendly identification (e.g., `PHI01`). `UserProfile` includes tuning weights plus `BaselineDailyMin` for daily commitment target.
 
 **`internal/contract`** — Request/response types for three core operations (`WhatNow`, `Status`, `Replan`). Builder constructors like `NewWhatNowRequest(availableMin)`. Custom error types with `Code` + `Message` fields.
 
@@ -68,7 +68,7 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 
 **`internal/service`** — Eight service interfaces wired via constructor injection (`NewWhatNowService(repos...)`). `ImportService` validates and converts JSON import files into domain objects. Core orchestration flow in `WhatNowService.Recommend()`: load candidates → compute risk per project → determine mode → score → sort → allocate.
 
-**`internal/db`** — `OpenDB(path)` opens SQLite (`:memory:` for tests), enables WAL mode + foreign keys, runs migrations. Schema has 6 tables with indexes, soft-delete via `archived_at`.
+**`internal/db`** — `OpenDB(path)` opens SQLite (`:memory:` for tests), enables WAL mode + foreign keys, runs migrations. Schema has 6 tables with indexes, soft-delete via `archived_at`. Migrations include `short_id` column on `projects` (unique index) and `baseline_daily_min` on `user_profile`.
 
 **`internal/template`** — JSON template schema types (`TemplateSchema`, `NodeConfig`, `WorkItemConfig`) and expression evaluation. `EvalExpr()` handles arithmetic with variables (e.g., `(i-1)*7`), `ExpandTemplate()` expands `{expr}` placeholders in template strings. Used by `TemplateService` to scaffold project structures from JSON files in `templates/`.
 
@@ -78,17 +78,22 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 
 **`internal/llm`** — Ollama HTTP client (`NewOllamaClient`), structured JSON extraction (`ExtractJSON[T]` — generic, strips markdown fences, validates via `SchemaValidator[T]`), config from env vars, and observability hooks (`Observer` interface). All LLM calls go through this package.
 
-**`internal/intelligence`** — Four LLM-powered services:
+**`internal/intelligence`** — Five LLM-powered services:
 - `IntentService` — NL→structured intent parsing (`ask` command). Pipeline: LLM parse → `ExtractJSON[ParsedIntent]` → `EnforceWriteSafety` → `ValidateIntentArguments` → `ConfirmationPolicy.Evaluate`
 - `ExplainService` — Generates faithful narrative explanations from engine traces. Falls back to `Deterministic*` functions when LLM fails or evidence bindings are invalid
 - `TemplateDraftService` — NL→template JSON generation. LLM output is validated against `template.ValidateSchema`
 - `ProjectDraftService` — Multi-turn NL→project structure drafting. Interactive conversation produces `ImportSchema`, validated via `importer.ValidateImportSchema`, then imported via `ImportService`
+- `HelpService` — LLM-powered Q&A about using Kairos. Supports one-shot questions and multi-turn chat (`StartChat`/`NextTurn`). Uses grounding validation to filter hallucinated commands/flags and a domain glossary embedded in the system prompt. Falls back to `DeterministicHelp()` (fuzzy-matching against the command spec) when LLM is unavailable
 
-**`internal/cli`** — Cobra command tree. `App` struct holds all service interfaces; v2 intelligence fields are nil when LLM is disabled. Commands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `shell`, `ask`, `explain` (subcommands: `now`, `why-not`), `review` (subcommand: `weekly`). Note: `kairos 45` is a shortcut for `kairos what-now --minutes 45`.
+**`internal/cli`** — Cobra command tree. `App` struct holds all service interfaces; v2 intelligence fields (`Intent`, `Explain`, `TemplateDraft`, `ProjectDraft`, `Help`) are nil when LLM is disabled. Commands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `shell`, `ask`, `explain` (subcommands: `now`, `why-not`), `review` (subcommand: `weekly`), `help` (subcommand: `chat`). Note: `kairos 45` is a shortcut for `kairos what-now --minutes 45`.
 
-**`internal/cli/shell_cmd.go`** — Interactive REPL via `kairos shell`. Uses `go-prompt` for autocomplete. Built-in commands: `projects`, `use <id>`, `inspect [id]`, `status`, `what-now [min]`, `clear`, `help`, `exit`. Unrecognized input falls through to the full Cobra command tree. Prompt shows active project context: `kairos (proj_id) ❯`.
+**`internal/cli/draft_wizard.go`** — Interactive structure wizard for guided project creation without LLM. Collects node groups (label, count, kind, day spacing), work item templates stamped on every node, and special one-off nodes (exams, milestones). Produces an `ImportSchema` that goes through the same validation and import pipeline as LLM-drafted projects. `generateShortID()` creates human-friendly IDs (e.g., `"PHYS01"`) from project descriptions.
 
-**`internal/cli/formatter`** — Terminal output formatting with lipgloss: tables, tree views, progress bars, color helpers. Separate formatters for what-now, status, explain, ask, and draft output.
+**`internal/cli/shell_cmd.go`** — Interactive REPL via `kairos shell`. Uses `go-prompt` for autocomplete. Built-in commands: `projects`, `use <id>`, `inspect [id]`, `status`, `what-now [min]`, `draft [description]`, `clear`, `help`, `exit`. Unrecognized input falls through to the full Cobra command tree. Prompt shows active project context: `kairos (proj_id) ❯`.
+
+**`internal/cli/shell_draft.go`** — Draft mode within the shell REPL. Two flows: (1) **Wizard flow** (no args / LLM disabled): phase-by-phase interactive collection via `draftPhase` state machine → preview → accept/refine/cancel. (2) **LLM conversational flow** (`draft <description>`): multi-turn AI drafting reusing `ProjectDraftService`. Both flows produce an `ImportSchema` and go through the same validation/import pipeline.
+
+**`internal/cli/formatter`** — Terminal output formatting with lipgloss: tables, tree views, progress bars, color helpers, animated spinner (`spinner.go`). Separate formatters for what-now, status, explain, ask, draft, and help output.
 
 ### Data Flow: what-now Recommendation Pipeline
 
@@ -101,13 +106,15 @@ SchedulableCandidate (from repo)
 
 ### v2 Intelligence: LLM Integration Pattern
 
-All LLM features are **optional** — the `App.Intent`, `App.Explain`, `App.TemplateDraft`, and `App.ProjectDraft` fields are nil when `KAIROS_LLM_ENABLED=false`. CLI commands check for nil before use and return a helpful error pointing to explicit commands.
+All LLM features are **optional** — the `App.Intent`, `App.Explain`, `App.TemplateDraft`, `App.ProjectDraft`, and `App.Help` fields are nil when `KAIROS_LLM_ENABLED=false`. CLI commands check for nil before use and return a helpful error pointing to explicit commands. The draft wizard provides a fully functional no-LLM path for project creation.
 
 Key design patterns:
 - **Graceful fallback**: `ExplainService` falls back to `Deterministic*` functions (pure Go, no LLM) on any failure: connection error, timeout, invalid JSON, or unfaithful evidence bindings
 - **Evidence binding validation**: LLM explanations must reference only valid `evidence_ref_key` values derived from the engine trace (`TraceKeys()` / `WeeklyTraceKeys()`). Invalid references trigger fallback
 - **Write safety enforcement**: `EnforceWriteSafety()` overrides LLM-classified risk for known write intents — the LLM cannot bypass confirmation for mutations
 - **Structured extraction**: `llm.ExtractJSON[T]()` handles markdown fences, brace matching, and schema validation generically
+- **Grounding validation**: `HelpService` filters LLM responses to remove hallucinated commands/flags not present in the actual Cobra command tree
+- **Wizard-to-LLM handoff**: Draft wizard collects structure interactively, then optionally hands off to LLM for refinement — both paths produce the same `ImportSchema` type
 
 ## Naming Conventions
 

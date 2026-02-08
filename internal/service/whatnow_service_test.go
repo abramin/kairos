@@ -216,6 +216,150 @@ func TestWhatNow_DeterministicOutput(t *testing.T) {
 	}
 }
 
+func TestWhatNow_BaselineFloor_PreventsSpuriousCritical(t *testing.T) {
+	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	fiveDaysOut := now.AddDate(0, 0, 5)
+
+	// Project with 70 min remaining, 5 days left = 14 min/day needed.
+	// No recent sessions, so recentDailyMin = 0.
+	// But baseline_daily_min = 30 (default), so effectiveDaily = 30.
+	// remaining with buffer: 70 * 1.1 = 77, requiredDaily = 77/5 = 15.4
+	// ratio = 15.4/30 = 0.51 < 1.0 => on_track (not critical).
+	proj := testutil.NewTestProject("Easy Project", testutil.WithTargetDate(fiveDaysOut))
+	require.NoError(t, projects.Create(ctx, proj))
+	node := testutil.NewTestNode(proj.ID, "Node")
+	require.NoError(t, nodes.Create(ctx, node))
+	wi := testutil.NewTestWorkItem(node.ID, "Easy Task",
+		testutil.WithPlannedMin(270),
+		testutil.WithLoggedMin(200),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, workItems.Create(ctx, wi))
+	// No sessions logged — recentDailyMin = 0
+
+	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	req := contract.NewWhatNowRequest(60)
+	req.Now = &now
+
+	resp, err := svc.Recommend(ctx, req)
+	require.NoError(t, err)
+
+	assert.Equal(t, domain.ModeBalanced, resp.Mode,
+		"baseline floor should prevent trivially-achievable deadlines from being critical")
+}
+
+func TestWhatNow_BaselineZero_AllowsCritical(t *testing.T) {
+	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	ctx := context.Background()
+
+	// Set baseline to 0 to disable the floor
+	profile, err := profiles.Get(ctx)
+	require.NoError(t, err)
+	profile.BaselineDailyMin = 0
+	require.NoError(t, profiles.Upsert(ctx, profile))
+
+	now := time.Now().UTC()
+	fiveDaysOut := now.AddDate(0, 0, 5)
+
+	// Same scenario: 70 min remaining, 5 days. With baseline=0 and no sessions,
+	// recentDailyMin=0 triggers the zero-activity critical path.
+	proj := testutil.NewTestProject("Project", testutil.WithTargetDate(fiveDaysOut))
+	require.NoError(t, projects.Create(ctx, proj))
+	node := testutil.NewTestNode(proj.ID, "Node")
+	require.NoError(t, nodes.Create(ctx, node))
+	wi := testutil.NewTestWorkItem(node.ID, "Task",
+		testutil.WithPlannedMin(270),
+		testutil.WithLoggedMin(200),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, workItems.Create(ctx, wi))
+
+	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	req := contract.NewWhatNowRequest(60)
+	req.Now = &now
+
+	resp, err := svc.Recommend(ctx, req)
+	require.NoError(t, err)
+
+	assert.Equal(t, domain.ModeCritical, resp.Mode,
+		"with baseline=0 and no sessions, zero-activity path should trigger critical")
+}
+
+func TestWhatNow_BackLoadedProject_NotFalseCritical(t *testing.T) {
+	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	target := now.AddDate(0, 2, 0) // 2 months from now
+
+	// Project with start date 5 months ago and target 2 months from now.
+	// Simulates OU01: weekly readings (mostly done) + large future assessment.
+	proj := testutil.NewTestProject("Course", testutil.WithTargetDate(target))
+	proj.StartDate = now.AddDate(0, -5, 0)
+	require.NoError(t, projects.Create(ctx, proj))
+
+	weekNode := testutil.NewTestNode(proj.ID, "Readings", testutil.WithNodeKind(domain.NodeWeek))
+	require.NoError(t, nodes.Create(ctx, weekNode))
+
+	// 10 completed weekly items with past due dates
+	for i := 0; i < 10; i++ {
+		dueDate := now.AddDate(0, 0, -(10-i)*7)
+		wi := testutil.NewTestWorkItem(weekNode.ID, "Week reading",
+			testutil.WithPlannedMin(200),
+			testutil.WithLoggedMin(200),
+			testutil.WithWorkItemDueDate(dueDate),
+			testutil.WithWorkItemStatus(domain.WorkItemDone),
+		)
+		require.NoError(t, workItems.Create(ctx, wi))
+	}
+
+	// 3 remaining weekly items with future due dates
+	var futureItems []*domain.WorkItem
+	for i := 0; i < 3; i++ {
+		dueDate := now.AddDate(0, 0, (i+1)*7)
+		wi := testutil.NewTestWorkItem(weekNode.ID, "Week reading",
+			testutil.WithPlannedMin(200),
+			testutil.WithSessionBounds(15, 60, 30),
+			testutil.WithWorkItemDueDate(dueDate),
+		)
+		require.NoError(t, workItems.Create(ctx, wi))
+		futureItems = append(futureItems, wi)
+	}
+
+	// Large assessment with future due date (back-loaded, correctly not started)
+	assessNode := testutil.NewTestNode(proj.ID, "Assessment", testutil.WithNodeKind(domain.NodeAssessment))
+	require.NoError(t, nodes.Create(ctx, assessNode))
+	assessDue := now.AddDate(0, 1, 14)
+	wiAssess := testutil.NewTestWorkItem(assessNode.ID, "Final Essay",
+		testutil.WithPlannedMin(2000),
+		testutil.WithSessionBounds(30, 120, 60),
+		testutil.WithWorkItemDueDate(assessDue),
+	)
+	require.NoError(t, workItems.Create(ctx, wiAssess))
+
+	// Log a recent session to avoid zero-activity path
+	sess := testutil.NewTestSession(futureItems[0].ID, 30,
+		testutil.WithStartedAt(now.Add(-24*time.Hour)),
+	)
+	require.NoError(t, sessions.Create(ctx, sess))
+
+	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	req := contract.NewWhatNowRequest(60)
+	req.Now = &now
+
+	resp, err := svc.Recommend(ctx, req)
+	require.NoError(t, err)
+
+	// Without due-date-aware on-pace: aggregate progress (43%) < timeline elapsed (71%)
+	// => ratio > 1.5 + NOT on pace => CRITICAL.
+	// With due-date-aware on-pace: all work due by now is done => on pace => capped at AT_RISK.
+	assert.NotEqual(t, domain.ModeCritical, resp.Mode,
+		"back-loaded project with all items on schedule should not be critical")
+}
+
 func TestWhatNow_DeadlineUpdate_ChangesRiskAndRanking(t *testing.T) {
 	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
 	ctx := context.Background()

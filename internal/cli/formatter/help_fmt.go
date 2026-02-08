@@ -59,6 +59,7 @@ func indentWrapped(text string, indent, width int) string {
 			b.WriteString("\n")
 		}
 		if strings.TrimSpace(line) == "" {
+			// Preserve blank lines as paragraph separators.
 			continue
 		}
 		b.WriteString(prefix)

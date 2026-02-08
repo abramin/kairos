@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/contract"
@@ -100,6 +101,7 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 			recentMin += sess.Minutes
 		}
 		recentDailyMin := float64(recentMin) / 7.0
+		effectiveDailyMin := math.Max(recentDailyMin, float64(profile.BaselineDailyMin))
 
 		var progressPct float64
 		if plannedBefore > 0 {
@@ -114,15 +116,35 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 			}
 		}
 
+		// Due-date-aware expected progress
+		var dueByNowMin int
+		for _, item := range items {
+			if item.Status == domain.WorkItemArchived || item.Status == domain.WorkItemDone || item.Status == domain.WorkItemSkipped {
+				continue
+			}
+			effectiveDue := item.DueDate
+			if effectiveDue == nil {
+				effectiveDue = p.TargetDate
+			}
+			if effectiveDue != nil && !effectiveDue.After(now) {
+				dueByNowMin += item.PlannedMin
+			}
+		}
+		var dueBasedExpectedPct float64
+		if plannedBefore > 0 {
+			dueBasedExpectedPct = float64(donePlannedBefore+dueByNowMin) / float64(plannedBefore) * 100
+		}
+
 		riskBefore := scheduler.ComputeRisk(scheduler.RiskInput{
-			Now:            now,
-			TargetDate:     p.TargetDate,
-			PlannedMin:     plannedBefore,
-			LoggedMin:      loggedBefore,
-			BufferPct:      profile.BufferPct,
-			RecentDailyMin: recentDailyMin,
-			ProgressPct:    progressPct,
-			TimeElapsedPct: timeElapsedPct,
+			Now:                 now,
+			TargetDate:          p.TargetDate,
+			PlannedMin:          plannedBefore,
+			LoggedMin:           loggedBefore,
+			BufferPct:           profile.BufferPct,
+			RecentDailyMin:      effectiveDailyMin,
+			ProgressPct:         progressPct,
+			TimeElapsedPct:      timeElapsedPct,
+			DueBasedExpectedPct: dueBasedExpectedPct,
 		})
 
 		// Re-estimate work items with units tracking
@@ -162,15 +184,35 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 			progressPctAfter = float64(donePlannedAfter) / float64(plannedAfter) * 100
 		}
 
+		// Recompute due-based expected with updated planned totals
+		var dueByNowMinAfter int
+		for _, item := range items {
+			if item.Status == domain.WorkItemArchived || item.Status == domain.WorkItemDone || item.Status == domain.WorkItemSkipped {
+				continue
+			}
+			effectiveDue := item.DueDate
+			if effectiveDue == nil {
+				effectiveDue = p.TargetDate
+			}
+			if effectiveDue != nil && !effectiveDue.After(now) {
+				dueByNowMinAfter += item.PlannedMin
+			}
+		}
+		var dueBasedExpectedPctAfter float64
+		if plannedAfter > 0 {
+			dueBasedExpectedPctAfter = float64(donePlannedAfter+dueByNowMinAfter) / float64(plannedAfter) * 100
+		}
+
 		riskAfter := scheduler.ComputeRisk(scheduler.RiskInput{
-			Now:            now,
-			TargetDate:     p.TargetDate,
-			PlannedMin:     plannedAfter,
-			LoggedMin:      loggedAfter,
-			BufferPct:      profile.BufferPct,
-			RecentDailyMin: recentDailyMin,
-			ProgressPct:    progressPctAfter,
-			TimeElapsedPct: timeElapsedPct,
+			Now:                 now,
+			TargetDate:          p.TargetDate,
+			PlannedMin:          plannedAfter,
+			LoggedMin:           loggedAfter,
+			BufferPct:           profile.BufferPct,
+			RecentDailyMin:      effectiveDailyMin,
+			ProgressPct:         progressPctAfter,
+			TimeElapsedPct:      timeElapsedPct,
+			DueBasedExpectedPct: dueBasedExpectedPctAfter,
 		})
 
 		if riskAfter.Level == domain.RiskCritical {

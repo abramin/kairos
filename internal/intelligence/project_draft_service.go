@@ -44,6 +44,10 @@ type ProjectDraftService interface {
 	// Start initiates a new conversation with an initial NL description.
 	Start(ctx context.Context, description string) (*DraftConversation, error)
 
+	// StartWithDraft initiates a conversation pre-seeded with an existing draft
+	// (e.g., from the structure wizard) so the LLM can refine it.
+	StartWithDraft(ctx context.Context, description string, draft *importer.ImportSchema) (*DraftConversation, error)
+
 	// NextTurn sends a user message in an ongoing conversation and returns
 	// the updated conversation with the LLM's response.
 	NextTurn(ctx context.Context, conv *DraftConversation, userMessage string) (*DraftConversation, error)
@@ -64,6 +68,21 @@ func (s *projectDraftService) Start(ctx context.Context, description string) (*D
 		Status: DraftStatusGathering,
 	}
 	return s.nextTurn(ctx, conv, description)
+}
+
+func (s *projectDraftService) StartWithDraft(ctx context.Context, description string, draft *importer.ImportSchema) (*DraftConversation, error) {
+	// Seed the conversation with a synthetic history so the LLM has context
+	// about the wizard-built draft when the user asks for refinements.
+	conv := &DraftConversation{
+		Turns: []ConversationTurn{
+			{Role: "User", Content: description},
+			{Role: "Assistant", Content: `{"message": "Here is your project draft built from the structure wizard. What would you like to change?", "draft": null, "status": "gathering"}`},
+		},
+		Draft:      draft,
+		Status:     DraftStatusGathering,
+		LLMMessage: "Here is your project draft built from the structure wizard. What would you like to change?",
+	}
+	return conv, nil
 }
 
 func (s *projectDraftService) NextTurn(ctx context.Context, conv *DraftConversation, userMessage string) (*DraftConversation, error) {

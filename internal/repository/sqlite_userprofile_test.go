@@ -25,6 +25,7 @@ func TestUserProfileRepo_Get_DefaultSeededProfile(t *testing.T) {
 	assert.Equal(t, 0.5, profile.WeightSpacing)
 	assert.Equal(t, 0.3, profile.WeightVariation)
 	assert.Equal(t, 3, profile.DefaultMaxSlices)
+	assert.Equal(t, 30, profile.BaselineDailyMin)
 }
 
 func TestUserProfileRepo_Upsert_UpdatesProfile(t *testing.T) {
@@ -40,6 +41,7 @@ func TestUserProfileRepo_Upsert_UpdatesProfile(t *testing.T) {
 		WeightSpacing:          0.7,
 		WeightVariation:        0.4,
 		DefaultMaxSlices:       5,
+		BaselineDailyMin:       45,
 	}
 	require.NoError(t, repo.Upsert(ctx, updated))
 
@@ -52,6 +54,7 @@ func TestUserProfileRepo_Upsert_UpdatesProfile(t *testing.T) {
 	assert.Equal(t, updated.WeightSpacing, got.WeightSpacing)
 	assert.Equal(t, updated.WeightVariation, got.WeightVariation)
 	assert.Equal(t, updated.DefaultMaxSlices, got.DefaultMaxSlices)
+	assert.Equal(t, updated.BaselineDailyMin, got.BaselineDailyMin)
 }
 
 func TestUserProfileRepo_Get_NotFoundWhenDefaultDeleted(t *testing.T) {

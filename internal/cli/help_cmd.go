@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -86,12 +87,13 @@ func runHelpChat(app *App, specJSON string, cmdInfos []intelligence.HelpCommandI
 	fmt.Print(formatter.FormatHelpChatWelcome())
 
 	ctx := context.Background()
+	reader := bufio.NewReader(os.Stdin)
 
 	var conv *intelligence.HelpConversation
 
 	for {
 		fmt.Print("help> ")
-		line, err := readPromptLine(os.Stdin)
+		line, err := readPromptLine(reader)
 		if err != nil {
 			if err == io.EOF {
 				return nil
@@ -117,11 +119,13 @@ func runHelpChat(app *App, specJSON string, cmdInfos []intelligence.HelpCommandI
 			var answer *intelligence.HelpAnswer
 			var err error
 
+			stopSpinner := formatter.StartSpinner("Thinking...")
 			if conv == nil {
 				conv, answer, err = app.Help.StartChat(ctx, input, specJSON)
 			} else {
 				answer, err = app.Help.NextTurn(ctx, conv, input)
 			}
+			stopSpinner()
 
 			if err != nil {
 				// Defensive fallback; HelpService should already handle this.
@@ -144,7 +148,9 @@ func resolveHelpAnswer(app *App, question, specJSON string, cmdInfos []intellige
 	}
 
 	ctx := context.Background()
+	stopSpinner := formatter.StartSpinner("Thinking...")
 	answer, err := app.Help.Ask(ctx, question, specJSON)
+	stopSpinner()
 	if err != nil {
 		return intelligence.DeterministicHelp(question, cmdInfos)
 	}

@@ -8,7 +8,7 @@ Your task is to answer user questions about how to use Kairos by referencing ONL
 
 You must output ONLY a JSON object with these exact fields:
 {
-  "answer": "A concise, helpful answer (2-5 sentences, appropriate for a terminal)",
+  "answer": "A concise, helpful answer (2-5 sentences, appropriate for a terminal). If listing multiple concepts, separate each with \\n\\n for readability.",
   "examples": [{"command": "kairos ...", "description": "What this command does"}],
   "next_commands": ["kairos ...", "kairos ..."],
   "confidence": 0.0-1.0

@@ -129,3 +129,73 @@ func TestComputeRisk_ZeroStructuralData_PreservesOldBehavior(t *testing.T) {
 	})
 	assert.Equal(t, domain.RiskCritical, result.Level)
 }
+
+func TestComputeRisk_HighRatio_DueBasedOnPace_CappedAtRisk(t *testing.T) {
+	// Simulates OU01: 38% progress, 57% timeline elapsed, but due-based expected is also 38%
+	// because all items due by now are done. High ratio (>1.5) from back-loaded work.
+	target := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	result := ComputeRisk(RiskInput{
+		Now:                 time.Date(2025, 3, 15, 0, 0, 0, 0, time.UTC),
+		TargetDate:          &target,
+		PlannedMin:          12030,
+		LoggedMin:           4590,
+		BufferPct:           0.1,
+		RecentDailyMin:      30,
+		ProgressPct:         38.2,
+		TimeElapsedPct:      56.5,
+		DueBasedExpectedPct: 38.2,
+	})
+	assert.Equal(t, domain.RiskAtRisk, result.Level,
+		"due-based on-pace should cap from critical to at_risk")
+}
+
+func TestComputeRisk_DueBasedExpectedZero_PreservesOldBehavior(t *testing.T) {
+	// DueBasedExpectedPct = 0 means no data; should not change existing classification.
+	target := time.Date(2025, 3, 20, 0, 0, 0, 0, time.UTC)
+	result := ComputeRisk(RiskInput{
+		Now:                 time.Date(2025, 3, 15, 0, 0, 0, 0, time.UTC),
+		TargetDate:          &target,
+		PlannedMin:          1000,
+		LoggedMin:           0,
+		BufferPct:           0.1,
+		RecentDailyMin:      30,
+		DueBasedExpectedPct: 0,
+	})
+	assert.Equal(t, domain.RiskCritical, result.Level,
+		"zero DueBasedExpectedPct should not affect existing classification")
+}
+
+func TestComputeRisk_ProgressBehindDueBasedExpected_StillCritical(t *testing.T) {
+	// Progress is 30% but 50% of work should be done by now based on due dates.
+	target := time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+	result := ComputeRisk(RiskInput{
+		Now:                 time.Date(2025, 3, 15, 0, 0, 0, 0, time.UTC),
+		TargetDate:          &target,
+		PlannedMin:          1000,
+		LoggedMin:           100,
+		BufferPct:           0.1,
+		RecentDailyMin:      5,
+		ProgressPct:         30,
+		TimeElapsedPct:      55,
+		DueBasedExpectedPct: 50,
+	})
+	assert.Equal(t, domain.RiskCritical, result.Level,
+		"behind on due-based expected should remain critical")
+}
+
+func TestComputeRisk_NoRecentActivity_DueBasedOnPace_CappedAtRisk(t *testing.T) {
+	// No recent sessions, but due-based expected matches progress.
+	target := time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC)
+	result := ComputeRisk(RiskInput{
+		Now:                 time.Date(2025, 3, 15, 0, 0, 0, 0, time.UTC),
+		TargetDate:          &target,
+		PlannedMin:          1000,
+		LoggedMin:           400,
+		RecentDailyMin:      0,
+		ProgressPct:         40,
+		TimeElapsedPct:      55,
+		DueBasedExpectedPct: 40,
+	})
+	assert.Equal(t, domain.RiskAtRisk, result.Level,
+		"due-based on-pace should cap no-activity critical to at_risk")
+}

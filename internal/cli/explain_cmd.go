@@ -55,7 +55,9 @@ func runExplainNow(app *App, minutes int) error {
 	// Step 3: Get explanation (LLM or fallback).
 	var explanation *intelligence.LLMExplanation
 	if app.Explain != nil {
+		stopSpinner := formatter.StartSpinner("Generating explanation...")
 		explanation, err = app.Explain.ExplainNow(ctx, trace)
+		stopSpinner()
 		if err != nil {
 			// LLM failed; use deterministic fallback.
 			explanation = intelligence.DeterministicExplainNow(trace)
@@ -99,7 +101,9 @@ func newExplainWhyNotCmd(app *App) *cobra.Command {
 
 			var explanation *intelligence.LLMExplanation
 			if app.Explain != nil {
+				stopSpinner := formatter.StartSpinner("Generating explanation...")
 				explanation, err = app.Explain.ExplainWhyNot(ctx, trace, candidateID)
+				stopSpinner()
 				if err != nil {
 					explanation = intelligence.DeterministicWhyNot(trace, candidateID)
 				}

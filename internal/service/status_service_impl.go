@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"sort"
 	"time"
 
@@ -94,6 +95,7 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 			recentMin += sess.Minutes
 		}
 		recentDailyMin := float64(recentMin) / float64(days)
+		effectiveDailyMin := math.Max(recentDailyMin, float64(profile.BaselineDailyMin))
 
 		// Weighted structural progress: done planned_min / all planned_min
 		var donePlannedMin int
@@ -120,16 +122,36 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 			}
 		}
 
+		// Due-date-aware expected progress
+		var dueByNowMin int
+		for _, item := range items {
+			if item.Status == domain.WorkItemArchived || item.Status == domain.WorkItemDone || item.Status == domain.WorkItemSkipped {
+				continue
+			}
+			effectiveDue := item.DueDate
+			if effectiveDue == nil {
+				effectiveDue = p.TargetDate
+			}
+			if effectiveDue != nil && !effectiveDue.After(now) {
+				dueByNowMin += item.PlannedMin
+			}
+		}
+		var dueBasedExpectedPct float64
+		if plannedTotal > 0 {
+			dueBasedExpectedPct = float64(donePlannedMin+dueByNowMin) / float64(plannedTotal) * 100
+		}
+
 		// Risk
 		riskResult := scheduler.ComputeRisk(scheduler.RiskInput{
-			Now:            now,
-			TargetDate:     p.TargetDate,
-			PlannedMin:     plannedTotal,
-			LoggedMin:      loggedTotal,
-			BufferPct:      profile.BufferPct,
-			RecentDailyMin: recentDailyMin,
-			ProgressPct:    progressPct,
-			TimeElapsedPct: timeElapsedPct,
+			Now:                 now,
+			TargetDate:          p.TargetDate,
+			PlannedMin:          plannedTotal,
+			LoggedMin:           loggedTotal,
+			BufferPct:           profile.BufferPct,
+			RecentDailyMin:      effectiveDailyMin,
+			ProgressPct:         progressPct,
+			TimeElapsedPct:      timeElapsedPct,
+			DueBasedExpectedPct: dueBasedExpectedPct,
 		})
 
 		var structuralPct float64

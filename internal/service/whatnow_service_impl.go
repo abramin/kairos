@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/contract"
@@ -96,7 +97,7 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 		return nil, fmt.Errorf("loading completed work summaries: %w", err)
 	}
 
-	agg := s.computeProjectAggregates(candidates, completedSummaries, recentSessions, now, profile.BufferPct)
+	agg := s.computeProjectAggregates(candidates, completedSummaries, recentSessions, now, profile.BufferPct, profile.BaselineDailyMin)
 
 	mode := domain.ModeBalanced
 	for _, risk := range agg.risks {
@@ -125,6 +126,7 @@ func (s *whatNowService) computeProjectAggregates(
 	recentSessions []*domain.WorkSessionLog,
 	now time.Time,
 	bufferPct float64,
+	baselineDailyMin int,
 ) projectAggregates {
 	agg := projectAggregates{
 		risks:      make(map[string]scheduler.RiskResult),
@@ -138,6 +140,7 @@ func (s *whatNowService) computeProjectAggregates(
 
 	// Build work-item-to-project index for O(1) session lookups
 	workItemToProject := make(map[string]string, len(candidates))
+	dueByNow := make(map[string]int) // sum of PlannedMin for schedulable items due by now
 	for _, c := range candidates {
 		agg.planned[c.ProjectID] += c.WorkItem.PlannedMin
 		agg.logged[c.ProjectID] += c.WorkItem.LoggedMin
@@ -149,6 +152,11 @@ func (s *whatNowService) computeProjectAggregates(
 			agg.startDate[c.ProjectID] = c.ProjectStartDate
 		}
 		workItemToProject[c.WorkItem.ID] = c.ProjectID
+
+		effectiveDue := earliestDueDate(c.WorkItem.DueDate, c.NodeDueDate, c.ProjectTargetDate)
+		if effectiveDue != nil && !effectiveDue.After(now) {
+			dueByNow[c.ProjectID] += c.WorkItem.PlannedMin
+		}
 	}
 
 	// Index completed work summaries by project
@@ -184,16 +192,25 @@ func (s *whatNowService) computeProjectAggregates(
 			}
 		}
 
+		// Due-date-aware expected progress: what % of total work should be done by now?
+		expectedDoneMin := cs.PlannedMin + dueByNow[pid]
+		var dueBasedExpectedPct float64
+		if allPlanned > 0 {
+			dueBasedExpectedPct = float64(expectedDoneMin) / float64(allPlanned) * 100
+		}
+
 		recentDaily := float64(agg.recentMin[pid]) / 7.0
+		effectiveDaily := math.Max(recentDaily, float64(baselineDailyMin))
 		agg.risks[pid] = scheduler.ComputeRisk(scheduler.RiskInput{
-			Now:            now,
-			TargetDate:     agg.targetDate[pid],
-			PlannedMin:     agg.planned[pid],
-			LoggedMin:      agg.logged[pid],
-			BufferPct:      bufferPct,
-			RecentDailyMin: recentDaily,
-			ProgressPct:    progressPct,
-			TimeElapsedPct: timeElapsedPct,
+			Now:                 now,
+			TargetDate:          agg.targetDate[pid],
+			PlannedMin:          agg.planned[pid],
+			LoggedMin:           agg.logged[pid],
+			BufferPct:           bufferPct,
+			RecentDailyMin:      effectiveDaily,
+			ProgressPct:         progressPct,
+			TimeElapsedPct:      timeElapsedPct,
+			DueBasedExpectedPct: dueBasedExpectedPct,
 		})
 	}
 

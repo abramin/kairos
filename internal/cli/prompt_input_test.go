@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"strings"
 	"testing"
@@ -72,4 +73,52 @@ func TestReadPromptLine_EOFWithoutNewline(t *testing.T) {
 	got, err := readPromptLine(strings.NewReader("yes"))
 	assert.NoError(t, err)
 	assert.Equal(t, "yes", got)
+}
+
+func TestReadPromptLine_CRLFConsumedAsSingleEnding(t *testing.T) {
+	t.Parallel()
+
+	// Simulate a terminal that sends \r\n for Enter.
+	// Two lines: "first\r\nsecond\r\n"
+	// With a shared bufio.Reader, the \r\n should be consumed as one
+	// line ending, and the second call should return "second" (not "").
+	br := bufio.NewReader(strings.NewReader("first\r\nsecond\r\n"))
+
+	got1, err := readPromptLine(br)
+	assert.NoError(t, err)
+	assert.Equal(t, "first", got1)
+
+	got2, err := readPromptLine(br)
+	assert.NoError(t, err)
+	assert.Equal(t, "second", got2)
+}
+
+func TestReadPromptLine_CRAloneStillWorks(t *testing.T) {
+	t.Parallel()
+
+	// Raw terminal mode: Enter sends \r only.
+	br := bufio.NewReader(strings.NewReader("hello\rworld\r"))
+
+	got1, err := readPromptLine(br)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello", got1)
+
+	got2, err := readPromptLine(br)
+	assert.NoError(t, err)
+	assert.Equal(t, "world", got2)
+}
+
+func TestReadPromptLine_LFStillWorks(t *testing.T) {
+	t.Parallel()
+
+	// Normal canonical mode: Enter sends \n only.
+	br := bufio.NewReader(strings.NewReader("hello\nworld\n"))
+
+	got1, err := readPromptLine(br)
+	assert.NoError(t, err)
+	assert.Equal(t, "hello", got1)
+
+	got2, err := readPromptLine(br)
+	assert.NoError(t, err)
+	assert.Equal(t, "world", got2)
 }

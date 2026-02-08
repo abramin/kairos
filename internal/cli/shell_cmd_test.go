@@ -237,3 +237,55 @@ func TestPrepareShellCobraArgs_DoesNotChangeNonAsk(t *testing.T) {
 	got := prepareShellCobraArgs([]string{"project", "list"})
 	assert.Equal(t, []string{"project", "list"}, got)
 }
+
+// TestShellSession_MultiStepJourney exercises a full REPL session:
+// create project → use project → status → what-now → clear → exit.
+func TestShellSession_MultiStepJourney(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+	sess := &shellSession{
+		app:   app,
+		cache: newShellProjectCache(),
+	}
+
+	// Step 1: Create a project via shell executor
+	sess.executor(`project add --id SHL01 --name "Shell Journey" --domain education --start 2026-01-15`)
+	projects, err := app.Projects.List(ctx, false)
+	require.NoError(t, err)
+	require.Len(t, projects, 1)
+	assert.Equal(t, "SHL01", projects[0].ShortID)
+
+	// Step 2: Add a node
+	sess.executor(`node add --project ` + projects[0].ID + ` --title "Week 1" --kind week`)
+	allNodes, err := app.Nodes.ListByProject(ctx, projects[0].ID)
+	require.NoError(t, err)
+	require.Len(t, allNodes, 1)
+
+	// Step 3: Add a work item
+	sess.executor(`work add --node ` + allNodes[0].ID + ` --title "Read Chapter 1" --type reading --planned-min 60`)
+	allItems, err := app.WorkItems.ListByProject(ctx, projects[0].ID)
+	require.NoError(t, err)
+	require.Len(t, allItems, 1)
+
+	// Step 4: Use project context
+	sess.executor("use shl01")
+	assert.Equal(t, projects[0].ID, sess.activeProjectID)
+	assert.Equal(t, "SHL01", sess.activeShortID)
+	assert.Equal(t, "Shell Journey", sess.activeProjectName)
+
+	// Step 5: Status command (should not error with active project context)
+	sess.executor("status")
+
+	// Step 6: What-now with minutes
+	sess.executor("what-now 60")
+
+	// Step 7: Clear project context (use with no arg clears active project)
+	sess.executor("use")
+	assert.Equal(t, "", sess.activeProjectID)
+	assert.Equal(t, "", sess.activeShortID)
+
+	// Step 8: Exit
+	assert.False(t, sess.wantExit)
+	sess.executor("exit")
+	assert.True(t, sess.wantExit)
+}

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -17,56 +18,80 @@ import (
 func newProjectDraftCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "draft [description]",
-		Short: "Interactively create a project from a natural language description",
-		Long: `Use LLM to iteratively build a project through conversation.
+		Short: "Interactively create a project with a guided wizard",
+		Long: `Create a project through a step-by-step structure wizard.
 
-Run without arguments to enter interactive mode, or pass a description directly.
+Run without arguments to enter interactive mode, or pass a description
+to use LLM-powered conversational drafting (requires KAIROS_LLM_ENABLED=true).
 
-Commands during conversation:
-  /show    Show current draft as a tree
-  /accept  Accept the current draft
-  /quit    Cancel and exit
+Interactive wizard collects:
+  1. Project description and dates
+  2. Node groups (phases, levels, modules)
+  3. Work items per node
+  4. Special nodes (exams, milestones)
+
+After the wizard, you can accept the draft or refine it with AI.
 
 Examples:
   kairos project draft
   kairos project draft "A 12-week physics study plan for my final exam in June"`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if app.ProjectDraft == nil {
-				return fmt.Errorf("LLM features are disabled. Use explicit commands:\n" +
-					"  kairos project add --name ... --domain ... --start ...\n" +
-					"  kairos project import file.json\n\n" +
-					"Enable with: KAIROS_LLM_ENABLED=true")
-			}
+			// Wrap stdin in a bufio.Reader so readPromptLine can consume
+			// \r\n sequences without leaking a stale \n into the next read.
+			reader := bufio.NewReader(os.Stdin)
 
-			var description string
 			if len(args) > 0 {
-				description = args[0]
-			} else {
-				var err error
-				description, err = gatherProjectInfo(os.Stdin)
-				if err != nil {
-					return err
+				// Direct description: use LLM conversational flow.
+				if app.ProjectDraft == nil {
+					return fmt.Errorf("LLM features are disabled. Run without arguments for the guided wizard.\n" +
+						"Or use explicit commands:\n" +
+						"  kairos project add --name ... --domain ... --start ...\n" +
+						"  kairos project import file.json\n\n" +
+						"Enable LLM with: KAIROS_LLM_ENABLED=true")
 				}
+				return runProjectDraftLoop(app, reader, args[0], nil)
 			}
 
-			return runProjectDraftLoop(app, os.Stdin, description)
+			// Interactive wizard flow.
+			info, err := gatherProjectInfo(reader)
+			if err != nil {
+				return err
+			}
+
+			wizard, err := runStructureWizard(reader)
+			if err != nil {
+				return err
+			}
+			wizard.Description = info.description
+			wizard.StartDate = info.startDate
+			wizard.Deadline = info.deadline
+
+			schema := buildSchemaFromWizard(wizard)
+			return runWizardReview(app, reader, schema, wizard)
 		},
 	}
 	return cmd
 }
 
-func gatherProjectInfo(in io.Reader) (string, error) {
+// projectInfo holds the basic project metadata from the first three questions.
+type projectInfo struct {
+	description string
+	startDate   string
+	deadline    string
+}
+
+func gatherProjectInfo(in io.Reader) (*projectInfo, error) {
 	fmt.Print(formatter.FormatDraftWelcome())
 
 	// Question 1: Project description (required).
 	fmt.Print("  Describe your project:\n  > ")
 	description, err := readDraftLine(in)
 	if err != nil {
-		return "", fmt.Errorf("input cancelled")
+		return nil, fmt.Errorf("input cancelled")
 	}
 	if description == "" {
-		return "", fmt.Errorf("project description is required")
+		return nil, fmt.Errorf("project description is required")
 	}
 
 	// Question 2: Start date (optional, defaults to today).
@@ -95,37 +120,113 @@ func gatherProjectInfo(in io.Reader) (string, error) {
 		}
 	}
 
-	// Question 4: Structure hint (optional).
-	fmt.Print("\n  How is the work organized? (e.g., \"5 chapters with reading + exercises each\")\n  > ")
-	var structure string
-	if input, err := readDraftLine(in); err == nil {
-		structure = input
-	}
-
-	// Bundle into a rich description string.
-	var b strings.Builder
-	b.WriteString(description)
-	b.WriteString("\nStart date: ")
-	b.WriteString(startDate)
-	if deadline != "" {
-		b.WriteString("\nDeadline: ")
-		b.WriteString(deadline)
-	}
-	if structure != "" {
-		b.WriteString("\nStructure: ")
-		b.WriteString(structure)
-	}
-
-	fmt.Printf("\n  %s\n\n", formatter.Dim("Building your project draft..."))
-
-	return b.String(), nil
+	return &projectInfo{
+		description: description,
+		startDate:   startDate,
+		deadline:    deadline,
+	}, nil
 }
 
-func runProjectDraftLoop(app *App, in io.Reader, description string) error {
+// runWizardReview shows the wizard-generated draft and offers accept/refine/cancel.
+func runWizardReview(app *App, in io.Reader, schema *importer.ImportSchema, wizard *wizardResult) error {
 	ctx := context.Background()
 
-	// Start the conversation.
-	conv, err := app.ProjectDraft.Start(ctx, description)
+	// Wrap schema in a DraftConversation for preview formatting.
+	conv := &intelligence.DraftConversation{
+		Draft:  schema,
+		Status: intelligence.DraftStatusReady,
+	}
+
+	fmt.Print(formatter.FormatDraftPreview(conv))
+
+	for {
+		if app.ProjectDraft != nil {
+			fmt.Print("\n[a]ccept  [r]efine with AI  [c]ancel: ")
+		} else {
+			fmt.Print("\n[a]ccept  [c]ancel: ")
+		}
+
+		input, err := readDraftLine(in)
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		switch strings.ToLower(input) {
+		case "a", "accept":
+			return acceptWizardDraft(app, ctx, schema)
+		case "c", "cancel":
+			fmt.Println("Draft cancelled.")
+			return nil
+		case "r", "refine":
+			if app.ProjectDraft == nil {
+				fmt.Println("LLM features are disabled. Accept the draft or cancel.")
+				continue
+			}
+			// Build a description string for the LLM to have context.
+			desc := buildLLMDescription(wizard)
+			return runProjectDraftLoop(app, in, desc, schema)
+		default:
+			fmt.Println("Invalid option.")
+		}
+	}
+}
+
+// buildLLMDescription creates a rich description string from wizard data for LLM context.
+func buildLLMDescription(wizard *wizardResult) string {
+	var b strings.Builder
+	b.WriteString(wizard.Description)
+	b.WriteString("\nStart date: ")
+	b.WriteString(wizard.StartDate)
+	if wizard.Deadline != "" {
+		b.WriteString("\nDeadline: ")
+		b.WriteString(wizard.Deadline)
+	}
+	b.WriteString("\nStructure: ")
+	for i, g := range wizard.Groups {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(fmt.Sprintf("%d %ss", g.Count, g.Label))
+		if g.DaysPer > 0 {
+			b.WriteString(fmt.Sprintf(" (%d days each)", g.DaysPer))
+		}
+	}
+	if len(wizard.WorkItems) > 0 {
+		b.WriteString(". Each node has: ")
+		for i, wi := range wizard.WorkItems {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(wi.Title)
+			if wi.PlannedMin > 0 {
+				b.WriteString(fmt.Sprintf(" (%dmin)", wi.PlannedMin))
+			}
+		}
+	}
+	return b.String()
+}
+
+// runProjectDraftLoop enters the LLM-powered conversational draft loop.
+// If preDraft is provided, the conversation is seeded with it.
+func runProjectDraftLoop(app *App, in io.Reader, description string, preDraft *importer.ImportSchema) error {
+	ctx := context.Background()
+
+	var conv *intelligence.DraftConversation
+	var err error
+
+	if preDraft != nil {
+		// Seed conversation with the wizard-built draft.
+		stopSpinner := formatter.StartSpinner("Preparing for refinement...")
+		conv, err = app.ProjectDraft.StartWithDraft(ctx, description, preDraft)
+		stopSpinner()
+	} else {
+		stopSpinner := formatter.StartSpinner("Building your project draft...")
+		conv, err = app.ProjectDraft.Start(ctx, description)
+		stopSpinner()
+	}
 	if err != nil {
 		return fmt.Errorf("failed to start project draft: %w", err)
 	}
@@ -165,7 +266,9 @@ func runProjectDraftLoop(app *App, in io.Reader, description string) error {
 				if editMsg == "" {
 					continue
 				}
+				stopSpinner := formatter.StartSpinner("Thinking...")
 				conv, err = app.ProjectDraft.NextTurn(ctx, conv, editMsg)
+				stopSpinner()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 					continue
@@ -174,7 +277,9 @@ func runProjectDraftLoop(app *App, in io.Reader, description string) error {
 				continue
 			default:
 				// Treat as an edit instruction.
+				stopSpinner := formatter.StartSpinner("Thinking...")
 				conv, err = app.ProjectDraft.NextTurn(ctx, conv, input)
+				stopSpinner()
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 					continue
@@ -214,7 +319,9 @@ func runProjectDraftLoop(app *App, in io.Reader, description string) error {
 		}
 
 		// Send to LLM.
+		stopSpinner := formatter.StartSpinner("Thinking...")
 		conv, err = app.ProjectDraft.NextTurn(ctx, conv, input)
+		stopSpinner()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			continue
@@ -232,17 +339,24 @@ func readDraftLine(in io.Reader) (string, error) {
 }
 
 func acceptDraft(app *App, ctx context.Context, conv *intelligence.DraftConversation) error {
+	return acceptSchemaImport(app, ctx, conv.Draft)
+}
+
+func acceptWizardDraft(app *App, ctx context.Context, schema *importer.ImportSchema) error {
+	return acceptSchemaImport(app, ctx, schema)
+}
+
+func acceptSchemaImport(app *App, ctx context.Context, schema *importer.ImportSchema) error {
 	// Validate the draft.
-	errs := importer.ValidateImportSchema(conv.Draft)
+	errs := importer.ValidateImportSchema(schema)
 	if len(errs) > 0 {
 		fmt.Print(formatter.FormatDraftValidationErrors(errs))
-		fmt.Println("Draft has validation errors. Continue editing to fix them.")
-		conv.Status = intelligence.DraftStatusGathering
+		fmt.Println("Draft has validation errors.")
 		return nil
 	}
 
 	// Import via ImportService.
-	result, err := app.Import.ImportProjectFromSchema(ctx, conv.Draft)
+	result, err := app.Import.ImportProjectFromSchema(ctx, schema)
 	if err != nil {
 		return fmt.Errorf("import failed: %w", err)
 	}

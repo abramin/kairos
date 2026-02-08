@@ -20,6 +20,9 @@ type RiskInput struct {
 	// TimeElapsedPct is the % of project timeline elapsed: (now - start) / (target - start) * 100.
 	// Zero means no timeline data available (preserves existing behavior).
 	TimeElapsedPct float64
+	// DueBasedExpectedPct is the % of total work expected to be done by now based on individual
+	// item due dates. Zero means no data available (preserves existing behavior).
+	DueBasedExpectedPct float64
 }
 
 type RiskResult struct {
@@ -74,10 +77,12 @@ func ComputeRisk(input RiskInput) RiskResult {
 		ProgressTimePct:  progressTimePct,
 	}
 
-	// Structural progress: if weighted progress >= timeline elapsed, the user is on pace.
-	// This prevents false-critical when recent sessions are missing but overall progress is fine.
-	onPace := input.ProgressPct > 0 && input.TimeElapsedPct > 0 &&
-		input.ProgressPct >= input.TimeElapsedPct
+	// Structural progress: the user is on pace if weighted progress >= expected progress.
+	// Two signals: (1) linear timeline elapsed, (2) due-date-aware expected progress.
+	// The second signal prevents false-critical for projects with correctly back-loaded work.
+	onPace := input.ProgressPct > 0 &&
+		((input.TimeElapsedPct > 0 && input.ProgressPct >= input.TimeElapsedPct) ||
+			(input.DueBasedExpectedPct > 0 && input.ProgressPct >= input.DueBasedExpectedPct))
 
 	// No recent activity and work remains => critical (unless structurally on pace)
 	if input.RecentDailyMin == 0 && remaining > 0 {

@@ -8,4 +8,5 @@ type UserProfile struct {
 	WeightSpacing          float64
 	WeightVariation        float64
 	DefaultMaxSlices       int
+	BaselineDailyMin       int
 }

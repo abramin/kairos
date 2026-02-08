@@ -56,9 +56,11 @@ func DeterministicHelp(question string, commands []HelpCommandInfo) *HelpAnswer 
 	// Build the answer.
 	var answer strings.Builder
 	if len(glossaryHits) > 0 {
-		for _, g := range glossaryHits {
+		for i, g := range glossaryHits {
+			if i > 0 {
+				answer.WriteString("\n\n")
+			}
 			answer.WriteString(g)
-			answer.WriteString(" ")
 		}
 	}
 	if len(matches) > 0 {

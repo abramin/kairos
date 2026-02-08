@@ -62,7 +62,9 @@ func runWeeklyReview(app *App) error {
 
 	var explanation *intelligence.LLMExplanation
 	if app.Explain != nil {
+		stopSpinner := formatter.StartSpinner("Generating weekly review...")
 		explanation, err = app.Explain.WeeklyReview(ctx, trace)
+		stopSpinner()
 		if err != nil {
 			explanation = intelligence.DeterministicWeeklyReview(trace)
 		}

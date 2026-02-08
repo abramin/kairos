@@ -34,7 +34,9 @@ func newAskCmd(app *App) *cobra.Command {
 					"Enable with: KAIROS_LLM_ENABLED=true")
 			}
 
+			stopSpinner := formatter.StartSpinner("Thinking...")
 			resolution, err := app.Intent.Parse(context.Background(), args[0])
+			stopSpinner()
 			if err != nil {
 				if errors.Is(err, llm.ErrTimeout) {
 					return fmt.Errorf("parse failed: %w (set KAIROS_LLM_PARSE_TIMEOUT_MS, e.g. 15000)", err)

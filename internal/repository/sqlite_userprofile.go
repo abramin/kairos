@@ -20,7 +20,7 @@ func NewSQLiteUserProfileRepo(db *sql.DB) *SQLiteUserProfileRepo {
 
 func (r *SQLiteUserProfileRepo) Get(ctx context.Context) (*domain.UserProfile, error) {
 	query := `SELECT id, buffer_pct, weight_deadline_pressure, weight_behind_pace,
-		weight_spacing, weight_variation, default_max_slices
+		weight_spacing, weight_variation, default_max_slices, baseline_daily_min
 		FROM user_profile WHERE id = 'default'`
 	row := r.db.QueryRowContext(ctx, query)
 
@@ -33,6 +33,7 @@ func (r *SQLiteUserProfileRepo) Get(ctx context.Context) (*domain.UserProfile, e
 		&p.WeightSpacing,
 		&p.WeightVariation,
 		&p.DefaultMaxSlices,
+		&p.BaselineDailyMin,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -45,8 +46,8 @@ func (r *SQLiteUserProfileRepo) Get(ctx context.Context) (*domain.UserProfile, e
 
 func (r *SQLiteUserProfileRepo) Upsert(ctx context.Context, p *domain.UserProfile) error {
 	query := `INSERT OR REPLACE INTO user_profile (id, buffer_pct, weight_deadline_pressure,
-		weight_behind_pace, weight_spacing, weight_variation, default_max_slices)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`
+		weight_behind_pace, weight_spacing, weight_variation, default_max_slices, baseline_daily_min)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := r.db.ExecContext(ctx, query,
 		p.ID,
 		p.BufferPct,
@@ -55,6 +56,7 @@ func (r *SQLiteUserProfileRepo) Upsert(ctx context.Context, p *domain.UserProfil
 		p.WeightSpacing,
 		p.WeightVariation,
 		p.DefaultMaxSlices,
+		p.BaselineDailyMin,
 	)
 	if err != nil {
 		return fmt.Errorf("upserting user profile: %w", err)

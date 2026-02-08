@@ -210,6 +210,9 @@ var migrations = []string{
 	// Seed default user profile
 	`INSERT OR IGNORE INTO user_profile (id) VALUES ('default')`,
 
+	// Add baseline_daily_min to user_profile
+	`ALTER TABLE user_profile ADD COLUMN baseline_daily_min INTEGER NOT NULL DEFAULT 30`,
+
 	// Add short_id column to projects
 	`ALTER TABLE projects ADD COLUMN short_id TEXT NOT NULL DEFAULT ''`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_short_id ON projects(short_id) WHERE short_id != ''`,
