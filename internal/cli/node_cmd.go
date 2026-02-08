@@ -82,12 +82,17 @@ func newNodeInspectCmd(app *App) *cobra.Command {
 			if err != nil {
 				return err
 			}
+			projectDisplayID := formatter.TruncID(n.ProjectID)
+			project, err := app.Projects.GetByID(ctx, n.ProjectID)
+			if err == nil && strings.TrimSpace(project.ShortID) != "" {
+				projectDisplayID = formatter.Dim(project.ShortID)
+			}
 
 			var b strings.Builder
 
 			b.WriteString(fmt.Sprintf("%s  %s\n\n", formatter.Bold(n.Title), formatter.Dim(string(n.Kind))))
 			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("ID     "), formatter.TruncID(n.ID)))
-			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("PROJECT"), formatter.TruncID(n.ProjectID)))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("PROJECT"), projectDisplayID))
 			b.WriteString(fmt.Sprintf("  %s  %d\n", formatter.Dim("ORDER  "), n.OrderIndex))
 			if n.ParentID != nil {
 				b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("PARENT "), formatter.TruncID(*n.ParentID)))

@@ -31,3 +31,16 @@ func TestLoadConfig_InvalidTaskTimeoutOverrideIgnored(t *testing.T) {
 
 	assert.Equal(t, 10000, cfg.TaskTimeout(TaskParse))
 }
+
+func TestDefaultConfig_LogCallsDisabled(t *testing.T) {
+	cfg := DefaultConfig()
+	assert.False(t, cfg.LogCalls)
+}
+
+func TestLoadConfig_LogCallsOverride(t *testing.T) {
+	t.Setenv("KAIROS_LLM_LOG_CALLS", "true")
+
+	cfg := LoadConfig()
+
+	assert.True(t, cfg.LogCalls)
+}

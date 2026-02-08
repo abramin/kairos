@@ -10,6 +10,12 @@ import (
 
 // FormatWhatNow formats a WhatNowResponse into a styled CLI dashboard string.
 func FormatWhatNow(resp *contract.WhatNowResponse) string {
+	return FormatWhatNowWithProjectIDs(resp, nil)
+}
+
+// FormatWhatNowWithProjectIDs formats WhatNow output and replaces internal project IDs
+// with user-facing IDs when a map entry is available.
+func FormatWhatNowWithProjectIDs(resp *contract.WhatNowResponse, projectIDs map[string]string) string {
 	var b strings.Builder
 
 	// Mode indicator.
@@ -41,9 +47,9 @@ func FormatWhatNow(resp *contract.WhatNowResponse) string {
 			)
 			b.WriteString(titleLine + "\n")
 
-			// Project info with truncated ID.
+			// Project info with user-facing short ID when available.
 			if rec.ProjectID != "" {
-				b.WriteString(fmt.Sprintf("   %s\n", Dim(fmt.Sprintf("Project: %s", TruncID(rec.ProjectID)))))
+				b.WriteString(fmt.Sprintf("   %s %s\n", Dim("Project:"), renderProjectID(rec.ProjectID, projectIDs)))
 			}
 
 			// Due date with relative styling.
@@ -99,4 +105,13 @@ func FormatWhatNow(resp *contract.WhatNowResponse) string {
 	}
 
 	return RenderBox("Session Plan", b.String())
+}
+
+func renderProjectID(projectID string, projectIDs map[string]string) string {
+	if projectIDs != nil {
+		if displayID := strings.TrimSpace(projectIDs[projectID]); displayID != "" {
+			return StyleDim.Render(displayID)
+		}
+	}
+	return TruncID(projectID)
 }

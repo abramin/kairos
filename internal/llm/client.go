@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -188,6 +189,12 @@ func (c *ollamaClient) doRequest(ctx context.Context, body ollamaRequest) (*olla
 	var resp ollamaResponse
 	if err := json.Unmarshal(respBody, &resp); err != nil {
 		return nil, fmt.Errorf("decoding response: %w", err)
+	}
+	if strings.TrimSpace(resp.Response) == "" {
+		return nil, fmt.Errorf("decoding response: missing or empty response field")
+	}
+	if strings.TrimSpace(resp.Model) == "" {
+		resp.Model = c.cfg.Model
 	}
 
 	return &resp, nil

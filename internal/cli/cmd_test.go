@@ -3,6 +3,8 @@ package cli
 import (
 	"bytes"
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -251,4 +253,504 @@ func TestReviewWeeklyCmd_DeterministicFallback(t *testing.T) {
 	// review weekly uses deterministic fallback when LLM is nil — should not error.
 	_, err := executeCmd(t, app, "review", "weekly")
 	require.NoError(t, err)
+}
+
+// --- helpers for full-service tests ---
+
+// testAppFull wires an App with Templates and Import services.
+func testAppFull(t *testing.T) *App {
+	t.Helper()
+	db := testutil.NewTestDB(t)
+
+	projRepo := repository.NewSQLiteProjectRepo(db)
+	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
+	wiRepo := repository.NewSQLiteWorkItemRepo(db)
+	depRepo := repository.NewSQLiteDependencyRepo(db)
+	sessRepo := repository.NewSQLiteSessionRepo(db)
+	profRepo := repository.NewSQLiteUserProfileRepo(db)
+
+	templateDir := findTemplatesDir(t)
+
+	return &App{
+		Projects:  service.NewProjectService(projRepo),
+		Nodes:     service.NewNodeService(nodeRepo),
+		WorkItems: service.NewWorkItemService(wiRepo),
+		Sessions:  service.NewSessionService(sessRepo, wiRepo),
+		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo),
+		Status:    service.NewStatusService(projRepo, wiRepo, sessRepo, profRepo),
+		Replan:    service.NewReplanService(projRepo, wiRepo, sessRepo, profRepo),
+		Templates: service.NewTemplateService(templateDir, projRepo, nodeRepo, wiRepo, depRepo),
+		Import:    service.NewImportService(projRepo, nodeRepo, wiRepo, depRepo),
+	}
+}
+
+func findTemplatesDir(t *testing.T) string {
+	t.Helper()
+	dir, err := os.Getwd()
+	require.NoError(t, err)
+
+	for {
+		candidate := filepath.Join(dir, "templates")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Fatal("could not find templates directory")
+		}
+		dir = parent
+	}
+}
+
+// --- project commands ---
+
+func TestProjectAddCmd_Success(t *testing.T) {
+	app := testApp(t)
+
+	_, err := executeCmd(t, app, "project", "add",
+		"--id", "TST01",
+		"--name", "Test Project",
+		"--domain", "education",
+		"--start", "2026-01-15",
+	)
+	require.NoError(t, err)
+
+	projects, err := app.Projects.List(context.Background(), false)
+	require.NoError(t, err)
+	require.Len(t, projects, 1)
+	assert.Equal(t, "TST01", projects[0].ShortID)
+	assert.Equal(t, "Test Project", projects[0].Name)
+}
+
+func TestProjectAddCmd_WithDueDate(t *testing.T) {
+	app := testApp(t)
+
+	_, err := executeCmd(t, app, "project", "add",
+		"--id", "DUE01",
+		"--name", "Due Project",
+		"--domain", "fitness",
+		"--start", "2026-01-01",
+		"--due", "2026-06-01",
+	)
+	require.NoError(t, err)
+
+	projects, err := app.Projects.List(context.Background(), false)
+	require.NoError(t, err)
+	require.Len(t, projects, 1)
+	assert.NotNil(t, projects[0].TargetDate)
+}
+
+func TestProjectAddCmd_MissingRequiredFlags(t *testing.T) {
+	app := testApp(t)
+
+	_, err := executeCmd(t, app, "project", "add", "--name", "No ID")
+	assert.Error(t, err)
+}
+
+func TestProjectListCmd_Empty(t *testing.T) {
+	app := testApp(t)
+
+	_, err := executeCmd(t, app, "project", "list")
+	require.NoError(t, err)
+}
+
+func TestProjectListCmd_WithData(t *testing.T) {
+	app := testApp(t)
+	seedProjectWithWork(t, app)
+
+	_, err := executeCmd(t, app, "project", "list")
+	require.NoError(t, err)
+}
+
+func TestProjectInspectCmd_ByShortID(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Inspect Me", testutil.WithShortID("INS01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Module 1", testutil.WithNodeKind(domain.NodeModule))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	_, err := executeCmd(t, app, "project", "inspect", "INS01")
+	require.NoError(t, err)
+}
+
+func TestProjectInspectCmd_NotFound(t *testing.T) {
+	app := testApp(t)
+
+	_, err := executeCmd(t, app, "project", "inspect", "NOPE99")
+	assert.Error(t, err)
+}
+
+func TestProjectUpdateCmd_Name(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Original", testutil.WithShortID("UPD01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	_, err := executeCmd(t, app, "project", "update", "UPD01", "--name", "Renamed")
+	require.NoError(t, err)
+
+	updated, err := app.Projects.GetByID(ctx, proj.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Renamed", updated.Name)
+}
+
+func TestProjectUpdateCmd_Status(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Pausable", testutil.WithShortID("PAU01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	_, err := executeCmd(t, app, "project", "update", "PAU01", "--status", "paused")
+	require.NoError(t, err)
+
+	updated, err := app.Projects.GetByID(ctx, proj.ID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.ProjectPaused, updated.Status)
+}
+
+func TestProjectArchiveCmd_Success(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Archivable", testutil.WithShortID("ARC01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	_, err := executeCmd(t, app, "project", "archive", "ARC01")
+	require.NoError(t, err)
+
+	// Archived projects should not appear in default list.
+	projects, err := app.Projects.List(ctx, false)
+	require.NoError(t, err)
+	assert.Empty(t, projects)
+
+	// But should appear with --all.
+	all, err := app.Projects.List(ctx, true)
+	require.NoError(t, err)
+	assert.Len(t, all, 1)
+}
+
+func TestProjectUnarchiveCmd_Success(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Restorable", testutil.WithShortID("RES01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	_, err := executeCmd(t, app, "project", "archive", "RES01")
+	require.NoError(t, err)
+
+	_, err = executeCmd(t, app, "project", "unarchive", "RES01")
+	require.NoError(t, err)
+
+	projects, err := app.Projects.List(ctx, false)
+	require.NoError(t, err)
+	assert.Len(t, projects, 1)
+}
+
+func TestProjectRemoveCmd_ForceDelete(t *testing.T) {
+	app := testApp(t)
+	projID, _ := seedProjectWithWork(t, app)
+
+	_, err := executeCmd(t, app, "project", "remove", projID, "--force")
+	require.NoError(t, err)
+
+	projects, err := app.Projects.List(context.Background(), true)
+	require.NoError(t, err)
+	assert.Empty(t, projects)
+}
+
+func TestProjectRemoveCmd_NotFound(t *testing.T) {
+	app := testApp(t)
+
+	_, err := executeCmd(t, app, "project", "remove", "nonexistent-id")
+	assert.Error(t, err)
+}
+
+// --- node commands ---
+
+func TestNodeAddCmd_Success(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Node Host", testutil.WithShortID("NOD01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	_, err := executeCmd(t, app, "node", "add",
+		"--project", proj.ID,
+		"--title", "Week 1",
+		"--kind", "week",
+	)
+	require.NoError(t, err)
+
+	nodes, err := app.Nodes.ListRoots(ctx, proj.ID)
+	require.NoError(t, err)
+	require.Len(t, nodes, 1)
+	assert.Equal(t, "Week 1", nodes[0].Title)
+	assert.Equal(t, domain.NodeWeek, nodes[0].Kind)
+}
+
+func TestNodeAddCmd_MissingRequiredFlags(t *testing.T) {
+	app := testApp(t)
+
+	_, err := executeCmd(t, app, "node", "add", "--title", "No Project")
+	assert.Error(t, err)
+}
+
+func TestNodeInspectCmd_Success(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Inspect Node", testutil.WithShortID("NIN01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Module A", testutil.WithNodeKind(domain.NodeModule))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	_, err := executeCmd(t, app, "node", "inspect", node.ID)
+	require.NoError(t, err)
+}
+
+func TestNodeUpdateCmd_Title(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Update Node", testutil.WithShortID("NUP01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Old Title", testutil.WithNodeKind(domain.NodeWeek))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	_, err := executeCmd(t, app, "node", "update", node.ID, "--title", "New Title")
+	require.NoError(t, err)
+
+	updated, err := app.Nodes.GetByID(ctx, node.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "New Title", updated.Title)
+}
+
+func TestNodeRemoveCmd_Success(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Remove Node", testutil.WithShortID("NRM01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Deletable", testutil.WithNodeKind(domain.NodeGeneric))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	_, err := executeCmd(t, app, "node", "remove", node.ID)
+	require.NoError(t, err)
+
+	_, err = app.Nodes.GetByID(ctx, node.ID)
+	assert.Error(t, err)
+}
+
+// --- work item commands ---
+
+func TestWorkAddCmd_Success(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Work Host", testutil.WithShortID("WRK01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Week 1", testutil.WithNodeKind(domain.NodeWeek))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	_, err := executeCmd(t, app, "work", "add",
+		"--node", node.ID,
+		"--title", "Read Chapter 1",
+		"--type", "reading",
+		"--planned-min", "45",
+	)
+	require.NoError(t, err)
+
+	items, err := app.WorkItems.ListByNode(ctx, node.ID)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "Read Chapter 1", items[0].Title)
+	assert.Equal(t, 45, items[0].PlannedMin)
+}
+
+func TestWorkAddCmd_MissingRequiredFlags(t *testing.T) {
+	app := testApp(t)
+
+	_, err := executeCmd(t, app, "work", "add", "--title", "No Node")
+	assert.Error(t, err)
+}
+
+func TestWorkInspectCmd_Success(t *testing.T) {
+	app := testApp(t)
+	_, wiID := seedProjectWithWork(t, app)
+
+	_, err := executeCmd(t, app, "work", "inspect", wiID)
+	require.NoError(t, err)
+}
+
+func TestWorkDoneCmd_Success(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+	_, wiID := seedProjectWithWork(t, app)
+
+	_, err := executeCmd(t, app, "work", "done", wiID)
+	require.NoError(t, err)
+
+	wi, err := app.WorkItems.GetByID(ctx, wiID)
+	require.NoError(t, err)
+	assert.Equal(t, domain.WorkItemDone, wi.Status)
+}
+
+func TestWorkDoneCmd_NotFound(t *testing.T) {
+	app := testApp(t)
+
+	_, err := executeCmd(t, app, "work", "done", "nonexistent-id")
+	assert.Error(t, err)
+}
+
+func TestWorkArchiveCmd_Success(t *testing.T) {
+	app := testApp(t)
+	_, wiID := seedProjectWithWork(t, app)
+
+	_, err := executeCmd(t, app, "work", "archive", wiID)
+	require.NoError(t, err)
+}
+
+func TestWorkUpdateCmd_PlannedMin(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+	_, wiID := seedProjectWithWork(t, app)
+
+	_, err := executeCmd(t, app, "work", "update", wiID, "--planned-min", "120")
+	require.NoError(t, err)
+
+	wi, err := app.WorkItems.GetByID(ctx, wiID)
+	require.NoError(t, err)
+	assert.Equal(t, 120, wi.PlannedMin)
+}
+
+func TestWorkRemoveCmd_Success(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+	_, wiID := seedProjectWithWork(t, app)
+
+	_, err := executeCmd(t, app, "work", "remove", wiID)
+	require.NoError(t, err)
+
+	_, err = app.WorkItems.GetByID(ctx, wiID)
+	assert.Error(t, err)
+}
+
+// --- project import command ---
+
+func TestProjectImportCmd_Success(t *testing.T) {
+	app := testAppFull(t)
+
+	importJSON := `{
+		"project": {
+			"short_id": "IMP01",
+			"name": "Imported Project",
+			"domain": "education",
+			"start_date": "2026-01-15"
+		},
+		"nodes": [
+			{"ref": "n1", "title": "Chapter 1", "kind": "module", "order": 0}
+		],
+		"work_items": [
+			{"ref": "w1", "node_ref": "n1", "title": "Read Ch1", "type": "reading", "planned_min": 45}
+		]
+	}`
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "import.json")
+	require.NoError(t, os.WriteFile(path, []byte(importJSON), 0644))
+
+	_, err := executeCmd(t, app, "project", "import", path)
+	require.NoError(t, err)
+
+	projects, err := app.Projects.List(context.Background(), false)
+	require.NoError(t, err)
+	require.Len(t, projects, 1)
+	assert.Equal(t, "IMP01", projects[0].ShortID)
+}
+
+func TestProjectImportCmd_InvalidJSON(t *testing.T) {
+	app := testAppFull(t)
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "bad.json")
+	require.NoError(t, os.WriteFile(path, []byte("not json"), 0644))
+
+	_, err := executeCmd(t, app, "project", "import", path)
+	assert.Error(t, err)
+}
+
+func TestProjectImportCmd_FileNotFound(t *testing.T) {
+	app := testAppFull(t)
+
+	_, err := executeCmd(t, app, "project", "import", "/nonexistent/path.json")
+	assert.Error(t, err)
+}
+
+// --- project init command ---
+
+func TestProjectInitCmd_Success(t *testing.T) {
+	app := testAppFull(t)
+
+	_, err := executeCmd(t, app, "project", "init",
+		"--id", "INI01",
+		"--template", "course_weekly_generic",
+		"--name", "Init Test",
+		"--start", "2026-02-10",
+		"--var", "weeks=2",
+		"--var", "assignment_count=1",
+	)
+	require.NoError(t, err)
+
+	projects, err := app.Projects.List(context.Background(), false)
+	require.NoError(t, err)
+	require.Len(t, projects, 1)
+	assert.Equal(t, "INI01", projects[0].ShortID)
+	assert.Equal(t, "Init Test", projects[0].Name)
+}
+
+func TestProjectInitCmd_MissingRequiredFlags(t *testing.T) {
+	app := testAppFull(t)
+
+	_, err := executeCmd(t, app, "project", "init", "--name", "No Template")
+	assert.Error(t, err)
+}
+
+// --- template commands ---
+
+func TestTemplateListCmd_Success(t *testing.T) {
+	app := testAppFull(t)
+
+	_, err := executeCmd(t, app, "template", "list")
+	require.NoError(t, err)
+}
+
+func TestTemplateShowCmd_Success(t *testing.T) {
+	app := testAppFull(t)
+
+	_, err := executeCmd(t, app, "template", "show", "course_weekly_generic")
+	require.NoError(t, err)
+}
+
+func TestTemplateShowCmd_NotFound(t *testing.T) {
+	app := testAppFull(t)
+
+	_, err := executeCmd(t, app, "template", "show", "nonexistent_template")
+	assert.Error(t, err)
+}
+
+func TestTemplateDraftCmd_LLMDisabled(t *testing.T) {
+	app := testAppFull(t)
+
+	_, err := executeCmd(t, app, "template", "draft", "a study plan for calculus")
+	assert.Error(t, err)
 }

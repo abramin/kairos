@@ -27,6 +27,12 @@ func (s *workItemService) Create(ctx context.Context, w *domain.WorkItem) error 
 	if w.Status == "" {
 		w.Status = domain.WorkItemTodo
 	}
+	if w.DurationMode == "" {
+		w.DurationMode = domain.DurationEstimate
+	}
+	if w.DurationSource == "" {
+		w.DurationSource = domain.SourceManual
+	}
 	return s.workItems.Create(ctx, w)
 }
 

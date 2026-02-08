@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -39,34 +39,32 @@ Examples:
 					"Enable with: KAIROS_LLM_ENABLED=true")
 			}
 
-			scanner := bufio.NewScanner(os.Stdin)
-
 			var description string
 			if len(args) > 0 {
 				description = args[0]
 			} else {
 				var err error
-				description, err = gatherProjectInfo(scanner)
+				description, err = gatherProjectInfo(os.Stdin)
 				if err != nil {
 					return err
 				}
 			}
 
-			return runProjectDraftLoop(app, scanner, description)
+			return runProjectDraftLoop(app, os.Stdin, description)
 		},
 	}
 	return cmd
 }
 
-func gatherProjectInfo(scanner *bufio.Scanner) (string, error) {
+func gatherProjectInfo(in io.Reader) (string, error) {
 	fmt.Print(formatter.FormatDraftWelcome())
 
 	// Question 1: Project description (required).
 	fmt.Print("  Describe your project:\n  > ")
-	if !scanner.Scan() {
+	description, err := readDraftLine(in)
+	if err != nil {
 		return "", fmt.Errorf("input cancelled")
 	}
-	description := strings.TrimSpace(scanner.Text())
 	if description == "" {
 		return "", fmt.Errorf("project description is required")
 	}
@@ -74,8 +72,7 @@ func gatherProjectInfo(scanner *bufio.Scanner) (string, error) {
 	// Question 2: Start date (optional, defaults to today).
 	fmt.Print("\n  When do you want to start? (YYYY-MM-DD, or Enter for today)\n  > ")
 	startDate := time.Now().Format("2006-01-02")
-	if scanner.Scan() {
-		input := strings.TrimSpace(scanner.Text())
+	if input, err := readDraftLine(in); err == nil {
 		if input != "" {
 			if _, err := time.Parse("2006-01-02", input); err != nil {
 				fmt.Fprintf(os.Stderr, "  Invalid date format, using today.\n")
@@ -88,8 +85,7 @@ func gatherProjectInfo(scanner *bufio.Scanner) (string, error) {
 	// Question 3: Deadline (optional).
 	fmt.Print("\n  When is the deadline? (YYYY-MM-DD, or Enter to skip)\n  > ")
 	var deadline string
-	if scanner.Scan() {
-		input := strings.TrimSpace(scanner.Text())
+	if input, err := readDraftLine(in); err == nil {
 		if input != "" {
 			if _, err := time.Parse("2006-01-02", input); err != nil {
 				fmt.Fprintf(os.Stderr, "  Invalid date format, skipping deadline.\n")
@@ -102,8 +98,8 @@ func gatherProjectInfo(scanner *bufio.Scanner) (string, error) {
 	// Question 4: Structure hint (optional).
 	fmt.Print("\n  How is the work organized? (e.g., \"5 chapters with reading + exercises each\")\n  > ")
 	var structure string
-	if scanner.Scan() {
-		structure = strings.TrimSpace(scanner.Text())
+	if input, err := readDraftLine(in); err == nil {
+		structure = input
 	}
 
 	// Bundle into a rich description string.
@@ -125,7 +121,7 @@ func gatherProjectInfo(scanner *bufio.Scanner) (string, error) {
 	return b.String(), nil
 }
 
-func runProjectDraftLoop(app *App, scanner *bufio.Scanner, description string) error {
+func runProjectDraftLoop(app *App, in io.Reader, description string) error {
 	ctx := context.Background()
 
 	// Start the conversation.
@@ -142,10 +138,13 @@ func runProjectDraftLoop(app *App, scanner *bufio.Scanner, description string) e
 			fmt.Print(formatter.FormatDraftReview(conv))
 			fmt.Print("\n[a]ccept  [e]dit  [c]ancel: ")
 
-			if !scanner.Scan() {
-				return nil
+			input, err := readDraftLine(in)
+			if err != nil {
+				if err == io.EOF {
+					return nil
+				}
+				return err
 			}
-			input := strings.TrimSpace(scanner.Text())
 
 			switch strings.ToLower(input) {
 			case "a", "accept":
@@ -156,10 +155,13 @@ func runProjectDraftLoop(app *App, scanner *bufio.Scanner, description string) e
 			case "e", "edit":
 				conv.Status = intelligence.DraftStatusGathering
 				fmt.Print("What would you like to change?\n> ")
-				if !scanner.Scan() {
-					return nil
+				editMsg, err := readDraftLine(in)
+				if err != nil {
+					if err == io.EOF {
+						return nil
+					}
+					return err
 				}
-				editMsg := strings.TrimSpace(scanner.Text())
 				if editMsg == "" {
 					continue
 				}
@@ -184,10 +186,13 @@ func runProjectDraftLoop(app *App, scanner *bufio.Scanner, description string) e
 
 		// Read user input.
 		fmt.Print("> ")
-		if !scanner.Scan() {
-			return nil
+		input, err := readDraftLine(in)
+		if err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
 		}
-		input := strings.TrimSpace(scanner.Text())
 		if input == "" {
 			continue
 		}
@@ -216,6 +221,14 @@ func runProjectDraftLoop(app *App, scanner *bufio.Scanner, description string) e
 		}
 		fmt.Print(formatter.FormatDraftTurn(conv))
 	}
+}
+
+func readDraftLine(in io.Reader) (string, error) {
+	line, err := readPromptLine(in)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(line), nil
 }
 
 func acceptDraft(app *App, ctx context.Context, conv *intelligence.DraftConversation) error {

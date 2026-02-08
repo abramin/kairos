@@ -68,7 +68,7 @@ func FormatAskResolution(r *intelligence.AskResolution) string {
 	case intelligence.StateExecuted:
 		b.WriteString(StyleGreen.Render("  Auto-executing (read-only, high confidence)"))
 	case intelligence.StateNeedsConfirmation:
-		b.WriteString(StyleYellow.Render("  Requires confirmation. Proceed? [y/N]"))
+		b.WriteString(StyleYellow.Render("  Requires confirmation. Proceed? [Y/n]"))
 	case intelligence.StateNeedsClarification:
 		b.WriteString(StyleYellow.Render("  Low confidence. Did you mean:"))
 		b.WriteString("\n")

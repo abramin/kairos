@@ -13,6 +13,7 @@ const (
 	TaskExplain       TaskType = "explain"
 	TaskTemplateDraft TaskType = "template_draft"
 	TaskProjectDraft  TaskType = "project_draft"
+	TaskHelp          TaskType = "help"
 )
 
 // TaskConfig holds per-task LLM parameters.
@@ -25,6 +26,7 @@ type TaskConfig struct {
 // LLMConfig holds all configuration for the LLM subsystem.
 type LLMConfig struct {
 	Enabled             bool
+	LogCalls            bool
 	Endpoint            string
 	Model               string
 	TimeoutMs           int
@@ -38,6 +40,7 @@ type LLMConfig struct {
 func DefaultConfig() LLMConfig {
 	return LLMConfig{
 		Enabled:             false,
+		LogCalls:            false,
 		Endpoint:            "http://localhost:11434",
 		Model:               "llama3.2",
 		TimeoutMs:           10000,
@@ -48,6 +51,7 @@ func DefaultConfig() LLMConfig {
 			TaskExplain:       {Temperature: 0.3, MaxTokens: 1024, TimeoutMs: 6000},
 			TaskTemplateDraft: {Temperature: 0.2, MaxTokens: 2048, TimeoutMs: 8000},
 			TaskProjectDraft:  {Temperature: 0.3, MaxTokens: 4096, TimeoutMs: 30000},
+			TaskHelp:          {Temperature: 0.2, MaxTokens: 1024, TimeoutMs: 8000},
 		},
 	}
 }
@@ -59,6 +63,9 @@ func LoadConfig() LLMConfig {
 
 	if v := os.Getenv("KAIROS_LLM_ENABLED"); v != "" {
 		cfg.Enabled, _ = strconv.ParseBool(v)
+	}
+	if v := os.Getenv("KAIROS_LLM_LOG_CALLS"); v != "" {
+		cfg.LogCalls, _ = strconv.ParseBool(v)
 	}
 	if v := os.Getenv("KAIROS_LLM_ENDPOINT"); v != "" {
 		cfg.Endpoint = v
@@ -86,6 +93,7 @@ func LoadConfig() LLMConfig {
 	applyTaskTimeoutEnv(&cfg, TaskExplain, "KAIROS_LLM_EXPLAIN_TIMEOUT_MS")
 	applyTaskTimeoutEnv(&cfg, TaskTemplateDraft, "KAIROS_LLM_TEMPLATE_DRAFT_TIMEOUT_MS")
 	applyTaskTimeoutEnv(&cfg, TaskProjectDraft, "KAIROS_LLM_PROJECT_DRAFT_TIMEOUT_MS")
+	applyTaskTimeoutEnv(&cfg, TaskHelp, "KAIROS_LLM_HELP_TIMEOUT_MS")
 
 	return cfg
 }

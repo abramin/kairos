@@ -234,6 +234,55 @@ func TestOllamaClient_ObserverTimeoutErrorCode(t *testing.T) {
 	assert.Equal(t, "TIMEOUT", captured.ErrorCode)
 }
 
+func TestOllamaClient_Generate_ParsesRealisticOllamaEnvelope(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{
+			"model":"llama3.2",
+			"created_at":"2026-02-08T12:00:00Z",
+			"response":"{\"intent\":\"status\"}",
+			"done":true,
+			"done_reason":"stop",
+			"context":[1,2,3],
+			"total_duration":1234567,
+			"load_duration":12345,
+			"prompt_eval_count":23,
+			"eval_count":15
+		}`))
+	}))
+	defer srv.Close()
+
+	client := NewOllamaClient(testConfig(srv.URL), NoopObserver{})
+	resp, err := client.Generate(context.Background(), GenerateRequest{
+		Task:       TaskParse,
+		UserPrompt: "status",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "llama3.2", resp.Model)
+	assert.Equal(t, `{"intent":"status"}`, resp.Text)
+}
+
+func TestOllamaClient_Generate_MissingResponseField(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"model":"llama3.2","done":true}`))
+	}))
+	defer srv.Close()
+
+	cfg := testConfig(srv.URL)
+	cfg.MaxRetries = 0
+
+	client := NewOllamaClient(cfg, NoopObserver{})
+	_, err := client.Generate(context.Background(), GenerateRequest{
+		Task:       TaskParse,
+		UserPrompt: "status",
+	})
+
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrRetryExhausted)
+}
+
 type captureObserver struct {
 	fn func(LLMCallEvent)
 }

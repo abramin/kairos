@@ -64,7 +64,7 @@ func runExplainNow(app *App, minutes int) error {
 		explanation = intelligence.DeterministicExplainNow(trace)
 	}
 
-	fmt.Print(formatter.FormatWhatNow(resp))
+	fmt.Print(formatWhatNowResponse(ctx, app, resp))
 	fmt.Println()
 	fmt.Print(formatter.FormatExplanation(explanation))
 	return nil

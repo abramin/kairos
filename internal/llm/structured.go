@@ -21,6 +21,7 @@ func ExtractJSON[T any](raw string, validator SchemaValidator[T]) (T, error) {
 	if jsonStr == "" {
 		return zero, fmt.Errorf("%w: no JSON object found in response", ErrInvalidOutput)
 	}
+	jsonStr = normalizeLeadingDecimalNumbers(jsonStr)
 
 	var result T
 	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
@@ -103,4 +104,72 @@ func extractJSONBlock(s string) string {
 	}
 
 	return ""
+}
+
+// normalizeLeadingDecimalNumbers rewrites invalid JSON numeric literals such as
+// ".8" or "-.3" into valid forms "0.8" and "-0.3" outside string values.
+func normalizeLeadingDecimalNumbers(s string) string {
+	var b strings.Builder
+	b.Grow(len(s) + 8)
+
+	inString := false
+	escaped := false
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+
+		if escaped {
+			b.WriteByte(c)
+			escaped = false
+			continue
+		}
+
+		if c == '\\' && inString {
+			b.WriteByte(c)
+			escaped = true
+			continue
+		}
+
+		if c == '"' {
+			b.WriteByte(c)
+			inString = !inString
+			continue
+		}
+
+		if inString {
+			b.WriteByte(c)
+			continue
+		}
+
+		// JSON does not allow ".5" or "-.5". Some models emit these forms.
+		if c == '.' && i+1 < len(s) && isDigit(s[i+1]) && isNumericBoundary(prevNonSpace(s, i-1)) {
+			b.WriteByte('0')
+		}
+
+		b.WriteByte(c)
+	}
+
+	return b.String()
+}
+
+func prevNonSpace(s string, i int) byte {
+	for ; i >= 0; i-- {
+		if s[i] != ' ' && s[i] != '\n' && s[i] != '\r' && s[i] != '\t' {
+			return s[i]
+		}
+	}
+	return 0
+}
+
+func isNumericBoundary(c byte) bool {
+	switch c {
+	case 0, ':', ',', '[', '{', '-':
+		return true
+	default:
+		return false
+	}
+}
+
+func isDigit(c byte) bool {
+	return c >= '0' && c <= '9'
 }

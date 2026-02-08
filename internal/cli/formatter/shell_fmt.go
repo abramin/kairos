@@ -28,6 +28,7 @@ func FormatShellHelp() string {
 		{"inspect [id]", "Show project details and plan tree"},
 		{"status", "Show project status overview"},
 		{"what-now [min]", "Get session recommendations (default: 60 min)"},
+		{"help chat [question]", "Open interactive help chat or ask one-shot"},
 		{"clear", "Clear the screen"},
 		{"help", "Show this help message"},
 		{"exit", "Quit the shell"},

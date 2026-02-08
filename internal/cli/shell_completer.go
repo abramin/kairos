@@ -52,6 +52,12 @@ func (c *shellProjectCache) get(app *App) []*domain.Project {
 
 func (s *shellSession) completer(d prompt.Document) []prompt.Suggest {
 	text := d.TextBeforeCursor()
+	if s.helpChatMode {
+		return prompt.FilterHasPrefix([]prompt.Suggest{
+			{Text: "/commands", Description: "List all available commands"},
+			{Text: "/quit", Description: "Exit help chat and return to shell"},
+		}, d.GetWordBeforeCursor(), true)
+	}
 	if text == "" {
 		return nil
 	}
@@ -68,6 +74,10 @@ func (s *shellSession) completer(d prompt.Document) []prompt.Suggest {
 	switch cmd {
 	case "use", "inspect":
 		return s.projectSuggestions(d.GetWordBeforeCursor())
+	case "help":
+		return prompt.FilterHasPrefix([]prompt.Suggest{
+			{Text: "chat", Description: "Interactive LLM-powered help"},
+		}, d.GetWordBeforeCursor(), true)
 	case "what-now":
 		return prompt.FilterHasPrefix([]prompt.Suggest{
 			{Text: "30", Description: "30 minutes"},

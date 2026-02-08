@@ -10,6 +10,7 @@ import (
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/domain"
+	"github.com/alexanderramin/kairos/internal/intelligence"
 	prompt "github.com/c-bata/go-prompt"
 	"github.com/spf13/cobra"
 )
@@ -21,6 +22,10 @@ type shellSession struct {
 	activeShortID     string
 	activeProjectName string
 	cache             *shellProjectCache
+	helpChatMode      bool
+	helpSpecJSON      string
+	helpCmdInfos      []intelligence.HelpCommandInfo
+	helpConv          *intelligence.HelpConversation
 }
 
 func newShellCmd(app *App) *cobra.Command {
@@ -63,6 +68,9 @@ func runShell(app *App) error {
 }
 
 func (s *shellSession) livePrefix() (string, bool) {
+	if s.helpChatMode {
+		return "help> ", true
+	}
 	if s.activeProjectID == "" {
 		return "kairos ❯ ", true
 	}
@@ -74,8 +82,16 @@ func (s *shellSession) executor(input string) {
 	if input == "" {
 		return
 	}
+	if s.helpChatMode {
+		s.execHelpChatTurn(input)
+		return
+	}
 
-	parts := strings.Fields(input)
+	parts, err := splitShellArgs(input)
+	if err != nil {
+		fmt.Println(formatter.StyleRed.Render(fmt.Sprintf("Error: %v", err)))
+		return
+	}
 	cmd := strings.ToLower(parts[0])
 	args := parts[1:]
 
@@ -93,7 +109,11 @@ func (s *shellSession) executor(input string) {
 	case "clear":
 		s.execClear()
 	case "help":
-		s.execHelp()
+		if len(args) > 0 && args[0] == "chat" {
+			s.execHelpChat(args[1:])
+		} else {
+			s.execHelp()
+		}
 	case "exit", "quit":
 		fmt.Println(formatter.Dim("Goodbye."))
 		os.Exit(0)
@@ -102,6 +122,85 @@ func (s *shellSession) executor(input string) {
 	default:
 		s.execCobra(parts)
 	}
+}
+
+func splitShellArgs(input string) ([]string, error) {
+	var parts []string
+	var cur strings.Builder
+
+	inSingle := false
+	inDouble := false
+	escaped := false
+	tokenStarted := false
+
+	flush := func() {
+		parts = append(parts, cur.String())
+		cur.Reset()
+		tokenStarted = false
+	}
+
+	for _, r := range input {
+		if escaped {
+			cur.WriteRune(r)
+			tokenStarted = true
+			escaped = false
+			continue
+		}
+
+		if inSingle {
+			if r == '\'' {
+				inSingle = false
+			} else {
+				cur.WriteRune(r)
+			}
+			tokenStarted = true
+			continue
+		}
+
+		if inDouble {
+			switch r {
+			case '"':
+				inDouble = false
+			case '\\':
+				escaped = true
+			default:
+				cur.WriteRune(r)
+			}
+			tokenStarted = true
+			continue
+		}
+
+		switch r {
+		case '\\':
+			escaped = true
+			tokenStarted = true
+		case '\'':
+			inSingle = true
+			tokenStarted = true
+		case '"':
+			inDouble = true
+			tokenStarted = true
+		case ' ', '\t', '\n', '\r':
+			if tokenStarted {
+				flush()
+			}
+		default:
+			cur.WriteRune(r)
+			tokenStarted = true
+		}
+	}
+
+	if escaped {
+		return nil, fmt.Errorf("unterminated escape sequence")
+	}
+	if inSingle || inDouble {
+		return nil, fmt.Errorf("unterminated quoted string")
+	}
+	if tokenStarted {
+		flush()
+	}
+
+	return parts, nil
 }
 
 func (s *shellSession) execProjects() {
@@ -149,7 +248,7 @@ func (s *shellSession) execUse(args []string) {
 
 	fmt.Printf("Active project: %s %s\n",
 		formatter.Bold(project.Name),
-		formatter.TruncID(project.ID),
+		formatter.Dim(s.activeShortID),
 	)
 }
 
@@ -255,19 +354,48 @@ func (s *shellSession) execWhatNow(args []string) {
 		fmt.Println(formatter.StyleRed.Render(fmt.Sprintf("Error: %v", err)))
 		return
 	}
-	fmt.Print(formatter.FormatWhatNow(resp))
+	fmt.Print(formatWhatNowResponse(ctx, s.app, resp))
 }
 
 // execCobra passes unrecognized input through to the full Cobra command tree,
 // giving the shell access to all CLI commands (project add, node, work, session, etc.).
 func (s *shellSession) execCobra(args []string) {
 	root := NewRootCmd(s.app)
-	root.SetArgs(args)
+	root.SetArgs(prepareShellCobraArgs(args))
 	root.SilenceUsage = true
 	root.SilenceErrors = true
 	if err := root.Execute(); err != nil {
 		fmt.Println(formatter.StyleRed.Render(fmt.Sprintf("Error: %v", err)))
 	}
+}
+
+// prepareShellCobraArgs adjusts command args for shell-mode compatibility.
+func prepareShellCobraArgs(args []string) []string {
+	if len(args) == 0 {
+		return args
+	}
+	if !strings.EqualFold(args[0], "ask") {
+		return args
+	}
+	if hasAnyArg(args, "--yes", "-y", "--help", "-h") {
+		return args
+	}
+
+	out := make([]string, 0, len(args)+1)
+	out = append(out, args...)
+	out = append(out, "--yes")
+	return out
+}
+
+func hasAnyArg(args []string, wanted ...string) bool {
+	for _, arg := range args {
+		for _, w := range wanted {
+			if arg == w {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (s *shellSession) execClear() {
@@ -276,4 +404,62 @@ func (s *shellSession) execClear() {
 
 func (s *shellSession) execHelp() {
 	fmt.Print(formatter.FormatShellHelp())
+}
+
+func (s *shellSession) execHelpChat(args []string) {
+	s.ensureHelpContext()
+
+	if len(args) > 0 {
+		question := strings.Join(args, " ")
+		answer := resolveHelpAnswer(s.app, question, s.helpSpecJSON, s.helpCmdInfos)
+		fmt.Print(formatter.FormatHelpAnswer(answer))
+		return
+	}
+
+	s.helpChatMode = true
+	s.helpConv = nil
+	fmt.Print(formatter.FormatHelpChatWelcome())
+}
+
+func (s *shellSession) ensureHelpContext() {
+	if s.helpSpecJSON != "" && len(s.helpCmdInfos) > 0 {
+		return
+	}
+
+	root := NewRootCmd(s.app)
+	spec := s.app.getCommandSpec(root)
+	s.helpSpecJSON = SerializeCommandSpec(spec)
+	s.helpCmdInfos = buildHelpCommandInfos(spec)
+}
+
+func (s *shellSession) execHelpChatTurn(input string) {
+	switch strings.ToLower(strings.TrimSpace(input)) {
+	case "/quit", "/exit", "/q", "quit", "exit":
+		s.helpChatMode = false
+		s.helpConv = nil
+		return
+	case "/commands":
+		fmt.Print(formatter.FormatCommandList(s.helpCmdInfos))
+		return
+	}
+
+	if s.app.Help != nil {
+		var answer *intelligence.HelpAnswer
+		var err error
+
+		if s.helpConv == nil {
+			s.helpConv, answer, err = s.app.Help.StartChat(context.Background(), input, s.helpSpecJSON)
+		} else {
+			answer, err = s.app.Help.NextTurn(context.Background(), s.helpConv, input)
+		}
+
+		if err != nil {
+			answer = intelligence.DeterministicHelp(input, s.helpCmdInfos)
+		}
+		fmt.Print(formatter.FormatHelpAnswer(answer))
+		return
+	}
+
+	answer := intelligence.DeterministicHelp(input, s.helpCmdInfos)
+	fmt.Print(formatter.FormatHelpAnswer(answer))
 }

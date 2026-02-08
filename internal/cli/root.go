@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"sync"
 
-	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/intelligence"
 	"github.com/alexanderramin/kairos/internal/service"
@@ -30,6 +30,11 @@ type App struct {
 	Explain       intelligence.ExplainService
 	TemplateDraft intelligence.TemplateDraftService
 	ProjectDraft  intelligence.ProjectDraftService
+	Help          intelligence.HelpService
+
+	// Cached command spec (populated lazily by getCommandSpec).
+	cmdSpec     *CommandSpec
+	cmdSpecOnce sync.Once
 }
 
 // NewRootCmd creates the top-level "kairos" command and registers all
@@ -55,7 +60,7 @@ Quick usage: kairos <minutes> is shorthand for kairos what-now --minutes <minute
 			if err != nil {
 				return err
 			}
-			fmt.Print(formatter.FormatWhatNow(resp))
+			fmt.Print(formatWhatNowResponse(context.Background(), app, resp))
 			return nil
 		},
 	}
@@ -76,5 +81,17 @@ Quick usage: kairos <minutes> is shorthand for kairos what-now --minutes <minute
 		newReviewCmd(app),
 	)
 
+	// Replace Cobra's auto-generated help command with our custom one
+	// that adds `help chat` while preserving default help behavior.
+	root.SetHelpCommand(newHelpCmd(app, root))
+
 	return root
+}
+
+// getCommandSpec lazily builds and caches the CommandSpec from the Cobra tree.
+func (a *App) getCommandSpec(root *cobra.Command) *CommandSpec {
+	a.cmdSpecOnce.Do(func() {
+		a.cmdSpec = BuildCommandSpec(root)
+	})
+	return a.cmdSpec
 }

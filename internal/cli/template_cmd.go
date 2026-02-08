@@ -1,13 +1,11 @@
 package cli
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/spf13/cobra"
@@ -93,11 +91,7 @@ func newTemplateDraftCmd(app *App) *cobra.Command {
 				return nil
 			}
 
-			fmt.Print("Save this template? [y/N]: ")
-			reader := bufio.NewReader(os.Stdin)
-			text, _ := reader.ReadString('\n')
-			text = strings.TrimSpace(strings.ToLower(text))
-			if text != "y" && text != "yes" {
+			if !promptYesNo("Save this template? [y/N]: ") {
 				fmt.Println("Discarded.")
 				return nil
 			}

@@ -39,7 +39,8 @@ CRITICAL RULES:
 2. Never invent project or work item IDs; use text names as-is
 3. If the user mentions time/minutes, likely intent is what_now
 4. If unsure, set confidence low and provide 2-3 clarification_options
-5. Output ONLY the JSON object, no markdown, no explanation`
+5. Use strict JSON numeric literals (e.g., 0.85, never .85)
+6. Output ONLY the JSON object, no markdown, no explanation`
 
 // explainNowSystemPrompt instructs the LLM to narrate scheduling recommendations.
 const explainNowSystemPrompt = `You are an explanation engine for a project planner called Kairos.

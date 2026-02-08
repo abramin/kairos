@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/testutil"
@@ -103,4 +104,47 @@ func TestLogSession_TriggersReEstimation(t *testing.T) {
 	assert.Equal(t, 130, updated.PlannedMin, "should apply smooth re-estimation: round(0.7*100 + 0.3*200)")
 	assert.Equal(t, 60, updated.LoggedMin)
 	assert.Equal(t, 3, updated.UnitsDone)
+}
+
+func TestSessionService_ListRecent(t *testing.T) {
+	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Recent Sessions")
+	require.NoError(t, projRepo.Create(ctx, proj))
+	node := testutil.NewTestNode(proj.ID, "Node")
+	require.NoError(t, nodes.Create(ctx, node))
+	wi := testutil.NewTestWorkItem(node.ID, "Task", testutil.WithSessionBounds(15, 60, 30))
+	require.NoError(t, wiRepo.Create(ctx, wi))
+
+	svc := NewSessionService(sessRepo, wiRepo)
+	recent := testutil.NewTestSession(wi.ID, 25, testutil.WithStartedAt(time.Now().UTC().Add(-24*time.Hour)))
+	old := testutil.NewTestSession(wi.ID, 25, testutil.WithStartedAt(time.Now().UTC().AddDate(0, 0, -10)))
+	require.NoError(t, svc.LogSession(ctx, recent))
+	require.NoError(t, svc.LogSession(ctx, old))
+
+	list, err := svc.ListRecent(ctx, 7)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, recent.ID, list[0].ID)
+}
+
+func TestSessionService_Delete(t *testing.T) {
+	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Delete Session")
+	require.NoError(t, projRepo.Create(ctx, proj))
+	node := testutil.NewTestNode(proj.ID, "Node")
+	require.NoError(t, nodes.Create(ctx, node))
+	wi := testutil.NewTestWorkItem(node.ID, "Task", testutil.WithSessionBounds(15, 60, 30))
+	require.NoError(t, wiRepo.Create(ctx, wi))
+
+	svc := NewSessionService(sessRepo, wiRepo)
+	session := testutil.NewTestSession(wi.ID, 30)
+	require.NoError(t, svc.LogSession(ctx, session))
+
+	require.NoError(t, svc.Delete(ctx, session.ID))
+	_, err := sessRepo.GetByID(ctx, session.ID)
+	require.Error(t, err)
 }

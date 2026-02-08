@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/spf13/cobra"
 )
@@ -31,7 +30,7 @@ func newWhatNowCmd(app *App) *cobra.Command {
 				return err
 			}
 
-			fmt.Print(formatter.FormatWhatNow(resp))
+			fmt.Print(formatWhatNowResponse(context.Background(), app, resp))
 			return nil
 		},
 	}

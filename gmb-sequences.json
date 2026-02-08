@@ -24,7 +24,7 @@
         {
             "ref": "gmb_sequences",
             "title": "GMB Sequences Program",
-            "kind": "program",
+            "kind": "section",
             "order": 0
         },
         {

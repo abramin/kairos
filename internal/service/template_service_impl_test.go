@@ -7,6 +7,49 @@ import (
 	"testing"
 )
 
+func TestTemplateServiceList_SkipsInvalidTemplates(t *testing.T) {
+	t.Parallel()
+
+	templateDir := t.TempDir()
+
+	validA := `{
+  "id": "alpha_template",
+  "name": "Alpha Template",
+  "version": "1.0.0",
+  "domain": "general"
+}`
+	validB := `{
+  "id": "beta_template",
+  "name": "Beta Template",
+  "version": "2.1.0",
+  "domain": "education"
+}`
+	invalid := `{"id":"broken"`
+
+	if err := os.WriteFile(filepath.Join(templateDir, "alpha.json"), []byte(validA), 0o644); err != nil {
+		t.Fatalf("write alpha template: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(templateDir, "beta.json"), []byte(validB), 0o644); err != nil {
+		t.Fatalf("write beta template: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(templateDir, "broken.json"), []byte(invalid), 0o644); err != nil {
+		t.Fatalf("write broken template: %v", err)
+	}
+
+	svc := NewTemplateService(templateDir, nil, nil, nil, nil)
+	list, err := svc.List(context.Background())
+	if err != nil {
+		t.Fatalf("List() error: %v", err)
+	}
+
+	if len(list) != 2 {
+		t.Fatalf("expected 2 valid templates, got %d", len(list))
+	}
+	if list[0].NumericID != 1 || list[1].NumericID != 2 {
+		t.Fatalf("expected sequential numeric IDs, got %d and %d", list[0].NumericID, list[1].NumericID)
+	}
+}
+
 func TestTemplateServiceGet_ResolvesByStemIDAndName(t *testing.T) {
 	t.Parallel()
 

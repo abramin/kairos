@@ -72,7 +72,10 @@ func run() error {
 	// Wire v2 intelligence services (only when LLM is enabled)
 	llmCfg := llm.LoadConfig()
 	if llmCfg.Enabled {
-		observer := llm.NewLogObserver(os.Stderr)
+		var observer llm.Observer = llm.NoopObserver{}
+		if llmCfg.LogCalls {
+			observer = llm.NewLogObserver(os.Stderr)
+		}
 		llmClient := llm.NewOllamaClient(llmCfg, observer)
 		policy := intelligence.DefaultConfirmationPolicy(llmCfg.ConfidenceThreshold)
 
@@ -80,6 +83,7 @@ func run() error {
 		app.Explain = intelligence.NewExplainService(llmClient, observer)
 		app.TemplateDraft = intelligence.NewTemplateDraftService(llmClient, observer)
 		app.ProjectDraft = intelligence.NewProjectDraftService(llmClient, observer)
+		app.Help = intelligence.NewHelpService(llmClient, observer)
 	}
 
 	// Execute root command

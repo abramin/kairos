@@ -99,3 +99,31 @@ func TestExtractJSON_MultipleFences(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "status", result.Intent)
 }
+
+func TestExtractJSON_LeadingDecimalConfidence(t *testing.T) {
+	raw := `{"intent":"status","confidence":.85}`
+	result, err := ExtractJSON[testPayload](raw, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "status", result.Intent)
+	assert.Equal(t, 0.85, result.Confidence)
+}
+
+func TestExtractJSON_NegativeLeadingDecimal(t *testing.T) {
+	type payload struct {
+		Value float64 `json:"value"`
+	}
+	raw := `{"value":-.25}`
+	result, err := ExtractJSON[payload](raw, nil)
+	require.NoError(t, err)
+	assert.Equal(t, -0.25, result.Value)
+}
+
+func TestExtractJSON_DecimalLikeStringNotNormalized(t *testing.T) {
+	type payload struct {
+		Note string `json:"note"`
+	}
+	raw := `{"note":"confidence .85 should stay text"}`
+	result, err := ExtractJSON[payload](raw, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "confidence .85 should stay text", result.Note)
+}
