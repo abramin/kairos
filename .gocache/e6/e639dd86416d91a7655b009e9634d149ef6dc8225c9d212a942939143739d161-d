@@ -1,8 +1,0 @@
-./dependency.go
-./enums.go
-./plannode.go
-./project.go
-./session.go
-./template.go
-./userprofile.go
-./workitem.go

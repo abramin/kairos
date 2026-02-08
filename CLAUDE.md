@@ -36,9 +36,11 @@ internal/cli/                    (Cobra command definitions + App struct)
   │    │    └→ internal/db/      (OpenDB, migrations, WAL+FK config)
   │    ├→ internal/scheduler/    (pure scoring/allocation functions — NO DB calls)
   │    │    └→ internal/domain/
-  │    └→ internal/template/     (JSON template parsing + expression evaluation + validation)
-  └→ internal/intelligence/      (v2 LLM-powered services: intent, explain, template draft)
-       └→ internal/llm/          (Ollama HTTP client, structured JSON extraction, config)
+  │    ├→ internal/template/     (JSON template parsing + expression evaluation + validation)
+  │    └→ internal/importer/     (JSON import schema validation + domain conversion)
+  └→ internal/intelligence/      (v2 LLM-powered services: intent, explain, template/project draft)
+       ├→ internal/llm/          (Ollama HTTP client, structured JSON extraction, config)
+       └→ internal/importer/     (validates draft output against import schema)
 
 templates/                       (JSON template files loaded by TemplateService)
 internal/testutil/               (in-memory DB helpers + builder-pattern fixtures)
@@ -59,7 +61,7 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 
 **`internal/repository`** — Six interfaces (`ProjectRepo`, `PlanNodeRepo`, `WorkItemRepo`, `DependencyRepo`, `SessionRepo`, `UserProfileRepo`) with SQLite implementations prefixed `SQLite*Repo`. Key query: `WorkItemRepo.ListSchedulable()` joins work_items + plan_nodes + projects for scoring input.
 
-**`internal/service`** — Seven service interfaces wired via constructor injection (`NewWhatNowService(repos...)`). Core orchestration flow in `WhatNowService.Recommend()`: load candidates → compute risk per project → determine mode → score → sort → allocate.
+**`internal/service`** — Eight service interfaces wired via constructor injection (`NewWhatNowService(repos...)`). `ImportService` validates and converts JSON import files into domain objects. Core orchestration flow in `WhatNowService.Recommend()`: load candidates → compute risk per project → determine mode → score → sort → allocate.
 
 **`internal/db`** — `OpenDB(path)` opens SQLite (`:memory:` for tests), enables WAL mode + foreign keys, runs migrations. Schema has 6 tables with indexes, soft-delete via `archived_at`.
 
@@ -67,16 +69,19 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 
 **`internal/testutil`** — `NewTestDB()` for in-memory databases. Builder fixtures: `NewTestProject(name, opts...)`, `NewTestNode(projectID, title, opts...)`, `NewTestWorkItem(nodeID, title, opts...)` with option functions like `WithTargetDate`, `WithPlannedMin`.
 
+**`internal/importer`** — JSON import schema (`ImportSchema`, `NodeImport`, `WorkItemImport`) with validation (`ValidateImportSchema`) and conversion to domain objects (`Convert`). Used by both `ImportService` (file-based import) and `ProjectDraftService` (LLM-generated drafts).
+
 **`internal/llm`** — Ollama HTTP client (`NewOllamaClient`), structured JSON extraction (`ExtractJSON[T]` — generic, strips markdown fences, validates via `SchemaValidator[T]`), config from env vars, and observability hooks (`Observer` interface). All LLM calls go through this package.
 
-**`internal/intelligence`** — Three LLM-powered services:
+**`internal/intelligence`** — Four LLM-powered services:
 - `IntentService` — NL→structured intent parsing (`ask` command). Pipeline: LLM parse → `ExtractJSON[ParsedIntent]` → `EnforceWriteSafety` → `ValidateIntentArguments` → `ConfirmationPolicy.Evaluate`
 - `ExplainService` — Generates faithful narrative explanations from engine traces. Falls back to `Deterministic*` functions when LLM fails or evidence bindings are invalid
 - `TemplateDraftService` — NL→template JSON generation. LLM output is validated against `template.ValidateSchema`
+- `ProjectDraftService` — Multi-turn NL→project structure drafting. Interactive conversation produces `ImportSchema`, validated via `importer.ValidateImportSchema`, then imported via `ImportService`
 
-**`internal/cli`** — Cobra command tree. `App` struct holds all service interfaces; v2 intelligence fields are nil when LLM is disabled. Commands: `project`, `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `ask`, `explain`, `review`.
+**`internal/cli`** — Cobra command tree. `App` struct holds all service interfaces; v2 intelligence fields are nil when LLM is disabled. Commands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `ask`, `explain`, `review`.
 
-**`internal/cli/formatter`** — Terminal output formatting with lipgloss: tables, tree views, progress bars, color helpers. Separate formatters for what-now, status, explain, and ask output.
+**`internal/cli/formatter`** — Terminal output formatting with lipgloss: tables, tree views, progress bars, color helpers. Separate formatters for what-now, status, explain, ask, and draft output.
 
 ### Data Flow: what-now Recommendation Pipeline
 
@@ -89,7 +94,7 @@ SchedulableCandidate (from repo)
 
 ### v2 Intelligence: LLM Integration Pattern
 
-All LLM features are **optional** — the `App.Intent`, `App.Explain`, and `App.TemplateDraft` fields are nil when `KAIROS_LLM_ENABLED=false`. CLI commands check for nil before use and return a helpful error pointing to explicit commands.
+All LLM features are **optional** — the `App.Intent`, `App.Explain`, `App.TemplateDraft`, and `App.ProjectDraft` fields are nil when `KAIROS_LLM_ENABLED=false`. CLI commands check for nil before use and return a helpful error pointing to explicit commands.
 
 Key design patterns:
 - **Graceful fallback**: `ExplainService` falls back to `Deterministic*` functions (pure Go, no LLM) on any failure: connection error, timeout, invalid JSON, or unfaithful evidence bindings
