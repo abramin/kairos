@@ -26,7 +26,11 @@ profile.cov
 go.work
 go.work.sum
 
-.gocache/
+.gocache
+
+# binary
+kairos
+
 # env file
 .env
 

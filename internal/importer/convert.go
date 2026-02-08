@@ -58,7 +58,7 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 
 		kind := n.Kind
 		if kind == "" {
-			kind = "generic"
+			kind = string(domain.NodeGeneric)
 		}
 
 		node := &domain.PlanNode{
@@ -90,27 +90,27 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 		}
 
 		// Apply defaults cascade: work item field > schema defaults > hardcoded
-		durationMode := coalesceStr(wi.DurationMode, defaultDurationMode(schema.Defaults), "estimate")
+		durationMode := domain.CoalesceStr(wi.DurationMode, defaultDurationMode(schema.Defaults), "estimate")
 		status := wi.Status
 		if status == "" {
 			status = "todo"
 		}
 
-		minSession := intFromPtrWithDefault(15,
+		minSession := domain.IntFromPtrWithDefault(15,
 			sessionPolicyField(wi.SessionPolicy, "min"),
 			sessionPolicyField(defaultSessionPolicy(schema.Defaults), "min"))
-		maxSession := intFromPtrWithDefault(60,
+		maxSession := domain.IntFromPtrWithDefault(60,
 			sessionPolicyField(wi.SessionPolicy, "max"),
 			sessionPolicyField(defaultSessionPolicy(schema.Defaults), "max"))
-		defSession := intFromPtrWithDefault(30,
+		defSession := domain.IntFromPtrWithDefault(30,
 			sessionPolicyField(wi.SessionPolicy, "default"),
 			sessionPolicyField(defaultSessionPolicy(schema.Defaults), "default"))
-		splittable := boolFromPtrWithDefault(true,
+		splittable := domain.BoolFromPtrWithDefault(true,
 			sessionPolicyBool(wi.SessionPolicy),
 			sessionPolicyBool(defaultSessionPolicy(schema.Defaults)))
 
-		plannedMin := intFromPtrWithDefault(0, wi.PlannedMin)
-		estimateConf := float64FromPtrWithDefault(0.5, wi.EstimateConfidence)
+		plannedMin := domain.IntFromPtrWithDefault(0, wi.PlannedMin)
+		estimateConf := domain.Float64FromPtrWithDefault(0.5, wi.EstimateConfidence)
 
 		var unitsKind string
 		var unitsTotal int
@@ -177,42 +177,6 @@ func parseOptionalDate(s *string) *time.Time {
 		return nil
 	}
 	return &t
-}
-
-func coalesceStr(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}
-
-func intFromPtrWithDefault(fallback int, ptrs ...*int) int {
-	for _, p := range ptrs {
-		if p != nil {
-			return *p
-		}
-	}
-	return fallback
-}
-
-func boolFromPtrWithDefault(fallback bool, ptrs ...*bool) bool {
-	for _, p := range ptrs {
-		if p != nil {
-			return *p
-		}
-	}
-	return fallback
-}
-
-func float64FromPtrWithDefault(fallback float64, ptrs ...*float64) float64 {
-	for _, p := range ptrs {
-		if p != nil {
-			return *p
-		}
-	}
-	return fallback
 }
 
 func defaultDurationMode(d *DefaultsImport) string {

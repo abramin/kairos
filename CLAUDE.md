@@ -8,6 +8,8 @@ Kairos is a single-user CLI project planner and session recommender. It answers:
 
 **Status**: Core v1 packages (domain, contracts, repository, scheduler, services) and v2 intelligence layer (LLM-backed NL parsing, explanations, template drafting) are implemented. CLI is fully wired with Cobra.
 
+**Requires**: Go 1.25+
+
 ## Build Commands
 
 ```bash
@@ -17,6 +19,8 @@ make test-race                                        # tests with race detector
 make vet                                              # go vet ./...
 make lint                                             # vet alias
 make all                                              # vet + test + build
+make install                                          # build + copy to $GOPATH/bin
+make clean                                            # remove built binary
 go test -run TestFunctionName ./internal/scheduler/   # single test
 ```
 
@@ -79,7 +83,7 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 - `TemplateDraftService` — NL→template JSON generation. LLM output is validated against `template.ValidateSchema`
 - `ProjectDraftService` — Multi-turn NL→project structure drafting. Interactive conversation produces `ImportSchema`, validated via `importer.ValidateImportSchema`, then imported via `ImportService`
 
-**`internal/cli`** — Cobra command tree. `App` struct holds all service interfaces; v2 intelligence fields are nil when LLM is disabled. Commands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `ask`, `explain`, `review`.
+**`internal/cli`** — Cobra command tree. `App` struct holds all service interfaces; v2 intelligence fields are nil when LLM is disabled. Commands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `ask`, `explain`, `review`. Note: `kairos 45` is a shortcut for `kairos what-now --minutes 45`.
 
 **`internal/cli/formatter`** — Terminal output formatting with lipgloss: tables, tree views, progress bars, color helpers. Separate formatters for what-now, status, explain, ask, and draft output.
 
@@ -130,19 +134,6 @@ Key design patterns:
 - `progress_time_pct` can exceed 100% (logged > planned is valid)
 - Replan is idempotent over unchanged input
 
-## Mandatory Acceptance Tests
-
-Defined in `docs/orchestrator.md` — must pass before v1:
-
-1. Critical deadline → critical mode recommendations only
-2. Balanced mode allows secondary project when primary is safe
-3. Session bounds never violated
-4. Unit-based re-estimation smoothing works correctly
-5. Template generation produces full expected structure
-6. Deadline update changes risk level and recommendation ranking
-7. Archived/removed entities excluded from suggestions
-8. Deterministic output stability on repeated runs
-
 ## Environment Variables
 
 | Variable | Default | Purpose |
@@ -156,13 +147,23 @@ Defined in `docs/orchestrator.md` — must pass before v1:
 | `KAIROS_LLM_MAX_RETRIES` | `1` | LLM retry count |
 | `KAIROS_LLM_CONFIDENCE_THRESHOLD` | `0.85` | Auto-execute threshold for read-only intents |
 
-## Dependencies
+## Key Dependencies
 
-- `modernc.org/sqlite` — pure Go SQLite driver (no CGO)
-- `github.com/google/uuid` — UUID generation for entity IDs
-- `github.com/stretchr/testify` — test assertions (`assert`/`require` packages)
-- `github.com/spf13/cobra` — CLI command framework
-- `github.com/charmbracelet/lipgloss` — terminal styling/formatting
+- `modernc.org/sqlite` — pure Go SQLite driver (**no CGO** — this is intentional, do not switch to `mattn/go-sqlite3`)
+- `github.com/stretchr/testify` — test assertions use `assert`/`require` packages (not `testing` stdlib alone)
+
+## Testing Patterns
+
+Tests use in-memory SQLite via `testutil.NewTestDB()`. Builder-pattern fixtures create test data:
+
+```go
+db := testutil.NewTestDB(t)
+proj := testutil.NewTestProject("My Project", testutil.WithTargetDate(deadline))
+node := testutil.NewTestNode(proj.ID, "Week 1", testutil.WithNodeKind(domain.NodeKindModule))
+item := testutil.NewTestWorkItem(node.ID, "Reading", testutil.WithPlannedMin(60))
+```
+
+Scheduler tests use pure functions with no DB setup needed — just construct `ScoringInput`/`RiskInput` structs directly.
 
 ## Reference Documents
 

@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
@@ -18,6 +19,98 @@ func Migrate(db *sql.DB) error {
 			return fmt.Errorf("migration %d: %w", i, err)
 		}
 	}
+	if err := migratePlanNodesAssessmentKind(db); err != nil {
+		return fmt.Errorf("migrating plan_nodes kind constraint: %w", err)
+	}
+	return nil
+}
+
+func migratePlanNodesAssessmentKind(db *sql.DB) error {
+	ctx := context.Background()
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("acquiring db connection: %w", err)
+	}
+	defer conn.Close()
+
+	var createSQL string
+	if err := conn.QueryRowContext(ctx, `SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'plan_nodes'`).Scan(&createSQL); err != nil {
+		return fmt.Errorf("loading plan_nodes schema: %w", err)
+	}
+	if strings.Contains(strings.ToLower(createSQL), "'assessment'") {
+		return nil
+	}
+
+	if _, err := conn.ExecContext(ctx, `PRAGMA foreign_keys = OFF`); err != nil {
+		return fmt.Errorf("disabling foreign keys: %w", err)
+	}
+	defer func() {
+		_, _ = conn.ExecContext(ctx, `PRAGMA foreign_keys = ON`)
+	}()
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("starting migration transaction: %w", err)
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = tx.Rollback()
+		}
+	}()
+
+	if _, err := tx.ExecContext(ctx, `DROP TABLE IF EXISTS plan_nodes_new`); err != nil {
+		return fmt.Errorf("dropping stale plan_nodes_new: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `CREATE TABLE plan_nodes_new (
+		id                 TEXT PRIMARY KEY,
+		project_id         TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		parent_id          TEXT REFERENCES plan_nodes_new(id) ON DELETE CASCADE,
+		title              TEXT NOT NULL,
+		kind               TEXT NOT NULL
+		                   CHECK(kind IN ('week','module','book','stage','section','assessment','generic')),
+		order_index        INTEGER NOT NULL DEFAULT 0,
+		due_date           TEXT,
+		not_before         TEXT,
+		not_after          TEXT,
+		planned_min_budget INTEGER,
+		created_at         TEXT NOT NULL,
+		updated_at         TEXT NOT NULL
+	)`); err != nil {
+		return fmt.Errorf("creating plan_nodes_new: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `INSERT INTO plan_nodes_new (
+		id, project_id, parent_id, title, kind, order_index,
+		due_date, not_before, not_after, planned_min_budget, created_at, updated_at
+	) SELECT
+		id, project_id, parent_id, title, kind, order_index,
+		due_date, not_before, not_after, planned_min_budget, created_at, updated_at
+	FROM plan_nodes`); err != nil {
+		return fmt.Errorf("copying plan_nodes data: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `DROP TABLE plan_nodes`); err != nil {
+		return fmt.Errorf("dropping old plan_nodes: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `ALTER TABLE plan_nodes_new RENAME TO plan_nodes`); err != nil {
+		return fmt.Errorf("renaming plan_nodes_new: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_plan_nodes_project ON plan_nodes(project_id)`); err != nil {
+		return fmt.Errorf("recreating idx_plan_nodes_project: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `CREATE INDEX IF NOT EXISTS idx_plan_nodes_parent ON plan_nodes(parent_id)`); err != nil {
+		return fmt.Errorf("recreating idx_plan_nodes_parent: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing plan_nodes migration: %w", err)
+	}
+	committed = true
+
 	return nil
 }
 
@@ -41,7 +134,7 @@ var migrations = []string{
 		parent_id          TEXT REFERENCES plan_nodes(id) ON DELETE CASCADE,
 		title              TEXT NOT NULL,
 		kind               TEXT NOT NULL
-		                   CHECK(kind IN ('week','module','book','stage','section','generic')),
+		                   CHECK(kind IN ('week','module','book','stage','section','assessment','generic')),
 		order_index        INTEGER NOT NULL DEFAULT 0,
 		due_date           TEXT,
 		not_before         TEXT,

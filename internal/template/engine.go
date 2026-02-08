@@ -204,13 +204,13 @@ func Execute(schema *TemplateSchema, projectName, startDate string, dueDate *str
 			}
 
 			// Apply defaults, then override with work item config
-			durationMode := coalesceStr(wc.DurationMode, defaultDurationMode(schema.Defaults), "estimate")
-			minSession := intFromPtrWithDefault(15, sessionPolicyField(wc.SessionPolicy, "min"), sessionPolicyField(defaultSessionPolicy(schema.Defaults), "min"))
-			maxSession := intFromPtrWithDefault(60, sessionPolicyField(wc.SessionPolicy, "max"), sessionPolicyField(defaultSessionPolicy(schema.Defaults), "max"))
-			defSession := intFromPtrWithDefault(30, sessionPolicyField(wc.SessionPolicy, "default"), sessionPolicyField(defaultSessionPolicy(schema.Defaults), "default"))
-			splittable := boolFromPtrWithDefault(true, sessionPolicyBool(wc.SessionPolicy), sessionPolicyBool(defaultSessionPolicy(schema.Defaults)))
-			plannedMin := intFromPtrWithDefault(0, wc.PlannedMin)
-			estimateConf := float64FromPtrWithDefault(0.5, wc.EstimateConf)
+			durationMode := domain.CoalesceStr(wc.DurationMode, defaultDurationMode(schema.Defaults), "estimate")
+			minSession := domain.IntFromPtrWithDefault(15, sessionPolicyField(wc.SessionPolicy, "min"), sessionPolicyField(defaultSessionPolicy(schema.Defaults), "min"))
+			maxSession := domain.IntFromPtrWithDefault(60, sessionPolicyField(wc.SessionPolicy, "max"), sessionPolicyField(defaultSessionPolicy(schema.Defaults), "max"))
+			defSession := domain.IntFromPtrWithDefault(30, sessionPolicyField(wc.SessionPolicy, "default"), sessionPolicyField(defaultSessionPolicy(schema.Defaults), "default"))
+			splittable := domain.BoolFromPtrWithDefault(true, sessionPolicyBool(wc.SessionPolicy), sessionPolicyBool(defaultSessionPolicy(schema.Defaults)))
+			plannedMin := domain.IntFromPtrWithDefault(0, wc.PlannedMin)
+			estimateConf := domain.Float64FromPtrWithDefault(0.5, wc.EstimateConf)
 
 			var unitsKind string
 			var unitsTotal int
@@ -472,48 +472,6 @@ func hasPrefix(s, prefix string) bool {
 
 func hasSuffix(s, suffix string) bool {
 	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
-}
-
-// Helper functions for coalescing defaults.
-// These take pointer values from config and return concrete types matching domain structs.
-
-func coalesceStr(vals ...string) string {
-	for _, v := range vals {
-		if v != "" {
-			return v
-		}
-	}
-	return ""
-}
-
-// intFromPtrWithDefault returns the first non-nil *int value, or the fallback.
-func intFromPtrWithDefault(fallback int, ptrs ...*int) int {
-	for _, p := range ptrs {
-		if p != nil {
-			return *p
-		}
-	}
-	return fallback
-}
-
-// boolFromPtrWithDefault returns the first non-nil *bool value, or the fallback.
-func boolFromPtrWithDefault(fallback bool, ptrs ...*bool) bool {
-	for _, p := range ptrs {
-		if p != nil {
-			return *p
-		}
-	}
-	return fallback
-}
-
-// float64FromPtrWithDefault returns the first non-nil *float64 value, or the fallback.
-func float64FromPtrWithDefault(fallback float64, ptrs ...*float64) float64 {
-	for _, p := range ptrs {
-		if p != nil {
-			return *p
-		}
-	}
-	return fallback
 }
 
 func defaultDurationMode(d *DefaultsConfig) string {

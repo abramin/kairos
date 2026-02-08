@@ -1,6 +1,7 @@
 package domain
 
 type Template struct {
+	NumericID  int
 	ID         string
 	Name       string
 	Domain     string

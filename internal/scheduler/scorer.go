@@ -73,125 +73,144 @@ func ScoreWorkItem(input ScoringInput) ScoredCandidate {
 	}
 
 	var score float64
-
-	// 1. DEADLINE_PRESSURE
-	if input.DueDate != nil {
-		daysUntil := int(input.DueDate.Sub(input.Now).Hours() / 24)
-		var pressure float64
-		switch {
-		case daysUntil <= 0:
-			pressure = 100.0
-		case daysUntil <= 3:
-			pressure = 80.0 / float64(daysUntil)
-		case daysUntil <= 7:
-			pressure = 40.0 / float64(daysUntil)
-		case daysUntil <= 14:
-			pressure = 20.0 / float64(daysUntil)
-		default:
-			pressure = 10.0 / float64(daysUntil)
+	factors := []func(ScoringInput) (float64, *contract.RecommendationReason){
+		scoreDeadlinePressure,
+		scoreBehindPace,
+		scoreSpacing,
+		scoreVariation,
+		scoreCriticalBonus,
+		scoreSafeMix,
+	}
+	for _, f := range factors {
+		delta, reason := f(input)
+		score += delta
+		if reason != nil {
+			result.Reasons = append(result.Reasons, *reason)
 		}
-		delta := pressure * input.Weights.DeadlinePressure
-		score += delta
-		result.Reasons = append(result.Reasons, contract.RecommendationReason{
-			Code:        contract.ReasonDeadlinePressure,
-			Message:     formatDeadlineMessage(daysUntil),
-			WeightDelta: &delta,
-		})
-	}
-
-	// 2. BEHIND_PACE
-	switch input.ProjectRisk {
-	case domain.RiskCritical:
-		delta := 30.0 * input.Weights.BehindPace
-		score += delta
-		result.Reasons = append(result.Reasons, contract.RecommendationReason{
-			Code:        contract.ReasonBehindPace,
-			Message:     "Project is in critical risk",
-			WeightDelta: &delta,
-		})
-	case domain.RiskAtRisk:
-		delta := 15.0 * input.Weights.BehindPace
-		score += delta
-		result.Reasons = append(result.Reasons, contract.RecommendationReason{
-			Code:        contract.ReasonBehindPace,
-			Message:     "Project is at risk",
-			WeightDelta: &delta,
-		})
-	}
-
-	// 3. SPACING
-	if input.LastSessionDaysAgo != nil {
-		daysAgo := *input.LastSessionDaysAgo
-		var spacingDelta float64
-		var code contract.RecommendationReasonCode
-		var msg string
-
-		switch {
-		case daysAgo == 0:
-			spacingDelta = -10.0 * input.Weights.Spacing
-			code = contract.ReasonSpacingBlocked
-			msg = "Already worked on this project today"
-		case daysAgo >= 1 && daysAgo <= 3:
-			spacingDelta = 5.0 * input.Weights.Spacing
-			code = contract.ReasonSpacingOK
-			msg = "Good spacing since last session"
-		default: // > 3 days ago
-			spacingDelta = 3.0 * input.Weights.Spacing
-			code = contract.ReasonSpacingOK
-			msg = "Haven't worked on this recently"
-		}
-		score += spacingDelta
-		result.Reasons = append(result.Reasons, contract.RecommendationReason{
-			Code:        code,
-			Message:     msg,
-			WeightDelta: &spacingDelta,
-		})
-	}
-
-	// 4. VARIATION
-	switch {
-	case input.ProjectSlicesInPlan == 0:
-		delta := 10.0 * input.Weights.Variation
-		score += delta
-		result.Reasons = append(result.Reasons, contract.RecommendationReason{
-			Code:        contract.ReasonVariationBonus,
-			Message:     "Adds variety across projects",
-			WeightDelta: &delta,
-		})
-	case input.ProjectSlicesInPlan >= 2:
-		delta := -5.0 * input.Weights.Variation * float64(input.ProjectSlicesInPlan)
-		score += delta
-		result.Reasons = append(result.Reasons, contract.RecommendationReason{
-			Code:        contract.ReasonVariationPenalty,
-			Message:     "Project already well-represented in plan",
-			WeightDelta: &delta,
-		})
-	}
-	// ProjectSlicesInPlan == 1 is neutral
-
-	// 5. Critical mode bonus
-	if input.Mode == domain.ModeCritical && input.ProjectRisk == domain.RiskCritical {
-		delta := 50.0
-		score += delta
-		result.Reasons = append(result.Reasons, contract.RecommendationReason{
-			Code:        contract.ReasonCriticalFocus,
-			Message:     "Critical mode: focusing on critical work",
-			WeightDelta: &delta,
-		})
-	}
-
-	// 6. Safe mix indicator (balanced mode, on-track project)
-	if input.Mode == domain.ModeBalanced && input.ProjectRisk == domain.RiskOnTrack {
-		zero := 0.0
-		result.Reasons = append(result.Reasons, contract.RecommendationReason{
-			Code:        contract.ReasonOnTrackSafeMix,
-			Message:     "Project is on track, safe to include",
-			WeightDelta: &zero,
-		})
 	}
 
 	result.Score = score
 	return result
+}
+
+func scoreDeadlinePressure(input ScoringInput) (float64, *contract.RecommendationReason) {
+	if input.DueDate == nil {
+		return 0, nil
+	}
+	daysUntil := int(input.DueDate.Sub(input.Now).Hours() / 24)
+	var pressure float64
+	switch {
+	case daysUntil <= 0:
+		pressure = 100.0
+	case daysUntil <= 3:
+		pressure = 80.0 / float64(daysUntil)
+	case daysUntil <= 7:
+		pressure = 40.0 / float64(daysUntil)
+	case daysUntil <= 14:
+		pressure = 20.0 / float64(daysUntil)
+	default:
+		pressure = 10.0 / float64(daysUntil)
+	}
+	delta := pressure * input.Weights.DeadlinePressure
+	return delta, &contract.RecommendationReason{
+		Code:        contract.ReasonDeadlinePressure,
+		Message:     formatDeadlineMessage(daysUntil),
+		WeightDelta: &delta,
+	}
+}
+
+func scoreBehindPace(input ScoringInput) (float64, *contract.RecommendationReason) {
+	switch input.ProjectRisk {
+	case domain.RiskCritical:
+		delta := 30.0 * input.Weights.BehindPace
+		return delta, &contract.RecommendationReason{
+			Code:        contract.ReasonBehindPace,
+			Message:     "Project is in critical risk",
+			WeightDelta: &delta,
+		}
+	case domain.RiskAtRisk:
+		delta := 15.0 * input.Weights.BehindPace
+		return delta, &contract.RecommendationReason{
+			Code:        contract.ReasonBehindPace,
+			Message:     "Project is at risk",
+			WeightDelta: &delta,
+		}
+	}
+	return 0, nil
+}
+
+func scoreSpacing(input ScoringInput) (float64, *contract.RecommendationReason) {
+	if input.LastSessionDaysAgo == nil {
+		return 0, nil
+	}
+	daysAgo := *input.LastSessionDaysAgo
+	var delta float64
+	var code contract.RecommendationReasonCode
+	var msg string
+
+	switch {
+	case daysAgo == 0:
+		delta = -10.0 * input.Weights.Spacing
+		code = contract.ReasonSpacingBlocked
+		msg = "Already worked on this project today"
+	case daysAgo >= 1 && daysAgo <= 3:
+		delta = 5.0 * input.Weights.Spacing
+		code = contract.ReasonSpacingOK
+		msg = "Good spacing since last session"
+	default: // > 3 days ago
+		delta = 3.0 * input.Weights.Spacing
+		code = contract.ReasonSpacingOK
+		msg = "Haven't worked on this recently"
+	}
+	return delta, &contract.RecommendationReason{
+		Code:        code,
+		Message:     msg,
+		WeightDelta: &delta,
+	}
+}
+
+func scoreVariation(input ScoringInput) (float64, *contract.RecommendationReason) {
+	switch {
+	case input.ProjectSlicesInPlan == 0:
+		delta := 10.0 * input.Weights.Variation
+		return delta, &contract.RecommendationReason{
+			Code:        contract.ReasonVariationBonus,
+			Message:     "Adds variety across projects",
+			WeightDelta: &delta,
+		}
+	case input.ProjectSlicesInPlan >= 2:
+		delta := -5.0 * input.Weights.Variation * float64(input.ProjectSlicesInPlan)
+		return delta, &contract.RecommendationReason{
+			Code:        contract.ReasonVariationPenalty,
+			Message:     "Project already well-represented in plan",
+			WeightDelta: &delta,
+		}
+	}
+	return 0, nil // ProjectSlicesInPlan == 1 is neutral
+}
+
+func scoreCriticalBonus(input ScoringInput) (float64, *contract.RecommendationReason) {
+	if input.Mode == domain.ModeCritical && input.ProjectRisk == domain.RiskCritical {
+		delta := 50.0
+		return delta, &contract.RecommendationReason{
+			Code:        contract.ReasonCriticalFocus,
+			Message:     "Critical mode: focusing on critical work",
+			WeightDelta: &delta,
+		}
+	}
+	return 0, nil
+}
+
+func scoreSafeMix(input ScoringInput) (float64, *contract.RecommendationReason) {
+	if input.Mode == domain.ModeBalanced && input.ProjectRisk == domain.RiskOnTrack {
+		zero := 0.0
+		return 0, &contract.RecommendationReason{
+			Code:        contract.ReasonOnTrackSafeMix,
+			Message:     "Project is on track, safe to include",
+			WeightDelta: &zero,
+		}
+	}
+	return 0, nil
 }
 
 func formatDeadlineMessage(daysUntil int) string {

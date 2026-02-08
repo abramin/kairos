@@ -53,19 +53,7 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 		return nil, fmt.Errorf("loading projects: %w", err)
 	}
 
-	if len(req.ProjectScope) > 0 {
-		scopeSet := make(map[string]bool)
-		for _, id := range req.ProjectScope {
-			scopeSet[id] = true
-		}
-		var filtered []*domain.Project
-		for _, p := range projects {
-			if scopeSet[p.ID] {
-				filtered = append(filtered, p)
-			}
-		}
-		projects = filtered
-	}
+	projects = filterProjectsByScope(projects, req.ProjectScope)
 
 	activeProjects := make([]*domain.Project, 0)
 	for _, p := range projects {
@@ -100,7 +88,10 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 			loggedBefore += item.LoggedMin
 		}
 
-		recentSessions, _ := s.sessions.ListRecentByProject(ctx, p.ID, 7)
+		recentSessions, err := s.sessions.ListRecentByProject(ctx, p.ID, 7)
+		if err != nil {
+			return nil, fmt.Errorf("loading recent sessions for project %s: %w", p.ID, err)
+		}
 		var recentMin int
 		for _, sess := range recentSessions {
 			recentMin += sess.Minutes

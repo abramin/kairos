@@ -35,6 +35,16 @@ func NewWhatNowService(
 	}
 }
 
+// projectAggregates holds per-project computed data shared across recommendation phases.
+type projectAggregates struct {
+	risks      map[string]scheduler.RiskResult
+	names      map[string]string
+	planned    map[string]int
+	logged     map[string]int
+	recentMin  map[string]int
+	targetDate map[string]*time.Time
+}
+
 func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequest) (*contract.WhatNowResponse, error) {
 	if req.AvailableMin <= 0 {
 		return nil, &contract.WhatNowError{
@@ -52,7 +62,6 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 		maxSlices = 3
 	}
 
-	// Load user profile for weights
 	profile, err := s.profiles.Get(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("loading user profile: %w", err)
@@ -64,27 +73,11 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 		Variation:        profile.WeightVariation,
 	}
 
-	// Load all schedulable candidates
 	candidates, err := s.workItems.ListSchedulable(ctx, req.IncludeArchived)
 	if err != nil {
 		return nil, fmt.Errorf("loading schedulable items: %w", err)
 	}
-
-	// Filter by project scope if specified
-	if len(req.ProjectScope) > 0 {
-		scopeSet := make(map[string]bool)
-		for _, id := range req.ProjectScope {
-			scopeSet[id] = true
-		}
-		var filtered []repository.SchedulableCandidate
-		for _, c := range candidates {
-			if scopeSet[c.ProjectID] {
-				filtered = append(filtered, c)
-			}
-		}
-		candidates = filtered
-	}
-
+	candidates = filterCandidatesByScope(candidates, req.ProjectScope)
 	if len(candidates) == 0 {
 		return nil, &contract.WhatNowError{
 			Code:    contract.ErrNoCandidates,
@@ -92,61 +85,92 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 		}
 	}
 
-	// Compute risk per project
-	projectRisks := make(map[string]scheduler.RiskResult)
-	projectNames := make(map[string]string)
-	recentSessions, _ := s.sessions.ListRecent(ctx, 7)
-
-	// Aggregate logged minutes per project for recent daily calculation
-	projectRecentMin := make(map[string]int)
-
-	// Build project aggregates from candidates
-	projectPlanned := make(map[string]int)
-	projectLogged := make(map[string]int)
-	projectTargetDate := make(map[string]*time.Time)
-	for _, c := range candidates {
-		projectPlanned[c.ProjectID] += c.WorkItem.PlannedMin
-		projectLogged[c.ProjectID] += c.WorkItem.LoggedMin
-		projectNames[c.ProjectID] = c.ProjectName
-		if c.ProjectTargetDate != nil {
-			projectTargetDate[c.ProjectID] = c.ProjectTargetDate
-		}
+	recentSessions, err := s.sessions.ListRecent(ctx, 7)
+	if err != nil {
+		return nil, fmt.Errorf("loading recent sessions: %w", err)
 	}
 
-	// Compute recent daily minutes per project from sessions
-	for _, sess := range recentSessions {
-		// Find the project for this session's work item
-		for _, c := range candidates {
-			if c.WorkItem.ID == sess.WorkItemID {
-				projectRecentMin[c.ProjectID] += sess.Minutes
-				break
-			}
-		}
-	}
+	agg := s.computeProjectAggregates(candidates, recentSessions, now, profile.BufferPct)
 
-	// Compute risk for each project
-	for pid := range projectPlanned {
-		recentDaily := float64(projectRecentMin[pid]) / 7.0
-		riskResult := scheduler.ComputeRisk(scheduler.RiskInput{
-			Now:            now,
-			TargetDate:     projectTargetDate[pid],
-			PlannedMin:     projectPlanned[pid],
-			LoggedMin:      projectLogged[pid],
-			BufferPct:      profile.BufferPct,
-			RecentDailyMin: recentDaily,
-		})
-		projectRisks[pid] = riskResult
-	}
-
-	// Determine mode
 	mode := domain.ModeBalanced
-	for _, risk := range projectRisks {
+	for _, risk := range agg.risks {
 		if risk.Level == domain.RiskCritical {
 			mode = domain.ModeCritical
 			break
 		}
 	}
 
+	scored, blockers, err := s.scoreCandidates(ctx, candidates, recentSessions, agg, weights, mode, now)
+	if err != nil {
+		return nil, err
+	}
+
+	scheduler.CanonicalSort(scored)
+	slices, allocBlockers := scheduler.AllocateSlices(scored, req.AvailableMin, maxSlices, req.EnforceVariation)
+	blockers = append(blockers, allocBlockers...)
+
+	return s.buildResponse(now, mode, req.AvailableMin, slices, blockers, agg), nil
+}
+
+// computeProjectAggregates builds per-project risk, totals, and recent session data from candidates.
+func (s *whatNowService) computeProjectAggregates(
+	candidates []repository.SchedulableCandidate,
+	recentSessions []*domain.WorkSessionLog,
+	now time.Time,
+	bufferPct float64,
+) projectAggregates {
+	agg := projectAggregates{
+		risks:      make(map[string]scheduler.RiskResult),
+		names:      make(map[string]string),
+		planned:    make(map[string]int),
+		logged:     make(map[string]int),
+		recentMin:  make(map[string]int),
+		targetDate: make(map[string]*time.Time),
+	}
+
+	// Build work-item-to-project index for O(1) session lookups
+	workItemToProject := make(map[string]string, len(candidates))
+	for _, c := range candidates {
+		agg.planned[c.ProjectID] += c.WorkItem.PlannedMin
+		agg.logged[c.ProjectID] += c.WorkItem.LoggedMin
+		agg.names[c.ProjectID] = c.ProjectName
+		if c.ProjectTargetDate != nil {
+			agg.targetDate[c.ProjectID] = c.ProjectTargetDate
+		}
+		workItemToProject[c.WorkItem.ID] = c.ProjectID
+	}
+
+	for _, sess := range recentSessions {
+		if pid, ok := workItemToProject[sess.WorkItemID]; ok {
+			agg.recentMin[pid] += sess.Minutes
+		}
+	}
+
+	for pid := range agg.planned {
+		recentDaily := float64(agg.recentMin[pid]) / 7.0
+		agg.risks[pid] = scheduler.ComputeRisk(scheduler.RiskInput{
+			Now:            now,
+			TargetDate:     agg.targetDate[pid],
+			PlannedMin:     agg.planned[pid],
+			LoggedMin:      agg.logged[pid],
+			BufferPct:      bufferPct,
+			RecentDailyMin: recentDaily,
+		})
+	}
+
+	return agg
+}
+
+// scoreCandidates checks constraints and scores each candidate, returning scored items and blockers.
+func (s *whatNowService) scoreCandidates(
+	ctx context.Context,
+	candidates []repository.SchedulableCandidate,
+	recentSessions []*domain.WorkSessionLog,
+	agg projectAggregates,
+	weights scheduler.ScoringWeights,
+	mode domain.PlanMode,
+	now time.Time,
+) ([]scheduler.ScoredCandidate, []contract.ConstraintBlocker, error) {
 	// Build last-session-days-ago per work item
 	lastSessionDaysAgo := make(map[string]*int)
 	for _, sess := range recentSessions {
@@ -157,16 +181,14 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 		}
 	}
 
-	// Score each candidate
 	var blockers []contract.ConstraintBlocker
 	var scored []scheduler.ScoredCandidate
-	projectSliceCount := make(map[string]int) // will track during allocation
+	projectSliceCount := make(map[string]int)
 
 	for _, c := range candidates {
-		// Check dependency blocking
 		blocked, err := s.deps.HasUnfinishedPredecessors(ctx, c.WorkItem.ID)
 		if err != nil {
-			return nil, fmt.Errorf("checking dependencies: %w", err)
+			return nil, nil, fmt.Errorf("checking dependencies: %w", err)
 		}
 		if blocked {
 			blockers = append(blockers, contract.ConstraintBlocker{
@@ -178,7 +200,6 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 			continue
 		}
 
-		// Check not_before constraint
 		if c.WorkItem.NotBefore != nil && now.Before(*c.WorkItem.NotBefore) {
 			blockers = append(blockers, contract.ConstraintBlocker{
 				EntityType: "work_item",
@@ -189,17 +210,7 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 			continue
 		}
 
-		// Determine effective due date (earliest of work item, node, or project)
-		var effectiveDue *time.Time
-		if c.WorkItem.DueDate != nil {
-			effectiveDue = c.WorkItem.DueDate
-		}
-		if c.NodeDueDate != nil && (effectiveDue == nil || c.NodeDueDate.Before(*effectiveDue)) {
-			effectiveDue = c.NodeDueDate
-		}
-		if c.ProjectTargetDate != nil && (effectiveDue == nil || c.ProjectTargetDate.Before(*effectiveDue)) {
-			effectiveDue = c.ProjectTargetDate
-		}
+		effectiveDue := earliestDueDate(c.WorkItem.DueDate, c.NodeDueDate, c.ProjectTargetDate)
 
 		input := scheduler.ScoringInput{
 			WorkItemID:          c.WorkItem.ID,
@@ -208,7 +219,7 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 			NodeTitle:           c.NodeTitle,
 			Title:               c.WorkItem.Title,
 			DueDate:             effectiveDue,
-			ProjectRisk:         projectRisks[c.ProjectID].Level,
+			ProjectRisk:         agg.risks[c.ProjectID].Level,
 			Now:                 now,
 			LastSessionDaysAgo:  lastSessionDaysAgo[c.WorkItem.ID],
 			ProjectSlicesInPlan: projectSliceCount[c.ProjectID],
@@ -223,34 +234,48 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 			NodeID:              c.WorkItem.NodeID,
 		}
 
-		result := scheduler.ScoreWorkItem(input)
-		scored = append(scored, result)
+		scored = append(scored, scheduler.ScoreWorkItem(input))
 	}
 
-	// Sort by canonical order
-	scheduler.CanonicalSort(scored)
+	return scored, blockers, nil
+}
 
-	// Allocate slices
-	slices, allocBlockers := scheduler.AllocateSlices(scored, req.AvailableMin, maxSlices, req.EnforceVariation)
-	blockers = append(blockers, allocBlockers...)
+// earliestDueDate returns the earliest non-nil date from the given pointers.
+func earliestDueDate(dates ...*time.Time) *time.Time {
+	var earliest *time.Time
+	for _, d := range dates {
+		if d != nil && (earliest == nil || d.Before(*earliest)) {
+			earliest = d
+		}
+	}
+	return earliest
+}
 
-	// Build risk summaries
+// buildResponse assembles the final WhatNowResponse from scored slices and project aggregates.
+func (s *whatNowService) buildResponse(
+	now time.Time,
+	mode domain.PlanMode,
+	requestedMin int,
+	slices []contract.WorkSlice,
+	blockers []contract.ConstraintBlocker,
+	agg projectAggregates,
+) *contract.WhatNowResponse {
 	var riskSummaries []contract.RiskSummary
-	for pid, risk := range projectRisks {
+	for pid, risk := range agg.risks {
 		var dueDateStr *string
-		if projectTargetDate[pid] != nil {
-			ds := projectTargetDate[pid].Format("2006-01-02")
+		if agg.targetDate[pid] != nil {
+			ds := agg.targetDate[pid].Format("2006-01-02")
 			dueDateStr = &ds
 		}
-		recentDaily := float64(projectRecentMin[pid]) / 7.0
+		recentDaily := float64(agg.recentMin[pid]) / 7.0
 		riskSummaries = append(riskSummaries, contract.RiskSummary{
 			ProjectID:         pid,
-			ProjectName:       projectNames[pid],
+			ProjectName:       agg.names[pid],
 			RiskLevel:         risk.Level,
 			DueDate:           dueDateStr,
 			DaysLeft:          risk.DaysLeft,
-			PlannedMinTotal:   projectPlanned[pid],
-			LoggedMinTotal:    projectLogged[pid],
+			PlannedMinTotal:   agg.planned[pid],
+			LoggedMinTotal:    agg.logged[pid],
 			RemainingMinTotal: risk.RemainingMin,
 			RequiredDailyMin:  risk.RequiredDailyMin,
 			RecentDailyMin:    recentDaily,
@@ -259,31 +284,27 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 		})
 	}
 
-	// Compute allocated total
 	allocatedMin := 0
 	for _, sl := range slices {
 		allocatedMin += sl.AllocatedMin
 	}
 
-	// Build policy messages
 	var policyMessages []string
-	for pid, risk := range projectRisks {
+	for pid, risk := range agg.risks {
 		if risk.Level == domain.RiskOnTrack {
-			policyMessages = append(policyMessages, fmt.Sprintf("%s is on track, secondary work is safe", projectNames[pid]))
+			policyMessages = append(policyMessages, fmt.Sprintf("%s is on track, secondary work is safe", agg.names[pid]))
 		}
 	}
 
-	resp := &contract.WhatNowResponse{
+	return &contract.WhatNowResponse{
 		GeneratedAt:     now,
 		Mode:            mode,
-		RequestedMin:    req.AvailableMin,
+		RequestedMin:    requestedMin,
 		AllocatedMin:    allocatedMin,
-		UnallocatedMin:  req.AvailableMin - allocatedMin,
+		UnallocatedMin:  requestedMin - allocatedMin,
 		Recommendations: slices,
 		Blockers:        blockers,
 		TopRiskProjects: riskSummaries,
 		PolicyMessages:  policyMessages,
 	}
-
-	return resp, nil
 }

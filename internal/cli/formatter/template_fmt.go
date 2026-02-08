@@ -11,11 +11,12 @@ import (
 
 // FormatTemplateList renders a styled template list inside a bordered box.
 func FormatTemplateList(templates []domain.Template) string {
-	headers := []string{"NAME", "DOMAIN", "VERSION"}
+	headers := []string{"ID", "NAME", "DOMAIN", "VERSION"}
 	rows := make([][]string, 0, len(templates))
 
 	for _, t := range templates {
 		rows = append(rows, []string{
+			Dim(fmt.Sprintf("%d", t.NumericID)),
 			Bold(t.Name),
 			DomainBadge(t.Domain),
 			Dim(t.Version),
@@ -33,6 +34,7 @@ func FormatTemplateShow(t *domain.Template) string {
 	titleLine := fmt.Sprintf("%s  %s", StyleBold.Render(t.Name), DomainBadge(t.Domain))
 	b.WriteString(titleLine + "\n\n")
 
+	b.WriteString(fmt.Sprintf("  %s  %s\n", StyleDim.Render("NUM ID "), Dim(fmt.Sprintf("%d", t.NumericID))))
 	b.WriteString(fmt.Sprintf("  %s  %s\n", StyleDim.Render("VERSION"), Dim(t.Version)))
 	b.WriteString(fmt.Sprintf("  %s  %s\n", StyleDim.Render("ID     "), Dim(t.ID)))
 

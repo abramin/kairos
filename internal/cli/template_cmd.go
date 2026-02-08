@@ -51,8 +51,8 @@ func newTemplateListCmd(app *App) *cobra.Command {
 
 func newTemplateShowCmd(app *App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "show NAME",
-		Short: "Show template details",
+		Use:   "show REF",
+		Short: "Show template details by ID, name, or file stem",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			t, err := app.Templates.Get(context.Background(), args[0])

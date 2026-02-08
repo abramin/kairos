@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	validNodeKinds     = map[string]bool{"week": true, "module": true, "book": true, "stage": true, "section": true, "generic": true}
+	validNodeKinds     = map[string]bool{"week": true, "module": true, "book": true, "stage": true, "section": true, "generic": true, "assessment": true}
 	validDurationModes = map[string]bool{"fixed": true, "estimate": true, "derived": true}
 	validWorkStatuses  = map[string]bool{"todo": true, "in_progress": true, "done": true, "skipped": true, "archived": true}
 )

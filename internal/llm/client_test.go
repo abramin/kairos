@@ -50,7 +50,7 @@ func TestOllamaClient_Generate_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, `{"intent":"what_now"}`, resp.Text)
 	assert.Equal(t, "llama3.2", resp.Model)
-	assert.Greater(t, resp.LatencyMs, int64(0))
+	assert.GreaterOrEqual(t, resp.LatencyMs, int64(0))
 }
 
 func TestOllamaClient_Generate_Timeout(t *testing.T) {

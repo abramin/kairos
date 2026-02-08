@@ -4,7 +4,6 @@ import (
 	"math"
 
 	"github.com/alexanderramin/kairos/internal/contract"
-	"github.com/alexanderramin/kairos/internal/domain"
 )
 
 // AllocateSlices takes sorted scored candidates and available time,
@@ -123,16 +122,12 @@ func tryAllocate(c ScoredCandidate, remaining int) (*contract.WorkSlice, *contra
 		DefaultSessionMin: defS,
 		Splittable:        c.Input.Splittable,
 		DueDate:           dueDateStr,
-		RiskLevel:         riskForProject(c),
+		RiskLevel:         c.Input.ProjectRisk,
 		Score:             c.Score,
 		Reasons:           reasons,
 	}
 
 	return slice, nil
-}
-
-func riskForProject(c ScoredCandidate) domain.RiskLevel {
-	return c.Input.ProjectRisk
 }
 
 func clamp(val, lo, hi int) int {

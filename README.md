@@ -116,6 +116,9 @@ You run:
 
 ```bash
 kairos what-now --minutes 45
+
+# short cut command
+kairos 45
 ```
 
 Kairos may suggest:

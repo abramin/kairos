@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func ptrStr(s string) *string    { return &s }
-func ptrInt(i int) *int          { return &i }
+func ptrStr(s string) *string     { return &s }
+func ptrInt(i int) *int           { return &i }
 func ptrFloat(f float64) *float64 { return &f }
-func ptrBool(b bool) *bool       { return &b }
+func ptrBool(b bool) *bool        { return &b }
 
 func validMinimalSchema() *ImportSchema {
 	return &ImportSchema{
@@ -253,6 +253,14 @@ func TestValidateImportSchema_InvalidEnums(t *testing.T) {
 			assert.True(t, found, "expected error containing %q", tc.wantMsg)
 		})
 	}
+}
+
+func TestValidateImportSchema_AssessmentNodeKind(t *testing.T) {
+	s := validMinimalSchema()
+	s.Nodes[0].Kind = "assessment"
+
+	errs := ValidateImportSchema(s)
+	assert.Empty(t, errs)
 }
 
 func TestValidateImportSchema_SessionBoundsViolation(t *testing.T) {

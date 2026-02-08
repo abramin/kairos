@@ -54,20 +54,7 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 		return nil, fmt.Errorf("loading projects: %w", err)
 	}
 
-	// Filter by scope
-	if len(req.ProjectScope) > 0 {
-		scopeSet := make(map[string]bool)
-		for _, id := range req.ProjectScope {
-			scopeSet[id] = true
-		}
-		var filtered []*domain.Project
-		for _, p := range projects {
-			if scopeSet[p.ID] {
-				filtered = append(filtered, p)
-			}
-		}
-		projects = filtered
-	}
+	projects = filterProjectsByScope(projects, req.ProjectScope)
 
 	var views []contract.ProjectStatusView
 	countOnTrack, countAtRisk, countCritical := 0, 0, 0
@@ -98,7 +85,10 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 		}
 
 		// Recent sessions for pace
-		recentSessions, _ := s.sessions.ListRecentByProject(ctx, p.ID, days)
+		recentSessions, err := s.sessions.ListRecentByProject(ctx, p.ID, days)
+		if err != nil {
+			return nil, fmt.Errorf("loading recent sessions for project %s: %w", p.ID, err)
+		}
 		var recentMin int
 		for _, sess := range recentSessions {
 			recentMin += sess.Minutes

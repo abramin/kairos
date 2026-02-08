@@ -135,6 +135,11 @@ func TestFormatDraftAccepted_ShowsResult(t *testing.T) {
 	assert.Contains(t, out, "5 dependencies")
 }
 
+func TestFormatDraftWelcome_ShowsHeader(t *testing.T) {
+	out := FormatDraftWelcome()
+	assert.Contains(t, out, "PROJECT DRAFT")
+}
+
 func TestFormatDraftPreview_NestedNodes(t *testing.T) {
 	draft := &importer.ImportSchema{
 		Project: importer.ProjectImport{

@@ -10,6 +10,11 @@ import (
 	"github.com/alexanderramin/kairos/internal/service"
 )
 
+// FormatDraftWelcome renders the welcome header for interactive draft mode.
+func FormatDraftWelcome() string {
+	return "\n" + Header("Project Draft") + "\n"
+}
+
 // FormatDraftTurn renders the LLM's conversational message and a compact
 // summary of the current draft state.
 func FormatDraftTurn(conv *intelligence.DraftConversation) string {

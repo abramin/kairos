@@ -48,12 +48,13 @@ const (
 type NodeKind string
 
 const (
-	NodeWeek    NodeKind = "week"
-	NodeModule  NodeKind = "module"
-	NodeBook    NodeKind = "book"
-	NodeStage   NodeKind = "stage"
-	NodeSection NodeKind = "section"
-	NodeGeneric NodeKind = "generic"
+	NodeWeek       NodeKind = "week"
+	NodeModule     NodeKind = "module"
+	NodeBook       NodeKind = "book"
+	NodeStage      NodeKind = "stage"
+	NodeSection    NodeKind = "section"
+	NodeAssessment NodeKind = "assessment"
+	NodeGeneric    NodeKind = "generic"
 )
 
 type DurationMode string

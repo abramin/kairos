@@ -363,7 +363,7 @@ func newProjectInitCmd(app *App) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&shortID, "id", "", "Short ID (3-6 uppercase letters + 2-4 digits, e.g. PHI01)")
-	cmd.Flags().StringVar(&templateName, "template", "", "Template name")
+	cmd.Flags().StringVar(&templateName, "template", "", "Template reference (integer ID from `template list`, name, schema ID, or file stem)")
 	cmd.Flags().StringVar(&name, "name", "", "Project name")
 	cmd.Flags().StringVar(&start, "start", "", "Start date (YYYY-MM-DD)")
 	cmd.Flags().StringVar(&due, "due", "", "Target due date (YYYY-MM-DD)")

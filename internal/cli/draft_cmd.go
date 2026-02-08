@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/importer"
@@ -15,20 +16,21 @@ import (
 
 func newProjectDraftCmd(app *App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   `draft "<description>"`,
+		Use:   "draft [description]",
 		Short: "Interactively create a project from a natural language description",
 		Long: `Use LLM to iteratively build a project through conversation.
 
-Describe your project, answer questions, review the draft, then accept.
+Run without arguments to enter interactive mode, or pass a description directly.
 
 Commands during conversation:
   /show    Show current draft as a tree
   /accept  Accept the current draft
   /quit    Cancel and exit
 
-Example:
+Examples:
+  kairos project draft
   kairos project draft "A 12-week physics study plan for my final exam in June"`,
-		Args: cobra.ExactArgs(1),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if app.ProjectDraft == nil {
 				return fmt.Errorf("LLM features are disabled. Use explicit commands:\n" +
@@ -36,15 +38,95 @@ Example:
 					"  kairos project import file.json\n\n" +
 					"Enable with: KAIROS_LLM_ENABLED=true")
 			}
-			return runProjectDraftLoop(app, args[0])
+
+			scanner := bufio.NewScanner(os.Stdin)
+
+			var description string
+			if len(args) > 0 {
+				description = args[0]
+			} else {
+				var err error
+				description, err = gatherProjectInfo(scanner)
+				if err != nil {
+					return err
+				}
+			}
+
+			return runProjectDraftLoop(app, scanner, description)
 		},
 	}
 	return cmd
 }
 
-func runProjectDraftLoop(app *App, description string) error {
+func gatherProjectInfo(scanner *bufio.Scanner) (string, error) {
+	fmt.Print(formatter.FormatDraftWelcome())
+
+	// Question 1: Project description (required).
+	fmt.Print("  Describe your project:\n  > ")
+	if !scanner.Scan() {
+		return "", fmt.Errorf("input cancelled")
+	}
+	description := strings.TrimSpace(scanner.Text())
+	if description == "" {
+		return "", fmt.Errorf("project description is required")
+	}
+
+	// Question 2: Start date (optional, defaults to today).
+	fmt.Print("\n  When do you want to start? (YYYY-MM-DD, or Enter for today)\n  > ")
+	startDate := time.Now().Format("2006-01-02")
+	if scanner.Scan() {
+		input := strings.TrimSpace(scanner.Text())
+		if input != "" {
+			if _, err := time.Parse("2006-01-02", input); err != nil {
+				fmt.Fprintf(os.Stderr, "  Invalid date format, using today.\n")
+			} else {
+				startDate = input
+			}
+		}
+	}
+
+	// Question 3: Deadline (optional).
+	fmt.Print("\n  When is the deadline? (YYYY-MM-DD, or Enter to skip)\n  > ")
+	var deadline string
+	if scanner.Scan() {
+		input := strings.TrimSpace(scanner.Text())
+		if input != "" {
+			if _, err := time.Parse("2006-01-02", input); err != nil {
+				fmt.Fprintf(os.Stderr, "  Invalid date format, skipping deadline.\n")
+			} else {
+				deadline = input
+			}
+		}
+	}
+
+	// Question 4: Structure hint (optional).
+	fmt.Print("\n  How is the work organized? (e.g., \"5 chapters with reading + exercises each\")\n  > ")
+	var structure string
+	if scanner.Scan() {
+		structure = strings.TrimSpace(scanner.Text())
+	}
+
+	// Bundle into a rich description string.
+	var b strings.Builder
+	b.WriteString(description)
+	b.WriteString("\nStart date: ")
+	b.WriteString(startDate)
+	if deadline != "" {
+		b.WriteString("\nDeadline: ")
+		b.WriteString(deadline)
+	}
+	if structure != "" {
+		b.WriteString("\nStructure: ")
+		b.WriteString(structure)
+	}
+
+	fmt.Printf("\n  %s\n\n", formatter.Dim("Building your project draft..."))
+
+	return b.String(), nil
+}
+
+func runProjectDraftLoop(app *App, scanner *bufio.Scanner, description string) error {
 	ctx := context.Background()
-	scanner := bufio.NewScanner(os.Stdin)
 
 	// Start the conversation.
 	conv, err := app.ProjectDraft.Start(ctx, description)

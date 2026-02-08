@@ -61,7 +61,7 @@ func newNodeAddCmd(app *App) *cobra.Command {
 
 	cmd.Flags().StringVar(&projectID, "project", "", "Project ID")
 	cmd.Flags().StringVar(&title, "title", "", "Node title")
-	cmd.Flags().StringVar(&kind, "kind", "", "Node kind (week|module|book|stage|section|generic)")
+	cmd.Flags().StringVar(&kind, "kind", "", "Node kind (week|module|book|stage|section|assessment|generic)")
 	cmd.Flags().StringVar(&parentID, "parent", "", "Parent node ID")
 	cmd.Flags().IntVar(&order, "order", 0, "Order index")
 	_ = cmd.MarkFlagRequired("project")
@@ -172,7 +172,7 @@ func newNodeUpdateCmd(app *App) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&title, "title", "", "Node title")
-	cmd.Flags().StringVar(&kind, "kind", "", "Node kind (week|module|book|stage|section|generic)")
+	cmd.Flags().StringVar(&kind, "kind", "", "Node kind (week|module|book|stage|section|assessment|generic)")
 	cmd.Flags().IntVar(&order, "order", 0, "Order index")
 
 	return cmd

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/alexanderramin/kairos/internal/domain"
@@ -18,6 +19,12 @@ type templateService struct {
 	nodes       repository.PlanNodeRepo
 	workItems   repository.WorkItemRepo
 	deps        repository.DependencyRepo
+}
+
+type templateEntry struct {
+	Index  int
+	Path   string
+	Schema *tmpl.TemplateSchema
 }
 
 func NewTemplateService(
@@ -37,60 +44,52 @@ func NewTemplateService(
 }
 
 func (s *templateService) List(ctx context.Context) ([]domain.Template, error) {
-	files, err := filepath.Glob(filepath.Join(s.templateDir, "*.json"))
+	entries, err := s.loadTemplateEntries()
 	if err != nil {
 		return nil, fmt.Errorf("listing templates: %w", err)
 	}
 
-	var templates []domain.Template
-	for _, f := range files {
-		schema, err := tmpl.LoadSchema(f)
-		if err != nil {
-			continue // skip invalid templates
-		}
+	templates := make([]domain.Template, 0, len(entries))
+	for _, entry := range entries {
 		templates = append(templates, domain.Template{
-			ID:      schema.ID,
-			Name:    schema.Name,
-			Domain:  schema.Domain,
-			Version: schema.Version,
+			NumericID: entry.Index,
+			ID:        entry.Schema.ID,
+			Name:      entry.Schema.Name,
+			Domain:    entry.Schema.Domain,
+			Version:   entry.Schema.Version,
 		})
 	}
 	return templates, nil
 }
 
 func (s *templateService) Get(ctx context.Context, name string) (*domain.Template, error) {
-	path, err := s.resolveTemplatePath(name)
+	entry, err := s.resolveTemplate(name)
 	if err != nil {
 		return nil, err
 	}
 
-	schema, err := tmpl.LoadSchema(path)
+	data, err := json.Marshal(entry.Schema)
 	if err != nil {
-		return nil, fmt.Errorf("template '%s' not found: %w", name, err)
+		return nil, fmt.Errorf("encoding template '%s': %w", name, err)
 	}
 
-	data, _ := json.Marshal(schema)
 	return &domain.Template{
-		ID:         schema.ID,
-		Name:       schema.Name,
-		Domain:     schema.Domain,
-		Version:    schema.Version,
+		NumericID:  entry.Index,
+		ID:         entry.Schema.ID,
+		Name:       entry.Schema.Name,
+		Domain:     entry.Schema.Domain,
+		Version:    entry.Schema.Version,
 		ConfigJSON: string(data),
 	}, nil
 }
 
 func (s *templateService) InitProject(ctx context.Context, templateName, projectName, shortID, startDate string, dueDate *string, vars map[string]string) (*domain.Project, error) {
-	path, err := s.resolveTemplatePath(templateName)
+	entry, err := s.resolveTemplate(templateName)
 	if err != nil {
 		return nil, err
 	}
 
-	schema, err := tmpl.LoadSchema(path)
-	if err != nil {
-		return nil, fmt.Errorf("template '%s' not found: %w", templateName, err)
-	}
-
-	generated, err := tmpl.Execute(schema, projectName, startDate, dueDate, vars)
+	generated, err := tmpl.Execute(entry.Schema, projectName, startDate, dueDate, vars)
 	if err != nil {
 		return nil, fmt.Errorf("executing template: %w", err)
 	}
@@ -127,43 +126,63 @@ func (s *templateService) InitProject(ctx context.Context, templateName, project
 	return generated.Project, nil
 }
 
-func (s *templateService) resolveTemplatePath(name string) (string, error) {
+func (s *templateService) resolveTemplate(name string) (*templateEntry, error) {
 	input := strings.TrimSpace(name)
 	if input == "" {
-		return "", fmt.Errorf("template '%s' not found: empty template name", name)
+		return nil, fmt.Errorf("template '%s' not found: empty template name", name)
 	}
 
-	// Fast path: treat input as file stem (current behavior).
-	stemPath := filepath.Join(s.templateDir, input+".json")
-	if schema, err := tmpl.LoadSchema(stemPath); err == nil && schema != nil {
-		return stemPath, nil
+	entries, err := s.loadTemplateEntries()
+	if err != nil {
+		return nil, fmt.Errorf("template '%s' not found: listing templates: %w", name, err)
 	}
 
-	// Also allow passing an explicit .json filename.
-	if strings.HasSuffix(strings.ToLower(input), ".json") {
-		filenamePath := filepath.Join(s.templateDir, input)
-		if schema, err := tmpl.LoadSchema(filenamePath); err == nil && schema != nil {
-			return filenamePath, nil
+	// Resolve by file stem, filename, schema ID, or display name (case-insensitive).
+	for i := range entries {
+		entry := &entries[i]
+		fileStem := strings.TrimSuffix(filepath.Base(entry.Path), filepath.Ext(entry.Path))
+		filename := filepath.Base(entry.Path)
+		if strings.EqualFold(fileStem, input) ||
+			strings.EqualFold(filename, input) ||
+			strings.EqualFold(entry.Schema.ID, input) ||
+			strings.EqualFold(entry.Schema.Name, input) {
+			return entry, nil
 		}
 	}
 
-	// Fallback: resolve by schema ID or display name (case-insensitive).
-	files, err := filepath.Glob(filepath.Join(s.templateDir, "*.json"))
-	if err != nil {
-		return "", fmt.Errorf("template '%s' not found: listing templates: %w", name, err)
+	// Resolve by integer selector from `template list`.
+	if numericID, err := strconv.Atoi(input); err == nil {
+		for i := range entries {
+			entry := &entries[i]
+			if entry.Index == numericID {
+				return entry, nil
+			}
+		}
 	}
 
+	stemPath := filepath.Join(s.templateDir, input+".json")
+	return nil, fmt.Errorf("template '%s' not found: open %s: no such file or directory", name, stemPath)
+}
+
+func (s *templateService) loadTemplateEntries() ([]templateEntry, error) {
+	files, err := filepath.Glob(filepath.Join(s.templateDir, "*.json"))
+	if err != nil {
+		return nil, err
+	}
+
+	entries := make([]templateEntry, 0, len(files))
 	for _, file := range files {
 		schema, err := tmpl.LoadSchema(file)
 		if err != nil {
-			continue
+			continue // skip invalid templates
 		}
 
-		fileStem := strings.TrimSuffix(filepath.Base(file), filepath.Ext(file))
-		if strings.EqualFold(fileStem, input) || strings.EqualFold(schema.ID, input) || strings.EqualFold(schema.Name, input) {
-			return file, nil
-		}
+		entries = append(entries, templateEntry{
+			Index:  len(entries) + 1,
+			Path:   file,
+			Schema: schema,
+		})
 	}
 
-	return "", fmt.Errorf("template '%s' not found: open %s: no such file or directory", name, stemPath)
+	return entries, nil
 }

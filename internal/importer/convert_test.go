@@ -245,6 +245,17 @@ func TestConvert_UnitsTracking(t *testing.T) {
 	assert.Equal(t, 0, gen.WorkItems[0].UnitsDone)
 }
 
+func TestConvert_AssessmentNodeKind(t *testing.T) {
+	schema := validMinimalSchema()
+	schema.Nodes[0].Kind = "assessment"
+
+	gen, err := Convert(schema)
+	require.NoError(t, err)
+
+	require.Len(t, gen.Nodes, 1)
+	assert.Equal(t, domain.NodeAssessment, gen.Nodes[0].Kind)
+}
+
 func TestConvert_ShortIDUppercased(t *testing.T) {
 	schema := validMinimalSchema()
 	schema.Project.ShortID = "phi01"
