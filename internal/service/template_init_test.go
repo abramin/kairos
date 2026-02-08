@@ -20,11 +20,11 @@ func TestTemplateInit_PersistsFullStructure(t *testing.T) {
 
 	svc := NewTemplateService(templateDir, projects, nodes, workItems, deps)
 
-	// Use study_weeks=3, tma_count=2 for a small but realistic test
+	// Use weeks=3, assignment_count=2 for a small but realistic test
 	due := "2026-06-01"
-	proj, err := svc.InitProject(ctx, "ou_module_weekly", "Test Module", "TST01", "2026-02-10", &due, map[string]string{
-		"study_weeks": "3",
-		"tma_count":   "2",
+	proj, err := svc.InitProject(ctx, "course_weekly_generic", "Test Module", "TST01", "2026-02-10", &due, map[string]string{
+		"weeks":            "3",
+		"assignment_count": "2",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, proj)
@@ -33,18 +33,18 @@ func TestTemplateInit_PersistsFullStructure(t *testing.T) {
 	assert.Equal(t, "TST01", proj.ShortID)
 	assert.Equal(t, "education", proj.Domain)
 
-	// Verify nodes persisted: study_root + 3 weeks + tma_root + 2 TMAs = 7 nodes
+	// Verify nodes persisted: course_root + 3 weeks + assignments_root + 2 assignments = 7 nodes
 	projectNodes, err := nodes.ListByProject(ctx, proj.ID)
 	require.NoError(t, err)
-	assert.Equal(t, 7, len(projectNodes), "expected 7 nodes: study_root + 3 weeks + tma_root + 2 TMAs")
+	assert.Equal(t, 7, len(projectNodes), "expected 7 nodes: course_root + 3 weeks + assignments_root + 2 assignments")
 
 	// Verify work items persisted:
-	// 3 weeks * (reading + activities) = 6 weekly items
-	// 2 TMAs * (draft + review + submit) = 6 TMA items
-	// Total: 12 work items
+	// 3 weeks * (reading + review) = 6 weekly items
+	// 2 assignments * (draft + submit) = 4 assignment items
+	// Total: 10 work items
 	projectItems, err := workItems.ListByProject(ctx, proj.ID)
 	require.NoError(t, err)
-	assert.Equal(t, 12, len(projectItems), "expected 12 work items: 6 weekly + 6 TMA")
+	assert.Equal(t, 10, len(projectItems), "expected 10 work items: 6 weekly + 4 assignment")
 
 	// Verify all work items have correct attributes from template
 	for _, item := range projectItems {
@@ -60,22 +60,22 @@ func TestTemplateInit_WithVariableOverride(t *testing.T) {
 	templateDir := findTemplatesDir(t)
 	svc := NewTemplateService(templateDir, projects, nodes, workItems, deps)
 
-	// Override study_weeks=2 (minimal)
-	proj, err := svc.InitProject(ctx, "ou_module_weekly", "Mini Module", "MIN01", "2026-02-10", nil, map[string]string{
-		"study_weeks": "2",
-		"tma_count":   "1",
+	// Override weeks=2 (minimal)
+	proj, err := svc.InitProject(ctx, "course_weekly_generic", "Mini Module", "MIN01", "2026-02-10", nil, map[string]string{
+		"weeks":            "2",
+		"assignment_count": "1",
 	})
 	require.NoError(t, err)
 
-	// Nodes: study_root + 2 weeks + tma_root + 1 TMA = 5
+	// Nodes: course_root + 2 weeks + assignments_root + 1 assignment = 5
 	projectNodes, err := nodes.ListByProject(ctx, proj.ID)
 	require.NoError(t, err)
-	assert.Equal(t, 5, len(projectNodes), "expected 5 nodes with 2 weeks and 1 TMA")
+	assert.Equal(t, 5, len(projectNodes), "expected 5 nodes with 2 weeks and 1 assignment")
 
-	// Work items: 2*(reading+activities) + 1*(draft+review+submit) = 7
+	// Work items: 2*(reading+review) + 1*(draft+submit) = 6
 	projectItems, err := workItems.ListByProject(ctx, proj.ID)
 	require.NoError(t, err)
-	assert.Equal(t, 7, len(projectItems), "expected 7 work items with 2 weeks and 1 TMA")
+	assert.Equal(t, 6, len(projectItems), "expected 6 work items with 2 weeks and 1 assignment")
 }
 
 func TestTemplateInit_WithDueDate(t *testing.T) {
@@ -86,9 +86,9 @@ func TestTemplateInit_WithDueDate(t *testing.T) {
 	svc := NewTemplateService(templateDir, projects, nodes, workItems, deps)
 
 	due := "2026-12-01"
-	proj, err := svc.InitProject(ctx, "ou_module_weekly", "Deadline Module", "DED01", "2026-02-10", &due, map[string]string{
-		"study_weeks": "1",
-		"tma_count":   "1",
+	proj, err := svc.InitProject(ctx, "course_weekly_generic", "Deadline Module", "DED01", "2026-02-10", &due, map[string]string{
+		"weeks":            "1",
+		"assignment_count": "1",
 	})
 	require.NoError(t, err)
 	require.NotNil(t, proj.TargetDate)

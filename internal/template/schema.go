@@ -80,8 +80,8 @@ type NodeConfig struct {
 	Repeat      json.RawMessage    `json:"repeat,omitempty"` // can be object or array
 	Title       string             `json:"title"`
 	Kind        string             `json:"kind"`
-	ParentID    *string            `json:"parent_id"`        // template ID reference, null for root
-	Order       string             `json:"order,omitempty"`  // expression
+	ParentID    *string            `json:"parent_id"`       // template ID reference, null for root
+	Order       string             `json:"order,omitempty"` // expression
 	Constraints *ConstraintsConfig `json:"constraints,omitempty"`
 	Budgets     *BudgetsConfig     `json:"budgets,omitempty"`
 }
@@ -114,7 +114,7 @@ type ValidationConfig struct {
 
 // ParseRepeats parses the repeat field which can be a single object or an array.
 func ParseRepeats(raw json.RawMessage) ([]RepeatConfig, error) {
-	if raw == nil || len(raw) == 0 || string(raw) == "null" {
+	if len(raw) == 0 || string(raw) == "null" {
 		return nil, nil
 	}
 

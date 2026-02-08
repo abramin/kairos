@@ -1,0 +1,75 @@
+{
+  "id": "self_paced_work_items",
+  "name": "Self-Paced Work Items",
+  "version": "1.0.0",
+  "description": "Fixed number of work items with no scheduled due dates (for example, 48 classes at any pace).",
+  "domain": "learning",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 25,
+      "max_session_min": 90,
+      "default_session_min": 60,
+      "splittable": false
+    },
+    "buffer_pct": 0.1
+  },
+  "project": {
+    "target_date_mode": "optional",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [
+    {
+      "key": "item_count",
+      "type": "int",
+      "required": false,
+      "default": 48,
+      "min": 1
+    }
+  ],
+  "nodes": [
+    {
+      "id": "work_root",
+      "title": "Work Items",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "1"
+    }
+  ],
+  "work_items": [
+    {
+      "id": "item_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "item_count"
+      },
+      "node_id": "work_root",
+      "title": "Class {i}",
+      "type": "class",
+      "duration_mode": "estimate",
+      "planned_min": 60,
+      "session_policy": {
+        "min_session_min": 25,
+        "max_session_min": 90,
+        "default_session_min": 60,
+        "splittable": false
+      },
+      "units": {
+        "kind": "classes",
+        "total": 1
+      },
+      "estimate_confidence": 0.7
+    }
+  ],
+  "dependencies": [],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}

@@ -1,0 +1,181 @@
+{
+  "id": "writing_project_stages",
+  "name": "Writing Project Stages",
+  "version": "1.0.0",
+  "description": "Writing workflow with planning, chapter drafting, revision, and publishing stages.",
+  "domain": "writing",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 30,
+      "max_session_min": 120,
+      "default_session_min": 75,
+      "splittable": true
+    },
+    "buffer_pct": 0.15
+  },
+  "project": {
+    "target_date_mode": "optional",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [
+    {
+      "key": "chapter_count",
+      "type": "int",
+      "required": false,
+      "default": 8,
+      "min": 1
+    }
+  ],
+  "nodes": [
+    {
+      "id": "writing_root",
+      "title": "Writing Project",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "1"
+    },
+    {
+      "id": "planning",
+      "title": "Planning",
+      "kind": "stage",
+      "parent_id": "writing_root",
+      "order": "1",
+      "constraints": {
+        "due_date_offset_days": "7"
+      }
+    },
+    {
+      "id": "drafting",
+      "title": "Drafting",
+      "kind": "stage",
+      "parent_id": "writing_root",
+      "order": "2"
+    },
+    {
+      "id": "chapter_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "chapter_count"
+      },
+      "title": "Chapter {i}",
+      "kind": "section",
+      "parent_id": "drafting",
+      "order": "{i}"
+    },
+    {
+      "id": "revision",
+      "title": "Revision",
+      "kind": "stage",
+      "parent_id": "writing_root",
+      "order": "3"
+    },
+    {
+      "id": "publishing",
+      "title": "Publishing",
+      "kind": "stage",
+      "parent_id": "writing_root",
+      "order": "4"
+    }
+  ],
+  "work_items": [
+    {
+      "id": "project_outline",
+      "node_id": "planning",
+      "title": "Project Outline",
+      "type": "planning",
+      "planned_min": 120,
+      "constraints": {
+        "due_date_offset_days": "7"
+      },
+      "estimate_confidence": 0.7
+    },
+    {
+      "id": "source_research",
+      "node_id": "planning",
+      "title": "Source and Background Research",
+      "type": "research",
+      "planned_min": 150,
+      "constraints": {
+        "due_date_offset_days": "14"
+      },
+      "estimate_confidence": 0.65
+    },
+    {
+      "id": "chapter{i}_draft",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "chapter_count"
+      },
+      "node_id": "chapter_{i}",
+      "title": "Chapter {i} Draft",
+      "type": "writing",
+      "planned_min": 120,
+      "units": {
+        "kind": "chapters",
+        "total": 1
+      },
+      "constraints": {
+        "due_date_offset_days": "{i*7+14}"
+      },
+      "estimate_confidence": 0.55
+    },
+    {
+      "id": "chapter{i}_revise",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "chapter_count"
+      },
+      "node_id": "chapter_{i}",
+      "title": "Chapter {i} Revision",
+      "type": "revision",
+      "planned_min": 75,
+      "constraints": {
+        "due_date_offset_days": "{i*7+16}"
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "full_manuscript_edit",
+      "node_id": "revision",
+      "title": "Full Manuscript Edit",
+      "type": "editing",
+      "planned_min": 240,
+      "session_policy": {
+        "min_session_min": 45,
+        "max_session_min": 120,
+        "default_session_min": 90,
+        "splittable": true
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "publish_and_submit",
+      "node_id": "publishing",
+      "title": "Publish / Submit",
+      "type": "submission",
+      "duration_mode": "fixed",
+      "planned_min": 45,
+      "session_policy": {
+        "min_session_min": 30,
+        "max_session_min": 45,
+        "default_session_min": 45,
+        "splittable": false
+      },
+      "estimate_confidence": 1
+    }
+  ],
+  "dependencies": [],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}

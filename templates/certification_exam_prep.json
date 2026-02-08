@@ -1,0 +1,220 @@
+{
+  "id": "certification_exam_prep",
+  "name": "Certification Exam Prep",
+  "version": "1.0.0",
+  "description": "Deadline-driven certification prep with weekly study, quizzes, mock exams, and final review.",
+  "domain": "education",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 30,
+      "max_session_min": 120,
+      "default_session_min": 60,
+      "splittable": true
+    },
+    "buffer_pct": 0.2
+  },
+  "project": {
+    "target_date_mode": "required",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [
+    {
+      "key": "weeks",
+      "type": "int",
+      "required": false,
+      "default": 8,
+      "min": 1
+    },
+    {
+      "key": "topics_per_week",
+      "type": "int",
+      "required": false,
+      "default": 2,
+      "min": 1
+    },
+    {
+      "key": "mock_exams",
+      "type": "int",
+      "required": false,
+      "default": 3,
+      "min": 1
+    }
+  ],
+  "nodes": [
+    {
+      "id": "prep_root",
+      "title": "Exam Prep",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "1"
+    },
+    {
+      "id": "week_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "weeks"
+      },
+      "title": "Week {i}",
+      "kind": "week",
+      "parent_id": "prep_root",
+      "order": "{i}",
+      "constraints": {
+        "not_before_offset_days": "{(i-1)*7}",
+        "not_after_offset_days": "{i*7-1}",
+        "due_date_offset_days": "{i*7}"
+      }
+    },
+    {
+      "id": "mocks_root",
+      "title": "Mock Exams",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "2"
+    },
+    {
+      "id": "mock_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "mock_exams"
+      },
+      "title": "Mock Exam {i}",
+      "kind": "stage",
+      "parent_id": "mocks_root",
+      "order": "{i}",
+      "constraints": {
+        "due_date_offset_days": "{weeks*7-(mock_exams-i)*7}"
+      }
+    },
+    {
+      "id": "final_review",
+      "title": "Final Review",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "3",
+      "constraints": {
+        "due_date_offset_days": "{weeks*7}"
+      }
+    }
+  ],
+  "work_items": [
+    {
+      "id": "w{i}_topic{j}_study",
+      "repeat": [
+        {
+          "var": "i",
+          "from": 1,
+          "to_var": "weeks"
+        },
+        {
+          "var": "j",
+          "from": 1,
+          "to_var": "topics_per_week"
+        }
+      ],
+      "node_id": "week_{i}",
+      "title": "Week {i} Topic {j} Study",
+      "type": "study",
+      "planned_min": 75,
+      "units": {
+        "kind": "topics",
+        "total": 1
+      },
+      "constraints": {
+        "due_date_offset_days": "{i*7}"
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "w{i}_quiz",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "weeks"
+      },
+      "node_id": "week_{i}",
+      "title": "Week {i} Quiz",
+      "type": "quiz",
+      "duration_mode": "fixed",
+      "planned_min": 30,
+      "session_policy": {
+        "min_session_min": 30,
+        "max_session_min": 30,
+        "default_session_min": 30,
+        "splittable": false
+      },
+      "constraints": {
+        "due_date_offset_days": "{i*7}"
+      },
+      "estimate_confidence": 1
+    },
+    {
+      "id": "mock{i}_take",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "mock_exams"
+      },
+      "node_id": "mock_{i}",
+      "title": "Mock Exam {i} - Take",
+      "type": "mock_exam",
+      "duration_mode": "fixed",
+      "planned_min": 120,
+      "session_policy": {
+        "min_session_min": 120,
+        "max_session_min": 120,
+        "default_session_min": 120,
+        "splittable": false
+      },
+      "constraints": {
+        "due_date_offset_days": "{weeks*7-(mock_exams-i)*7}"
+      },
+      "estimate_confidence": 1
+    },
+    {
+      "id": "mock{i}_review",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "mock_exams"
+      },
+      "node_id": "mock_{i}",
+      "title": "Mock Exam {i} - Review",
+      "type": "review",
+      "planned_min": 60,
+      "constraints": {
+        "due_date_offset_days": "{weeks*7-(mock_exams-i)*7+1}"
+      },
+      "estimate_confidence": 0.7
+    },
+    {
+      "id": "final_revision_pack",
+      "node_id": "final_review",
+      "title": "Final Revision Pack",
+      "type": "review",
+      "planned_min": 180,
+      "session_policy": {
+        "min_session_min": 45,
+        "max_session_min": 120,
+        "default_session_min": 90,
+        "splittable": true
+      },
+      "constraints": {
+        "due_date_offset_days": "{weeks*7}"
+      },
+      "estimate_confidence": 0.65
+    }
+  ],
+  "dependencies": [],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}

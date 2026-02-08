@@ -66,6 +66,7 @@ func run() error {
 		Status:    service.NewStatusService(projectRepo, workItemRepo, sessionRepo, profileRepo),
 		Replan:    service.NewReplanService(projectRepo, workItemRepo, sessionRepo, profileRepo),
 		Templates: service.NewTemplateService(templateDir, projectRepo, nodeRepo, workItemRepo, depRepo),
+		Import:    service.NewImportService(projectRepo, nodeRepo, workItemRepo, depRepo),
 	}
 
 	// Wire v2 intelligence services (only when LLM is enabled)
@@ -78,6 +79,7 @@ func run() error {
 		app.Intent = intelligence.NewIntentService(llmClient, observer, policy)
 		app.Explain = intelligence.NewExplainService(llmClient, observer)
 		app.TemplateDraft = intelligence.NewTemplateDraftService(llmClient, observer)
+		app.ProjectDraft = intelligence.NewProjectDraftService(llmClient, observer)
 	}
 
 	// Execute root command

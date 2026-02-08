@@ -69,6 +69,8 @@ func newProjectCmd(app *App) *cobra.Command {
 		newProjectUnarchiveCmd(app),
 		newProjectRemoveCmd(app),
 		newProjectInitCmd(app),
+		newProjectImportCmd(app),
+		newProjectDraftCmd(app),
 	)
 
 	return cmd
@@ -144,7 +146,7 @@ func newProjectListCmd(app *App) *cobra.Command {
 				return nil
 			}
 
-			fmt.Print(formatter.FormatProjectList(projects))
+			fmt.Printf("%s\n", formatter.FormatProjectList(projects))
 			return nil
 		},
 	}
@@ -199,7 +201,7 @@ func newProjectInspectCmd(app *App) *cobra.Command {
 				WorkItems: workItems,
 			}
 
-			fmt.Print(formatter.FormatProjectInspect(data))
+			fmt.Printf("%s\n", formatter.FormatProjectInspect(data))
 			return nil
 		},
 	}
@@ -372,4 +374,23 @@ func newProjectInitCmd(app *App) *cobra.Command {
 	_ = cmd.MarkFlagRequired("start")
 
 	return cmd
+}
+
+func newProjectImportCmd(app *App) *cobra.Command {
+	return &cobra.Command{
+		Use:   "import FILE",
+		Short: "Import a project from a JSON file",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			result, err := app.Import.ImportProject(context.Background(), args[0])
+			if err != nil {
+				return err
+			}
+
+			fmt.Printf("Imported project %s [%s] — %d nodes, %d work items, %d dependencies\n",
+				result.Project.Name, result.Project.ShortID,
+				result.NodeCount, result.WorkItemCount, result.DependencyCount)
+			return nil
+		},
+	}
 }

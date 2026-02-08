@@ -5,6 +5,7 @@ import (
 
 	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/domain"
+	"github.com/alexanderramin/kairos/internal/importer"
 )
 
 type ProjectService interface {
@@ -62,4 +63,17 @@ type TemplateService interface {
 	List(ctx context.Context) ([]domain.Template, error)
 	Get(ctx context.Context, name string) (*domain.Template, error)
 	InitProject(ctx context.Context, templateName string, projectName string, shortID string, startDate string, dueDate *string, vars map[string]string) (*domain.Project, error)
+}
+
+// ImportResult holds the outcome of a project import.
+type ImportResult struct {
+	Project         *domain.Project
+	NodeCount       int
+	WorkItemCount   int
+	DependencyCount int
+}
+
+type ImportService interface {
+	ImportProject(ctx context.Context, filePath string) (*ImportResult, error)
+	ImportProjectFromSchema(ctx context.Context, schema *importer.ImportSchema) (*ImportResult, error)
 }

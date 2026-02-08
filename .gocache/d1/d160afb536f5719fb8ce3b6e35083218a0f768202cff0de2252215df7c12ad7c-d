@@ -1,0 +1,8 @@
+./helpers.go
+./interfaces.go
+./sqlite_dependency.go
+./sqlite_plannode.go
+./sqlite_project.go
+./sqlite_session.go
+./sqlite_userprofile.go
+./sqlite_workitem.go

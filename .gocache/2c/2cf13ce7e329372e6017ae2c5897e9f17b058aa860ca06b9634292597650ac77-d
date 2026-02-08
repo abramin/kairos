@@ -1,0 +1,5 @@
+./client.go
+./config.go
+./errors.go
+./observability.go
+./structured.go

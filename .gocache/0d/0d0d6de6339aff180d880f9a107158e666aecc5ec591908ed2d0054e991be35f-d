@@ -1,0 +1,12 @@
+./color.go
+./explain_fmt.go
+./helpers.go
+./progress.go
+./project_fmt.go
+./status_fmt.go
+./table.go
+./template_fmt.go
+./tree.go
+./whatnow_fmt.go
+./helpers_test.go
+./project_fmt_test.go

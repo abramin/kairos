@@ -1,0 +1,162 @@
+{
+  "id": "portfolio_milestones",
+  "name": "Portfolio Milestones",
+  "version": "1.0.0",
+  "description": "Portfolio/project build plan organized by milestones with build tasks, demo, and retrospective.",
+  "domain": "career",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 30,
+      "max_session_min": 120,
+      "default_session_min": 75,
+      "splittable": true
+    },
+    "buffer_pct": 0.15
+  },
+  "project": {
+    "target_date_mode": "optional",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [
+    {
+      "key": "milestone_count",
+      "type": "int",
+      "required": false,
+      "default": 4,
+      "min": 1
+    },
+    {
+      "key": "tasks_per_milestone",
+      "type": "int",
+      "required": false,
+      "default": 3,
+      "min": 1
+    },
+    {
+      "key": "weeks_per_milestone",
+      "type": "int",
+      "required": false,
+      "default": 3,
+      "min": 1
+    }
+  ],
+  "nodes": [
+    {
+      "id": "portfolio_root",
+      "title": "Portfolio Roadmap",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "1"
+    },
+    {
+      "id": "milestone_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "milestone_count"
+      },
+      "title": "Milestone {i}",
+      "kind": "stage",
+      "parent_id": "portfolio_root",
+      "order": "{i}",
+      "constraints": {
+        "due_date_offset_days": "{i*weeks_per_milestone*7}"
+      }
+    }
+  ],
+  "work_items": [
+    {
+      "id": "m{i}_plan",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "milestone_count"
+      },
+      "node_id": "milestone_{i}",
+      "title": "Milestone {i} Planning",
+      "type": "planning",
+      "planned_min": 60,
+      "constraints": {
+        "due_date_offset_days": "{(i-1)*weeks_per_milestone*7+2}"
+      },
+      "estimate_confidence": 0.7
+    },
+    {
+      "id": "m{i}_build{j}",
+      "repeat": [
+        {
+          "var": "i",
+          "from": 1,
+          "to_var": "milestone_count"
+        },
+        {
+          "var": "j",
+          "from": 1,
+          "to_var": "tasks_per_milestone"
+        }
+      ],
+      "node_id": "milestone_{i}",
+      "title": "Milestone {i} Build Task {j}",
+      "type": "build",
+      "planned_min": 90,
+      "units": {
+        "kind": "deliverables",
+        "total": 1
+      },
+      "constraints": {
+        "due_date_offset_days": "{(i-1)*weeks_per_milestone*7+j*5}"
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "m{i}_demo",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "milestone_count"
+      },
+      "node_id": "milestone_{i}",
+      "title": "Milestone {i} Demo",
+      "type": "demo",
+      "duration_mode": "fixed",
+      "planned_min": 45,
+      "session_policy": {
+        "min_session_min": 45,
+        "max_session_min": 45,
+        "default_session_min": 45,
+        "splittable": false
+      },
+      "constraints": {
+        "due_date_offset_days": "{i*weeks_per_milestone*7}"
+      },
+      "estimate_confidence": 1
+    },
+    {
+      "id": "m{i}_retro",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "milestone_count"
+      },
+      "node_id": "milestone_{i}",
+      "title": "Milestone {i} Retrospective",
+      "type": "review",
+      "planned_min": 30,
+      "constraints": {
+        "due_date_offset_days": "{i*weeks_per_milestone*7+1}"
+      },
+      "estimate_confidence": 0.75
+    }
+  ],
+  "dependencies": [],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}

@@ -1,0 +1,197 @@
+{
+  "id": "course_weekly_generic",
+  "name": "Course Weekly (Generic)",
+  "version": "1.0.0",
+  "description": "Generic course plan with weekly readings and scheduled assignments with due dates.",
+  "domain": "education",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 25,
+      "max_session_min": 90,
+      "default_session_min": 60,
+      "splittable": true
+    },
+    "buffer_pct": 0.2
+  },
+  "project": {
+    "target_date_mode": "required",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [
+    {
+      "key": "weeks",
+      "type": "int",
+      "required": false,
+      "default": 12,
+      "min": 1
+    },
+    {
+      "key": "assignment_count",
+      "type": "int",
+      "required": false,
+      "default": 4,
+      "min": 1
+    },
+    {
+      "key": "assignment_spacing_weeks",
+      "type": "int",
+      "required": false,
+      "default": 3,
+      "min": 1
+    }
+  ],
+  "nodes": [
+    {
+      "id": "course_root",
+      "title": "Course Plan",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "1"
+    },
+    {
+      "id": "week_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "weeks"
+      },
+      "title": "Week {i}",
+      "kind": "week",
+      "parent_id": "course_root",
+      "order": "{i}",
+      "constraints": {
+        "not_before_offset_days": "{(i-1)*7}",
+        "not_after_offset_days": "{i*7-1}",
+        "due_date_offset_days": "{i*7}"
+      }
+    },
+    {
+      "id": "assignments_root",
+      "title": "Assignments",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "2"
+    },
+    {
+      "id": "assignment_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "assignment_count"
+      },
+      "title": "Assignment {i}",
+      "kind": "stage",
+      "parent_id": "assignments_root",
+      "order": "{i}",
+      "constraints": {
+        "due_date_offset_days": "{i*assignment_spacing_weeks*7}"
+      }
+    }
+  ],
+  "work_items": [
+    {
+      "id": "w{i}_reading",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "weeks"
+      },
+      "node_id": "week_{i}",
+      "title": "Week {i} Reading",
+      "type": "reading",
+      "duration_mode": "estimate",
+      "planned_min": 90,
+      "session_policy": {
+        "min_session_min": 25,
+        "max_session_min": 90,
+        "default_session_min": 60,
+        "splittable": true
+      },
+      "units": {
+        "kind": "pages",
+        "total": 30
+      },
+      "constraints": {
+        "due_date_offset_days": "{i*7}"
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "w{i}_review",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "weeks"
+      },
+      "node_id": "week_{i}",
+      "title": "Week {i} Notes Review",
+      "type": "review",
+      "duration_mode": "estimate",
+      "planned_min": 45,
+      "session_policy": {
+        "min_session_min": 20,
+        "max_session_min": 45,
+        "default_session_min": 30,
+        "splittable": true
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "a{i}_draft",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "assignment_count"
+      },
+      "node_id": "assignment_{i}",
+      "title": "Assignment {i} Draft",
+      "type": "assignment",
+      "duration_mode": "estimate",
+      "planned_min": 150,
+      "session_policy": {
+        "min_session_min": 45,
+        "max_session_min": 120,
+        "default_session_min": 75,
+        "splittable": true
+      },
+      "constraints": {
+        "due_date_offset_days": "{i*assignment_spacing_weeks*7-2}"
+      },
+      "estimate_confidence": 0.55
+    },
+    {
+      "id": "a{i}_submit",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "assignment_count"
+      },
+      "node_id": "assignment_{i}",
+      "title": "Assignment {i} Submit",
+      "type": "submission",
+      "duration_mode": "fixed",
+      "planned_min": 20,
+      "session_policy": {
+        "min_session_min": 15,
+        "max_session_min": 30,
+        "default_session_min": 20,
+        "splittable": false
+      },
+      "constraints": {
+        "due_date_offset_days": "{i*assignment_spacing_weeks*7}"
+      },
+      "estimate_confidence": 1
+    }
+  ],
+  "dependencies": [],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}

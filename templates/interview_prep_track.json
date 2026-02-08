@@ -1,0 +1,210 @@
+{
+  "id": "interview_prep_track",
+  "name": "Interview Prep Track",
+  "version": "1.0.0",
+  "description": "Interview prep template combining DSA practice, system design, behavioral prep, and mock interviews.",
+  "domain": "career",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 30,
+      "max_session_min": 120,
+      "default_session_min": 60,
+      "splittable": true
+    },
+    "buffer_pct": 0.15
+  },
+  "project": {
+    "target_date_mode": "optional",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [
+    {
+      "key": "weeks",
+      "type": "int",
+      "required": false,
+      "default": 10,
+      "min": 1
+    },
+    {
+      "key": "dsa_sets_per_week",
+      "type": "int",
+      "required": false,
+      "default": 3,
+      "min": 1
+    },
+    {
+      "key": "system_design_sessions",
+      "type": "int",
+      "required": false,
+      "default": 6,
+      "min": 1
+    },
+    {
+      "key": "behavior_sessions",
+      "type": "int",
+      "required": false,
+      "default": 8,
+      "min": 1
+    },
+    {
+      "key": "system_design_spacing_days",
+      "type": "int",
+      "required": false,
+      "default": 10,
+      "min": 1
+    },
+    {
+      "key": "behavior_spacing_days",
+      "type": "int",
+      "required": false,
+      "default": 7,
+      "min": 1
+    }
+  ],
+  "nodes": [
+    {
+      "id": "prep_root",
+      "title": "Interview Prep",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "1"
+    },
+    {
+      "id": "week_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "weeks"
+      },
+      "title": "Week {i}",
+      "kind": "week",
+      "parent_id": "prep_root",
+      "order": "{i}",
+      "constraints": {
+        "not_before_offset_days": "{(i-1)*7}",
+        "not_after_offset_days": "{i*7-1}",
+        "due_date_offset_days": "{i*7}"
+      }
+    },
+    {
+      "id": "system_design_root",
+      "title": "System Design",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "2"
+    },
+    {
+      "id": "behavior_root",
+      "title": "Behavioral Stories",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "3"
+    }
+  ],
+  "work_items": [
+    {
+      "id": "w{i}_dsa{j}",
+      "repeat": [
+        {
+          "var": "i",
+          "from": 1,
+          "to_var": "weeks"
+        },
+        {
+          "var": "j",
+          "from": 1,
+          "to_var": "dsa_sets_per_week"
+        }
+      ],
+      "node_id": "week_{i}",
+      "title": "Week {i} DSA Set {j}",
+      "type": "coding",
+      "planned_min": 75,
+      "units": {
+        "kind": "problems",
+        "total": 2
+      },
+      "constraints": {
+        "due_date_offset_days": "{i*7}"
+      },
+      "estimate_confidence": 0.6
+    },
+    {
+      "id": "w{i}_review",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "weeks"
+      },
+      "node_id": "week_{i}",
+      "title": "Week {i} Interview Notes Review",
+      "type": "review",
+      "planned_min": 30,
+      "constraints": {
+        "due_date_offset_days": "{i*7}"
+      },
+      "estimate_confidence": 0.7
+    },
+    {
+      "id": "sd{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "system_design_sessions"
+      },
+      "node_id": "system_design_root",
+      "title": "System Design Session {i}",
+      "type": "system_design",
+      "planned_min": 90,
+      "constraints": {
+        "due_date_offset_days": "{i*system_design_spacing_days}"
+      },
+      "estimate_confidence": 0.65
+    },
+    {
+      "id": "beh{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "behavior_sessions"
+      },
+      "node_id": "behavior_root",
+      "title": "Behavioral Prep {i}",
+      "type": "behavioral",
+      "planned_min": 45,
+      "constraints": {
+        "due_date_offset_days": "{i*behavior_spacing_days}"
+      },
+      "estimate_confidence": 0.7
+    },
+    {
+      "id": "final_mock_interview",
+      "node_id": "prep_root",
+      "title": "Final Mock Interview",
+      "type": "mock_interview",
+      "duration_mode": "fixed",
+      "planned_min": 90,
+      "session_policy": {
+        "min_session_min": 90,
+        "max_session_min": 90,
+        "default_session_min": 90,
+        "splittable": false
+      },
+      "constraints": {
+        "due_date_offset_days": "{weeks*7}"
+      },
+      "estimate_confidence": 1
+    }
+  ],
+  "dependencies": [],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}

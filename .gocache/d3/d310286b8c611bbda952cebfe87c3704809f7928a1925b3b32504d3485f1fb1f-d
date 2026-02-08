@@ -1,0 +1,12 @@
+./ask_cmd.go
+./explain_cmd.go
+./node_cmd.go
+./project_cmd.go
+./replan_cmd.go
+./review_cmd.go
+./root.go
+./session_cmd.go
+./status_cmd.go
+./template_cmd.go
+./whatnow_cmd.go
+./work_cmd.go

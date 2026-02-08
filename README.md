@@ -27,15 +27,15 @@ Kairos is for you if you:
 - Go 1.25+ installed
 - macOS/Linux terminal
 
-### 1) Build Kairos
+### 1) Install Kairos
 
 From the project root:
 
 ```bash
-make build
+make install
 ```
 
-This creates a local executable: `./kairos`
+This installs `kairos` globally so you can run it from anywhere.
 
 ### 2) Point Kairos to local data and templates
 
@@ -49,14 +49,8 @@ export KAIROS_TEMPLATES="$PWD/templates"
 ### 3) Run it
 
 ```bash
-./kairos --help
-./kairos template list
-```
-
-Optional: install globally so you can run `kairos` from anywhere:
-
-```bash
-make install
+kairos --help
+kairos template list
 ```
 
 ## First-time walkthrough
@@ -64,30 +58,44 @@ make install
 Create a project from a template:
 
 ```bash
-./kairos project init \
-  --template ou_module_weekly \
-  --name "Philosophy OU" \
-  --start 2026-02-07
+kairos project init \
+  --id PHI01 \
+  --template course_weekly_generic \
+  --name "Philosophy 101" \
+  --start 2026-02-07 \
+  --due 2026-05-30 \
+  --var weeks=12 \
+  --var assignment_count=4
 ```
 
 Check your projects:
 
 ```bash
-./kairos project list
-./kairos status
+kairos project list
+kairos status
 ```
 
 Ask what to do with your next 45 minutes:
 
 ```bash
-./kairos what-now --minutes 45
+kairos what-now --minutes 45
 ```
 
 Log what you actually did:
 
 ```bash
-./kairos session log --work-item <WORK_ITEM_ID> --minutes 45 --units-done 1 --note "Focused reading"
+kairos session log --work-item <WORK_ITEM_ID> --minutes 45 --units-done 1 --note "Focused reading"
 ```
+
+## Starter templates
+
+- `course_weekly_generic`: Course with weekly nodes, reading work, and assignment due dates.
+- `self_paced_work_items`: Fixed number of work items (for example, `48` classes) with no forced schedule.
+- `certification_exam_prep`: Weekly certification prep with quizzes, mock exams, and a final review block.
+- `writing_project_stages`: Planning, chapter drafting, revision, and publishing workflow.
+- `interview_prep_track`: DSA sets, system design sessions, behavioral prep, and final mock interview.
+- `language_immersion_sprint`: Daily listening/reading/speaking blocks plus weekly review.
+- `portfolio_milestones`: Milestone-based build tasks with demo and retrospective sessions.
 
 ## Simple mental model
 
@@ -107,7 +115,7 @@ flowchart TD
 You run:
 
 ```bash
-./kairos what-now --minutes 45
+kairos what-now --minutes 45
 ```
 
 Kairos may suggest:
@@ -137,8 +145,8 @@ flowchart LR
 At the start of the week, you check status and then ask for a work block:
 
 ```bash
-./kairos status
-./kairos what-now --minutes 60
+kairos status
+kairos what-now --minutes 60
 ```
 
 Kairos shows which projects are:
@@ -159,17 +167,104 @@ Kairos tries to avoid unrealistic plans by respecting session limits:
 
 So if a task needs at least 25 minutes, it will not suggest it in a 10-minute window.
 
+## Importing a project from JSON
+
+If you have a specific project plan (not a reusable template), you can import it directly from a JSON file:
+
+```bash
+kairos project import myproject.json
+```
+
+### JSON format
+
+```json
+{
+  "project": {
+    "short_id": "PHI01",
+    "name": "Philosophy Essay",
+    "domain": "education",
+    "start_date": "2026-02-01",
+    "target_date": "2026-05-01"
+  },
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 15,
+      "max_session_min": 60,
+      "default_session_min": 30,
+      "splittable": true
+    }
+  },
+  "nodes": [
+    {
+      "ref": "ch1",
+      "title": "Chapter 1: Introduction",
+      "kind": "module",
+      "order": 0
+    },
+    {
+      "ref": "ch1_s1",
+      "parent_ref": "ch1",
+      "title": "Section 1.1",
+      "kind": "section",
+      "order": 0
+    }
+  ],
+  "work_items": [
+    {
+      "ref": "ch1_s1_read",
+      "node_ref": "ch1_s1",
+      "title": "Read Section 1.1",
+      "type": "reading",
+      "planned_min": 45,
+      "units": { "kind": "pages", "total": 20 }
+    },
+    {
+      "ref": "ch1_s1_exercises",
+      "node_ref": "ch1_s1",
+      "title": "Exercises 1.1",
+      "type": "assignment",
+      "planned_min": 30
+    }
+  ],
+  "dependencies": [
+    {
+      "predecessor_ref": "ch1_s1_read",
+      "successor_ref": "ch1_s1_exercises"
+    }
+  ]
+}
+```
+
+### Key points
+
+- **`ref`** fields are local IDs within the file (not UUIDs). Kairos generates real IDs on import.
+- **`parent_ref`** and **`node_ref`** cross-reference other `ref` values in the same file.
+- **`defaults`** is optional. It sets project-wide session policy and duration mode so you don't repeat them on every work item.
+- Nodes must be listed in order: parents before children.
+- Omitted optional fields get sensible defaults (status `todo`, duration mode `estimate`, session bounds `15/60/30`, splittable `true`).
+
+### Import vs templates
+
+| | `project import` | `project init` |
+|---|---|---|
+| Use case | One-off project with specific tasks | Reusable pattern (e.g. "12-week course") |
+| Variables/loops | No | Yes |
+| Project metadata | Inside the JSON file | Passed via CLI flags |
+| File location | Any path | Must be in templates directory |
+
 ## Core commands
 
 ```bash
-./kairos project add
-./kairos project init
-./kairos work add
-./kairos session log
-./kairos status
-./kairos what-now --minutes 60
-./kairos replan
-./kairos template list
+kairos project add
+kairos project init
+kairos project import <file.json>
+kairos work add
+kairos session log
+kairos status
+kairos what-now --minutes 60
+kairos replan
+kairos template list
 ```
 
 ## Documentation map

@@ -22,13 +22,21 @@ func FormatProjectList(projects []*domain.Project) string {
 	rows := make([][]string, 0, len(projects))
 
 	for _, p := range projects {
+		id := p.ShortID
+		if strings.TrimSpace(id) == "" {
+			id = TruncID(p.ID)
+		}
+		if strings.TrimSpace(id) == "" {
+			id = "--"
+		}
+
 		dueStr := Dim("--")
 		if p.TargetDate != nil {
 			dueStr = RelativeDateStyled(*p.TargetDate)
 		}
 
 		rows = append(rows, []string{
-			Dim(p.ShortID),
+			id,
 			Bold(p.Name),
 			DomainBadge(p.Domain),
 			StatusPill(p.Status),

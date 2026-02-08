@@ -12,6 +12,7 @@ const (
 	TaskParse         TaskType = "parse"
 	TaskExplain       TaskType = "explain"
 	TaskTemplateDraft TaskType = "template_draft"
+	TaskProjectDraft  TaskType = "project_draft"
 )
 
 // TaskConfig holds per-task LLM parameters.
@@ -46,6 +47,7 @@ func DefaultConfig() LLMConfig {
 			TaskParse:         {Temperature: 0.1, MaxTokens: 512, TimeoutMs: 3000},
 			TaskExplain:       {Temperature: 0.3, MaxTokens: 1024, TimeoutMs: 6000},
 			TaskTemplateDraft: {Temperature: 0.2, MaxTokens: 2048, TimeoutMs: 8000},
+			TaskProjectDraft:  {Temperature: 0.3, MaxTokens: 4096, TimeoutMs: 30000},
 		},
 	}
 }

@@ -1,0 +1,173 @@
+{
+  "id": "language_immersion_sprint",
+  "name": "Language Immersion Sprint",
+  "version": "1.0.0",
+  "description": "Daily listening, reading, and speaking blocks with weekly review for language immersion.",
+  "domain": "language",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 20,
+      "max_session_min": 60,
+      "default_session_min": 30,
+      "splittable": true
+    },
+    "buffer_pct": 0.1
+  },
+  "project": {
+    "target_date_mode": "optional",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [
+    {
+      "key": "weeks",
+      "type": "int",
+      "required": false,
+      "default": 6,
+      "min": 1
+    },
+    {
+      "key": "days_per_week",
+      "type": "int",
+      "required": false,
+      "default": 5,
+      "min": 1,
+      "max": 7
+    }
+  ],
+  "nodes": [
+    {
+      "id": "immersion_root",
+      "title": "Immersion Sprint",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "1"
+    },
+    {
+      "id": "week_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "weeks"
+      },
+      "title": "Week {i}",
+      "kind": "week",
+      "parent_id": "immersion_root",
+      "order": "{i}",
+      "constraints": {
+        "not_before_offset_days": "{(i-1)*7}",
+        "not_after_offset_days": "{i*7-1}",
+        "due_date_offset_days": "{i*7}"
+      }
+    }
+  ],
+  "work_items": [
+    {
+      "id": "w{i}_d{d}_listen",
+      "repeat": [
+        {
+          "var": "i",
+          "from": 1,
+          "to_var": "weeks"
+        },
+        {
+          "var": "d",
+          "from": 1,
+          "to_var": "days_per_week"
+        }
+      ],
+      "node_id": "week_{i}",
+      "title": "Week {i} Day {d} Listening",
+      "type": "listening",
+      "planned_min": 30,
+      "units": {
+        "kind": "sessions",
+        "total": 1
+      },
+      "constraints": {
+        "due_date_offset_days": "{(i-1)*7+d}"
+      },
+      "estimate_confidence": 0.75
+    },
+    {
+      "id": "w{i}_d{d}_reading",
+      "repeat": [
+        {
+          "var": "i",
+          "from": 1,
+          "to_var": "weeks"
+        },
+        {
+          "var": "d",
+          "from": 1,
+          "to_var": "days_per_week"
+        }
+      ],
+      "node_id": "week_{i}",
+      "title": "Week {i} Day {d} Reading",
+      "type": "reading",
+      "planned_min": 35,
+      "units": {
+        "kind": "pages",
+        "total": 8
+      },
+      "constraints": {
+        "due_date_offset_days": "{(i-1)*7+d}"
+      },
+      "estimate_confidence": 0.7
+    },
+    {
+      "id": "w{i}_d{d}_speaking",
+      "repeat": [
+        {
+          "var": "i",
+          "from": 1,
+          "to_var": "weeks"
+        },
+        {
+          "var": "d",
+          "from": 1,
+          "to_var": "days_per_week"
+        }
+      ],
+      "node_id": "week_{i}",
+      "title": "Week {i} Day {d} Speaking",
+      "type": "speaking",
+      "planned_min": 25,
+      "units": {
+        "kind": "sessions",
+        "total": 1
+      },
+      "constraints": {
+        "due_date_offset_days": "{(i-1)*7+d}"
+      },
+      "estimate_confidence": 0.75
+    },
+    {
+      "id": "w{i}_weekly_review",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "weeks"
+      },
+      "node_id": "week_{i}",
+      "title": "Week {i} Weekly Review",
+      "type": "review",
+      "planned_min": 45,
+      "constraints": {
+        "due_date_offset_days": "{i*7}"
+      },
+      "estimate_confidence": 0.7
+    }
+  ],
+  "dependencies": [],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}
