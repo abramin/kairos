@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
@@ -95,39 +96,48 @@ func newWorkInspectCmd(app *App) *cobra.Command {
 				return err
 			}
 
-			fmt.Println(formatter.Header("Work Item"))
-			fmt.Printf("  ID:              %s\n", w.ID)
-			fmt.Printf("  Node:            %s\n", w.NodeID)
-			fmt.Printf("  Title:           %s\n", formatter.Bold(w.Title))
-			fmt.Printf("  Type:            %s\n", w.Type)
-			fmt.Printf("  Status:          %s\n", string(w.Status))
-			fmt.Printf("  Duration mode:   %s\n", string(w.DurationMode))
-			fmt.Printf("  Planned:         %d min\n", w.PlannedMin)
-			fmt.Printf("  Logged:          %d min\n", w.LoggedMin)
+			var b strings.Builder
+
+			b.WriteString(fmt.Sprintf("%s  %s\n\n", formatter.Bold(w.Title), formatter.Dim(w.Type)))
+
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("STATUS "), formatter.WorkItemStatusPill(w.Status)))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("ID     "), formatter.TruncID(w.ID)))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("NODE   "), formatter.TruncID(w.NodeID)))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("MODE   "), formatter.Dim(string(w.DurationMode))))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("PLANNED"), formatter.FormatMinutes(w.PlannedMin)))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("LOGGED "), formatter.FormatMinutes(w.LoggedMin)))
 
 			if w.PlannedMin > 0 {
 				pct := float64(w.LoggedMin) / float64(w.PlannedMin)
-				fmt.Printf("  Progress:        %s\n", formatter.RenderProgress(pct, 20))
+				b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("PROGRESS"), formatter.RenderProgress(pct, 20)))
 			}
 
-			fmt.Printf("  Session policy:  %d-%d min (default %d)\n",
-				w.MinSessionMin, w.MaxSessionMin, w.DefaultSessionMin)
-			fmt.Printf("  Splittable:      %v\n", w.Splittable)
+			sessionPolicy := fmt.Sprintf("%s-%s (default %s)",
+				formatter.FormatMinutes(w.MinSessionMin),
+				formatter.FormatMinutes(w.MaxSessionMin),
+				formatter.FormatMinutes(w.DefaultSessionMin))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("SESSION"), sessionPolicy))
+
+			if w.Splittable {
+				b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("SPLIT  "), formatter.StyleGreen.Render("Yes")))
+			}
 
 			if w.UnitsKind != "" {
-				fmt.Printf("  Units:           %d/%d %s\n", w.UnitsDone, w.UnitsTotal, w.UnitsKind)
+				b.WriteString(fmt.Sprintf("  %s  %d/%d %s\n", formatter.Dim("UNITS  "), w.UnitsDone, w.UnitsTotal, w.UnitsKind))
 			}
 
 			if w.DueDate != nil {
-				fmt.Printf("  Due:             %s\n", w.DueDate.Format("2006-01-02"))
+				b.WriteString(fmt.Sprintf("  %s  %s %s\n", formatter.Dim("DUE    "),
+					formatter.RelativeDateStyled(*w.DueDate),
+					formatter.Dim("("+w.DueDate.Format("Jan 2, 2006")+")")))
 			}
 			if w.NotBefore != nil {
-				fmt.Printf("  Not before:      %s\n", w.NotBefore.Format("2006-01-02"))
+				b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("AFTER  "), formatter.HumanDate(*w.NotBefore)))
 			}
 
-			fmt.Printf("  Created:         %s\n", w.CreatedAt.Format(time.RFC3339))
-			fmt.Printf("  Updated:         %s\n", w.UpdatedAt.Format(time.RFC3339))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("UPDATED"), formatter.HumanTimestamp(w.UpdatedAt)))
 
+			fmt.Print(formatter.RenderBox("Work Item", b.String()))
 			return nil
 		},
 	}

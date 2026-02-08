@@ -144,24 +144,7 @@ func newProjectListCmd(app *App) *cobra.Command {
 				return nil
 			}
 
-			headers := []string{"ID", "Name", "Domain", "Status", "Start", "Due"}
-			rows := make([][]string, 0, len(projects))
-			for _, p := range projects {
-				dueStr := formatter.Dim("none")
-				if p.TargetDate != nil {
-					dueStr = p.TargetDate.Format("2006-01-02")
-				}
-				rows = append(rows, []string{
-					p.ShortID,
-					p.Name,
-					p.Domain,
-					string(p.Status),
-					p.StartDate.Format("2006-01-02"),
-					dueStr,
-				})
-			}
-
-			fmt.Print(formatter.RenderTable(headers, rows))
+			fmt.Print(formatter.FormatProjectList(projects))
 			return nil
 		},
 	}
@@ -187,22 +170,36 @@ func newProjectInspectCmd(app *App) *cobra.Command {
 				return err
 			}
 
-			fmt.Println(formatter.Header("Project"))
-			fmt.Printf("  ID:      %s\n", p.ShortID)
-			fmt.Printf("  UUID:    %s\n", formatter.Dim(p.ID))
-			fmt.Printf("  Name:    %s\n", formatter.Bold(p.Name))
-			fmt.Printf("  Domain:  %s\n", p.Domain)
-			fmt.Printf("  Status:  %s\n", string(p.Status))
-			fmt.Printf("  Start:   %s\n", p.StartDate.Format("2006-01-02"))
-			if p.TargetDate != nil {
-				fmt.Printf("  Due:     %s\n", p.TargetDate.Format("2006-01-02"))
-			}
-			if p.ArchivedAt != nil {
-				fmt.Printf("  Archived: %s\n", p.ArchivedAt.Format("2006-01-02"))
-			}
-			fmt.Printf("  Created: %s\n", p.CreatedAt.Format(time.RFC3339))
-			fmt.Printf("  Updated: %s\n", p.UpdatedAt.Format(time.RFC3339))
+			// Fetch tree data for the inspect view.
+			rootNodes, _ := app.Nodes.ListRoots(ctx, projectID)
+			childMap := make(map[string][]*domain.PlanNode)
+			workItems := make(map[string][]*domain.WorkItem)
 
+			// Build tree: fetch children and work items for each node.
+			var fetchChildren func(nodes []*domain.PlanNode)
+			fetchChildren = func(nodes []*domain.PlanNode) {
+				for _, n := range nodes {
+					children, _ := app.Nodes.ListChildren(ctx, n.ID)
+					if len(children) > 0 {
+						childMap[n.ID] = children
+						fetchChildren(children)
+					}
+					items, _ := app.WorkItems.ListByNode(ctx, n.ID)
+					if len(items) > 0 {
+						workItems[n.ID] = items
+					}
+				}
+			}
+			fetchChildren(rootNodes)
+
+			data := formatter.ProjectInspectData{
+				Project:   p,
+				RootNodes: rootNodes,
+				ChildMap:  childMap,
+				WorkItems: workItems,
+			}
+
+			fmt.Print(formatter.FormatProjectInspect(data))
 			return nil
 		},
 	}

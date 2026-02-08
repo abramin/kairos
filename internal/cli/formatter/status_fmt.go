@@ -3,6 +3,7 @@ package formatter
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/domain"
@@ -14,44 +15,35 @@ const statusProgressBarWidth = 10
 func FormatStatus(resp *contract.StatusResponse) string {
 	var b strings.Builder
 
-	// Header.
-	b.WriteString(Header("Projects Overview"))
-	b.WriteString("\n\n")
-
 	// Build the table.
-	headers := []string{"NAME", "DOMAIN", "PROGRESS", "STATUS", "DUE"}
+	headers := []string{"NAME", "STATUS", "PROGRESS", "RISK", "DUE"}
 	rows := make([][]string, 0, len(resp.Projects))
 
 	for _, p := range resp.Projects {
 		// Progress bar.
 		progress := RenderProgress(p.ProgressTimePct, statusProgressBarWidth)
 
-		// Risk indicator as status.
-		status := RiskIndicator(p.RiskLevel)
+		// Risk indicator.
+		risk := RiskIndicator(p.RiskLevel)
 
-		// Due date.
+		// Status pill.
+		status := StatusPill(p.Status)
+
+		// Due date with relative styling.
 		due := Dim("--")
 		if p.DueDate != nil {
-			dueStr := *p.DueDate
-			if p.DaysLeft != nil {
-				dueStr = fmt.Sprintf("%s (%dd)", *p.DueDate, *p.DaysLeft)
+			if parsed, err := time.Parse("2006-01-02", *p.DueDate); err == nil {
+				due = RelativeDateStyled(parsed)
+			} else {
+				due = StyleFg.Render(*p.DueDate)
 			}
-			due = StyleFg.Render(dueStr)
-		}
-
-		// Domain display (capitalize first letter).
-		domainStr := Dim("--")
-		if p.ProjectName != "" {
-			// Use project status as fallback label; domain is not on ProjectStatusView,
-			// so we show the project status.
-			domainStr = StylePurple.Render(string(p.Status))
 		}
 
 		rows = append(rows, []string{
 			Bold(p.ProjectName),
-			domainStr,
-			progress,
 			status,
+			progress,
+			risk,
 			due,
 		})
 	}
@@ -83,7 +75,7 @@ func FormatStatus(resp *contract.StatusResponse) string {
 		}
 	}
 
-	return b.String()
+	return RenderBox("Status", b.String())
 }
 
 // countByRisk counts projects by risk level. This is a utility in case
@@ -100,13 +92,4 @@ func countByRisk(projects []contract.ProjectStatusView) (critical, atRisk, onTra
 		}
 	}
 	return
-}
-
-// formatDomainLabel formats a domain string for display. Currently a
-// simple pass-through that capitalizes the first letter.
-func formatDomainLabel(d string) string {
-	if d == "" {
-		return "--"
-	}
-	return strings.ToUpper(d[:1]) + d[1:]
 }

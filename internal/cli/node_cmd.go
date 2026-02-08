@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
@@ -82,29 +83,30 @@ func newNodeInspectCmd(app *App) *cobra.Command {
 				return err
 			}
 
-			fmt.Println(formatter.Header("Plan Node"))
-			fmt.Printf("  ID:        %s\n", n.ID)
-			fmt.Printf("  Project:   %s\n", n.ProjectID)
-			fmt.Printf("  Title:     %s\n", formatter.Bold(n.Title))
-			fmt.Printf("  Kind:      %s\n", string(n.Kind))
-			fmt.Printf("  Order:     %d\n", n.OrderIndex)
+			var b strings.Builder
+
+			b.WriteString(fmt.Sprintf("%s  %s\n\n", formatter.Bold(n.Title), formatter.Dim(string(n.Kind))))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("ID     "), formatter.TruncID(n.ID)))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("PROJECT"), formatter.TruncID(n.ProjectID)))
+			b.WriteString(fmt.Sprintf("  %s  %d\n", formatter.Dim("ORDER  "), n.OrderIndex))
 			if n.ParentID != nil {
-				fmt.Printf("  Parent:    %s\n", *n.ParentID)
+				b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("PARENT "), formatter.TruncID(*n.ParentID)))
 			}
 			if n.DueDate != nil {
-				fmt.Printf("  Due:       %s\n", n.DueDate.Format("2006-01-02"))
+				b.WriteString(fmt.Sprintf("  %s  %s %s\n", formatter.Dim("DUE    "),
+					formatter.RelativeDateStyled(*n.DueDate),
+					formatter.Dim("("+n.DueDate.Format("Jan 2, 2006")+")")))
 			}
 			if n.NotBefore != nil {
-				fmt.Printf("  Not before: %s\n", n.NotBefore.Format("2006-01-02"))
+				b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("AFTER  "), formatter.HumanDate(*n.NotBefore)))
 			}
 			if n.NotAfter != nil {
-				fmt.Printf("  Not after:  %s\n", n.NotAfter.Format("2006-01-02"))
+				b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("BEFORE "), formatter.HumanDate(*n.NotAfter)))
 			}
 			if n.PlannedMinBudget != nil {
-				fmt.Printf("  Budget:    %d min\n", *n.PlannedMinBudget)
+				b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("BUDGET "), formatter.FormatMinutes(*n.PlannedMinBudget)))
 			}
-			fmt.Printf("  Created:   %s\n", n.CreatedAt.Format(time.RFC3339))
-			fmt.Printf("  Updated:   %s\n", n.UpdatedAt.Format(time.RFC3339))
+			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("UPDATED"), formatter.HumanTimestamp(n.UpdatedAt)))
 
 			// List children.
 			children, err := app.Nodes.ListChildren(ctx, n.ID)
@@ -112,21 +114,23 @@ func newNodeInspectCmd(app *App) *cobra.Command {
 				return err
 			}
 			if len(children) > 0 {
-				fmt.Println()
-				fmt.Println(formatter.Header("Children"))
-				headers := []string{"ID", "Title", "Kind", "Order"}
+				b.WriteString("\n")
+				b.WriteString(formatter.Header("Children"))
+				b.WriteString("\n")
+				headers := []string{"ID", "TITLE", "KIND", "ORDER"}
 				rows := make([][]string, 0, len(children))
 				for _, c := range children {
 					rows = append(rows, []string{
-						c.ID[:8],
+						formatter.TruncID(c.ID),
 						c.Title,
 						string(c.Kind),
 						fmt.Sprintf("%d", c.OrderIndex),
 					})
 				}
-				fmt.Print(formatter.RenderTable(headers, rows))
+				b.WriteString(formatter.RenderTable(headers, rows))
 			}
 
+			fmt.Print(formatter.RenderBox("Plan Node", b.String()))
 			return nil
 		},
 	}

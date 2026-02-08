@@ -90,7 +90,7 @@ func newSessionListCmd(app *App) *cobra.Command {
 				return nil
 			}
 
-			headers := []string{"ID", "Work Item", "Started", "Minutes", "Units", "Note"}
+			headers := []string{"ID", "WORK ITEM", "STARTED", "DURATION", "UNITS", "NOTE"}
 			rows := make([][]string, 0, len(sessions))
 			for _, s := range sessions {
 				notePreview := s.Note
@@ -98,16 +98,16 @@ func newSessionListCmd(app *App) *cobra.Command {
 					notePreview = notePreview[:37] + "..."
 				}
 				rows = append(rows, []string{
-					s.ID[:8],
-					s.WorkItemID[:8],
-					s.StartedAt.Format("2006-01-02 15:04"),
-					fmt.Sprintf("%d", s.Minutes),
+					formatter.TruncID(s.ID),
+					formatter.TruncID(s.WorkItemID),
+					formatter.HumanTimestamp(s.StartedAt),
+					formatter.FormatMinutes(s.Minutes),
 					fmt.Sprintf("%d", s.UnitsDoneDelta),
-					notePreview,
+					formatter.Dim(notePreview),
 				})
 			}
 
-			fmt.Print(formatter.RenderTable(headers, rows))
+			fmt.Print(formatter.RenderBox("Sessions", formatter.RenderTable(headers, rows)))
 			return nil
 		},
 	}

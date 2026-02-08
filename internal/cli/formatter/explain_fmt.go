@@ -13,10 +13,7 @@ import (
 func FormatExplanation(e *intelligence.LLMExplanation) string {
 	var b strings.Builder
 
-	b.WriteString(Header("Explanation"))
-	b.WriteString("\n")
-
-	b.WriteString(fmt.Sprintf("  %s\n\n", StyleBold.Render(e.SummaryShort)))
+	b.WriteString(fmt.Sprintf("%s\n\n", StyleBold.Render(e.SummaryShort)))
 
 	if e.SummaryDetailed != "" && e.SummaryDetailed != e.SummaryShort {
 		b.WriteString(fmt.Sprintf("  %s\n\n", e.SummaryDetailed))
@@ -49,15 +46,12 @@ func FormatExplanation(e *intelligence.LLMExplanation) string {
 	}
 
 	b.WriteString(Dim(fmt.Sprintf("  Confidence: %.0f%%\n", e.Confidence*100)))
-	return b.String()
+	return RenderBox("Explanation", b.String())
 }
 
 // FormatAskResolution renders the result of an `ask` command.
 func FormatAskResolution(r *intelligence.AskResolution) string {
 	var b strings.Builder
-
-	b.WriteString(Header("Ask"))
-	b.WriteString("\n")
 
 	intent := r.ParsedIntent
 	b.WriteString(fmt.Sprintf("  Intent:     %s\n", StyleBold.Render(string(intent.Intent))))
@@ -86,15 +80,12 @@ func FormatAskResolution(r *intelligence.AskResolution) string {
 	}
 
 	b.WriteString("\n")
-	return b.String()
+	return RenderBox("Ask", b.String())
 }
 
 // FormatTemplateDraft renders a template draft result.
 func FormatTemplateDraft(d *intelligence.TemplateDraft) string {
 	var b strings.Builder
-
-	b.WriteString(Header("Template Draft"))
-	b.WriteString("\n")
 
 	if d.Validation.IsValid {
 		b.WriteString(StyleGreen.Render("  Validation: PASSED"))
@@ -137,7 +128,7 @@ func FormatTemplateDraft(d *intelligence.TemplateDraft) string {
 	b.WriteString("\n")
 	b.WriteString(Dim(fmt.Sprintf("  Confidence: %.0f%%\n", d.Confidence*100)))
 
-	return b.String()
+	return RenderBox("Template Draft", b.String())
 }
 
 func riskStyle(risk intelligence.IntentRisk) lipgloss.Style {

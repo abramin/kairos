@@ -43,17 +43,7 @@ func newTemplateListCmd(app *App) *cobra.Command {
 				return nil
 			}
 
-			headers := []string{"Name", "Domain", "Version"}
-			rows := make([][]string, 0, len(templates))
-			for _, t := range templates {
-				rows = append(rows, []string{
-					t.Name,
-					t.Domain,
-					t.Version,
-				})
-			}
-
-			fmt.Print(formatter.RenderTable(headers, rows))
+			fmt.Print(formatter.FormatTemplateList(templates))
 			return nil
 		},
 	}
@@ -70,14 +60,7 @@ func newTemplateShowCmd(app *App) *cobra.Command {
 				return err
 			}
 
-			fmt.Println(formatter.Header("Template"))
-			fmt.Printf("  Name:    %s\n", formatter.Bold(t.Name))
-			fmt.Printf("  Domain:  %s\n", t.Domain)
-			fmt.Printf("  Version: %s\n", t.Version)
-			fmt.Println()
-			fmt.Println(formatter.Header("Configuration"))
-			fmt.Println(t.ConfigJSON)
-
+			fmt.Print(formatter.FormatTemplateShow(t))
 			return nil
 		},
 	}

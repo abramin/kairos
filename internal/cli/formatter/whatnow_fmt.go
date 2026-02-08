@@ -3,6 +3,7 @@ package formatter
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/contract"
 )
@@ -17,7 +18,7 @@ func FormatWhatNow(resp *contract.WhatNowResponse) string {
 	b.WriteString("\n\n")
 
 	// Session header.
-	headerText := fmt.Sprintf("SUGGESTED SESSION (%d Minutes Available)", resp.RequestedMin)
+	headerText := fmt.Sprintf("Suggested Session (%s available)", FormatMinutes(resp.RequestedMin))
 	b.WriteString(Header(headerText))
 	b.WriteString("\n\n")
 
@@ -30,24 +31,30 @@ func FormatWhatNow(resp *contract.WhatNowResponse) string {
 			num := fmt.Sprintf("%d.", i+1)
 			riskBadge := RiskIndicator(rec.RiskLevel)
 
-			// Title line: "1. Title  (25 min)  ● ON TRACK"
+			// Title line: "1. Title  (25m)  ● ON TRACK"
 			titleLine := fmt.Sprintf(
 				"%s %s  %s  %s",
 				Bold(num),
 				StyleFg.Render(rec.Title),
-				StyleBlue.Render(fmt.Sprintf("(%d min)", rec.AllocatedMin)),
+				StyleBlue.Render(fmt.Sprintf("(%s)", FormatMinutes(rec.AllocatedMin))),
 				riskBadge,
 			)
 			b.WriteString(titleLine + "\n")
 
-			// Project info.
+			// Project info with truncated ID.
 			if rec.ProjectID != "" {
-				b.WriteString(fmt.Sprintf("   %s\n", Dim(fmt.Sprintf("Project: %s", rec.ProjectID))))
+				b.WriteString(fmt.Sprintf("   %s\n", Dim(fmt.Sprintf("Project: %s", TruncID(rec.ProjectID)))))
 			}
 
-			// Due date if present.
+			// Due date with relative styling.
 			if rec.DueDate != nil {
-				b.WriteString(fmt.Sprintf("   %s\n", Dim(fmt.Sprintf("Due: %s", *rec.DueDate))))
+				if parsed, err := time.Parse(time.RFC3339, *rec.DueDate); err == nil {
+					b.WriteString(fmt.Sprintf("   %s %s\n", Dim("Due:"), RelativeDateStyled(parsed)))
+				} else if parsed, err := time.Parse("2006-01-02", *rec.DueDate); err == nil {
+					b.WriteString(fmt.Sprintf("   %s %s\n", Dim("Due:"), RelativeDateStyled(parsed)))
+				} else {
+					b.WriteString(fmt.Sprintf("   %s\n", Dim(fmt.Sprintf("Due: %s", *rec.DueDate))))
+				}
 			}
 
 			// Reason lines.
@@ -69,9 +76,9 @@ func FormatWhatNow(resp *contract.WhatNowResponse) string {
 	b.WriteString("\n")
 	summaryLine := fmt.Sprintf(
 		"%s  %s  %s",
-		StyleGreen.Render(fmt.Sprintf("Allocated: %d min", resp.AllocatedMin)),
+		StyleGreen.Render(fmt.Sprintf("Allocated: %s", FormatMinutes(resp.AllocatedMin))),
 		StyleDim.Render("|"),
-		StyleDim.Render(fmt.Sprintf("Unallocated: %d min", resp.UnallocatedMin)),
+		StyleDim.Render(fmt.Sprintf("Unallocated: %s", FormatMinutes(resp.UnallocatedMin))),
 	)
 	b.WriteString(summaryLine + "\n")
 
@@ -91,5 +98,5 @@ func FormatWhatNow(resp *contract.WhatNowResponse) string {
 		}
 	}
 
-	return b.String()
+	return RenderBox("Session Plan", b.String())
 }
