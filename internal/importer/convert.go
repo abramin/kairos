@@ -119,6 +119,14 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 			unitsTotal = wi.Units.Total
 		}
 
+		// Resolve logged_min: explicit value > auto-fill for done items > 0
+		loggedMin := 0
+		if wi.LoggedMin != nil {
+			loggedMin = *wi.LoggedMin
+		} else if status == "done" && plannedMin > 0 {
+			loggedMin = plannedMin
+		}
+
 		item := &domain.WorkItem{
 			ID:                 realID,
 			NodeID:             nodeUUID,
@@ -127,6 +135,7 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 			Status:             domain.WorkItemStatus(status),
 			DurationMode:       domain.DurationMode(durationMode),
 			PlannedMin:         plannedMin,
+			LoggedMin:          loggedMin,
 			DurationSource:     domain.SourceManual,
 			EstimateConfidence: estimateConf,
 			MinSessionMin:      minSession,

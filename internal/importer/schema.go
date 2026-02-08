@@ -60,6 +60,7 @@ type WorkItemImport struct {
 	Status             string               `json:"status,omitempty"`
 	DurationMode       string               `json:"duration_mode,omitempty"`
 	PlannedMin         *int                 `json:"planned_min,omitempty"`
+	LoggedMin          *int                 `json:"logged_min,omitempty"`
 	EstimateConfidence *float64             `json:"estimate_confidence,omitempty"`
 	SessionPolicy      *SessionPolicyImport `json:"session_policy,omitempty"`
 	Units              *UnitsImport         `json:"units,omitempty"`

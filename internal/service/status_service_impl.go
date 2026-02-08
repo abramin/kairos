@@ -95,6 +95,31 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 		}
 		recentDailyMin := float64(recentMin) / float64(days)
 
+		// Weighted structural progress: done planned_min / all planned_min
+		var donePlannedMin int
+		for _, item := range items {
+			if item.Status == domain.WorkItemArchived {
+				continue
+			}
+			if item.Status == domain.WorkItemDone || item.Status == domain.WorkItemSkipped {
+				donePlannedMin += item.PlannedMin
+			}
+		}
+		var progressPct float64
+		if plannedTotal > 0 {
+			progressPct = float64(donePlannedMin) / float64(plannedTotal) * 100
+		}
+
+		// Timeline elapsed: (now - start) / (target - start)
+		var timeElapsedPct float64
+		if p.TargetDate != nil {
+			totalDays := p.TargetDate.Sub(p.StartDate).Hours() / 24
+			elapsedDays := now.Sub(p.StartDate).Hours() / 24
+			if totalDays > 0 {
+				timeElapsedPct = elapsedDays / totalDays * 100
+			}
+		}
+
 		// Risk
 		riskResult := scheduler.ComputeRisk(scheduler.RiskInput{
 			Now:            now,
@@ -103,6 +128,8 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 			LoggedMin:      loggedTotal,
 			BufferPct:      profile.BufferPct,
 			RecentDailyMin: recentDailyMin,
+			ProgressPct:    progressPct,
+			TimeElapsedPct: timeElapsedPct,
 		})
 
 		var structuralPct float64

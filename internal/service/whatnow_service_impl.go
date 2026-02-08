@@ -43,6 +43,7 @@ type projectAggregates struct {
 	logged     map[string]int
 	recentMin  map[string]int
 	targetDate map[string]*time.Time
+	startDate  map[string]*time.Time
 }
 
 func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequest) (*contract.WhatNowResponse, error) {
@@ -90,7 +91,12 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 		return nil, fmt.Errorf("loading recent sessions: %w", err)
 	}
 
-	agg := s.computeProjectAggregates(candidates, recentSessions, now, profile.BufferPct)
+	completedSummaries, err := s.workItems.ListCompletedSummaryByProject(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("loading completed work summaries: %w", err)
+	}
+
+	agg := s.computeProjectAggregates(candidates, completedSummaries, recentSessions, now, profile.BufferPct)
 
 	mode := domain.ModeBalanced
 	for _, risk := range agg.risks {
@@ -115,6 +121,7 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 // computeProjectAggregates builds per-project risk, totals, and recent session data from candidates.
 func (s *whatNowService) computeProjectAggregates(
 	candidates []repository.SchedulableCandidate,
+	completedSummaries []repository.CompletedWorkSummary,
 	recentSessions []*domain.WorkSessionLog,
 	now time.Time,
 	bufferPct float64,
@@ -126,6 +133,7 @@ func (s *whatNowService) computeProjectAggregates(
 		logged:     make(map[string]int),
 		recentMin:  make(map[string]int),
 		targetDate: make(map[string]*time.Time),
+		startDate:  make(map[string]*time.Time),
 	}
 
 	// Build work-item-to-project index for O(1) session lookups
@@ -137,7 +145,16 @@ func (s *whatNowService) computeProjectAggregates(
 		if c.ProjectTargetDate != nil {
 			agg.targetDate[c.ProjectID] = c.ProjectTargetDate
 		}
+		if c.ProjectStartDate != nil {
+			agg.startDate[c.ProjectID] = c.ProjectStartDate
+		}
 		workItemToProject[c.WorkItem.ID] = c.ProjectID
+	}
+
+	// Index completed work summaries by project
+	completedByProject := make(map[string]repository.CompletedWorkSummary, len(completedSummaries))
+	for _, cs := range completedSummaries {
+		completedByProject[cs.ProjectID] = cs
 	}
 
 	for _, sess := range recentSessions {
@@ -147,6 +164,26 @@ func (s *whatNowService) computeProjectAggregates(
 	}
 
 	for pid := range agg.planned {
+		cs := completedByProject[pid]
+
+		// Weighted structural progress: done planned_min / all planned_min.
+		// Uses full project totals (done + remaining) for the denominator.
+		allPlanned := agg.planned[pid] + cs.PlannedMin
+		var progressPct float64
+		if allPlanned > 0 {
+			progressPct = float64(cs.PlannedMin) / float64(allPlanned) * 100
+		}
+
+		// Timeline elapsed: (now - start) / (target - start)
+		var timeElapsedPct float64
+		if agg.startDate[pid] != nil && agg.targetDate[pid] != nil {
+			totalDays := agg.targetDate[pid].Sub(*agg.startDate[pid]).Hours() / 24
+			elapsedDays := now.Sub(*agg.startDate[pid]).Hours() / 24
+			if totalDays > 0 {
+				timeElapsedPct = elapsedDays / totalDays * 100
+			}
+		}
+
 		recentDaily := float64(agg.recentMin[pid]) / 7.0
 		agg.risks[pid] = scheduler.ComputeRisk(scheduler.RiskInput{
 			Now:            now,
@@ -155,6 +192,8 @@ func (s *whatNowService) computeProjectAggregates(
 			LoggedMin:      agg.logged[pid],
 			BufferPct:      bufferPct,
 			RecentDailyMin: recentDaily,
+			ProgressPct:    progressPct,
+			TimeElapsedPct: timeElapsedPct,
 		})
 	}
 

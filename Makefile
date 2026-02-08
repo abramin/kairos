@@ -28,7 +28,7 @@ clean:
 	rm -f coverage.out
 
 install: build
-	cp $(BUILD_DIR)/$(BINARY) $(GOPATH)/bin/$(BINARY) 2>/dev/null || \
-		cp $(BUILD_DIR)/$(BINARY) $(HOME)/go/bin/$(BINARY)
+	mkdir -p $(firstword $(GOPATH) $(HOME)/go)/bin
+	cp $(BUILD_DIR)/$(BINARY) $(firstword $(GOPATH) $(HOME)/go)/bin/$(BINARY)
 
 all: vet test build

@@ -104,7 +104,7 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 			w.min_session_min, w.max_session_min, w.default_session_min, w.splittable,
 			w.units_kind, w.units_total, w.units_done, w.due_date, w.not_before, w.created_at, w.updated_at,
 			n.project_id, p.name AS project_name, p.domain AS project_domain,
-			n.title AS node_title, n.due_date AS node_due_date, p.target_date
+			n.title AS node_title, n.due_date AS node_due_date, p.target_date, p.start_date
 			FROM work_items w
 			JOIN plan_nodes n ON w.node_id = n.id
 			JOIN projects p ON n.project_id = p.id
@@ -117,7 +117,7 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 			w.min_session_min, w.max_session_min, w.default_session_min, w.splittable,
 			w.units_kind, w.units_total, w.units_done, w.due_date, w.not_before, w.created_at, w.updated_at,
 			n.project_id, p.name AS project_name, p.domain AS project_domain,
-			n.title AS node_title, n.due_date AS node_due_date, p.target_date
+			n.title AS node_title, n.due_date AS node_due_date, p.target_date, p.start_date
 			FROM work_items w
 			JOIN plan_nodes n ON w.node_id = n.id
 			JOIN projects p ON n.project_id = p.id
@@ -144,7 +144,7 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 
 		// Extra joined fields
 		var projectID, projectName, projectDomain, nodeTitle string
-		var nodeDueDateStr, targetDateStr sql.NullString
+		var nodeDueDateStr, targetDateStr, startDateStr sql.NullString
 
 		err := rows.Scan(
 			&w.ID, &w.NodeID, &w.Title, &w.Type, &statusStr, &archivedAtStr,
@@ -153,7 +153,7 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 			&w.UnitsKind, &w.UnitsTotal, &w.UnitsDone, &dueDateStr, &notBeforeStr,
 			&createdAtStr, &updatedAtStr,
 			&projectID, &projectName, &projectDomain,
-			&nodeTitle, &nodeDueDateStr, &targetDateStr,
+			&nodeTitle, &nodeDueDateStr, &targetDateStr, &startDateStr,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scanning schedulable candidate: %w", err)
@@ -185,6 +185,7 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 			NodeTitle:         nodeTitle,
 			NodeDueDate:       parseNullableTime(nodeDueDateStr, dateLayout),
 			ProjectTargetDate: parseNullableTime(targetDateStr, dateLayout),
+			ProjectStartDate:  parseNullableTime(startDateStr, dateLayout),
 		}
 		candidates = append(candidates, candidate)
 	}
@@ -192,6 +193,41 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 		return nil, fmt.Errorf("iterating schedulable candidates: %w", err)
 	}
 	return candidates, nil
+}
+
+func (r *SQLiteWorkItemRepo) ListCompletedSummaryByProject(ctx context.Context) ([]CompletedWorkSummary, error) {
+	query := `SELECT n.project_id,
+			COALESCE(SUM(CASE WHEN w.status IN ('done','skipped') THEN w.planned_min ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN w.status IN ('done','skipped') THEN w.logged_min ELSE 0 END), 0),
+			COALESCE(SUM(CASE WHEN w.status IN ('done','skipped') THEN 1 ELSE 0 END), 0),
+			COUNT(*)
+		FROM work_items w
+		JOIN plan_nodes n ON w.node_id = n.id
+		JOIN projects p ON n.project_id = p.id
+		WHERE w.status != 'archived'
+		  AND (w.archived_at IS NULL)
+		  AND p.status = 'active'
+		  AND (p.archived_at IS NULL)
+		GROUP BY n.project_id`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("listing completed work summary: %w", err)
+	}
+	defer rows.Close()
+
+	var summaries []CompletedWorkSummary
+	for rows.Next() {
+		var s CompletedWorkSummary
+		if err := rows.Scan(&s.ProjectID, &s.PlannedMin, &s.LoggedMin, &s.DoneItemCount, &s.TotalItemCount); err != nil {
+			return nil, fmt.Errorf("scanning completed work summary: %w", err)
+		}
+		summaries = append(summaries, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating completed work summaries: %w", err)
+	}
+	return summaries, nil
 }
 
 func (r *SQLiteWorkItemRepo) Update(ctx context.Context, w *domain.WorkItem) error {

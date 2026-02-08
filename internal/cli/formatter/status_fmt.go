@@ -21,7 +21,7 @@ func FormatStatus(resp *contract.StatusResponse) string {
 
 	for _, p := range resp.Projects {
 		// Progress bar.
-		progress := RenderProgress(p.ProgressTimePct, statusProgressBarWidth)
+		progress := RenderProgress(p.ProgressTimePct/100, statusProgressBarWidth)
 
 		// Risk indicator.
 		risk := RiskIndicator(p.RiskLevel)

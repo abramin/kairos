@@ -79,13 +79,16 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 		}
 
 		// Compute before-risk
-		var plannedBefore, loggedBefore int
+		var plannedBefore, loggedBefore, donePlannedBefore int
 		for _, item := range items {
 			if item.Status == domain.WorkItemArchived {
 				continue
 			}
 			plannedBefore += item.PlannedMin
 			loggedBefore += item.LoggedMin
+			if item.Status == domain.WorkItemDone || item.Status == domain.WorkItemSkipped {
+				donePlannedBefore += item.PlannedMin
+			}
 		}
 
 		recentSessions, err := s.sessions.ListRecentByProject(ctx, p.ID, 7)
@@ -98,6 +101,19 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 		}
 		recentDailyMin := float64(recentMin) / 7.0
 
+		var progressPct float64
+		if plannedBefore > 0 {
+			progressPct = float64(donePlannedBefore) / float64(plannedBefore) * 100
+		}
+		var timeElapsedPct float64
+		if p.TargetDate != nil {
+			totalDays := p.TargetDate.Sub(p.StartDate).Hours() / 24
+			elapsedDays := now.Sub(p.StartDate).Hours() / 24
+			if totalDays > 0 {
+				timeElapsedPct = elapsedDays / totalDays * 100
+			}
+		}
+
 		riskBefore := scheduler.ComputeRisk(scheduler.RiskInput{
 			Now:            now,
 			TargetDate:     p.TargetDate,
@@ -105,6 +121,8 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 			LoggedMin:      loggedBefore,
 			BufferPct:      profile.BufferPct,
 			RecentDailyMin: recentDailyMin,
+			ProgressPct:    progressPct,
+			TimeElapsedPct: timeElapsedPct,
 		})
 
 		// Re-estimate work items with units tracking
@@ -127,13 +145,21 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 		}
 
 		// Compute after-risk
-		var plannedAfter, loggedAfter int
+		var plannedAfter, loggedAfter, donePlannedAfter int
 		for _, item := range items {
 			if item.Status == domain.WorkItemArchived {
 				continue
 			}
 			plannedAfter += item.PlannedMin
 			loggedAfter += item.LoggedMin
+			if item.Status == domain.WorkItemDone || item.Status == domain.WorkItemSkipped {
+				donePlannedAfter += item.PlannedMin
+			}
+		}
+
+		var progressPctAfter float64
+		if plannedAfter > 0 {
+			progressPctAfter = float64(donePlannedAfter) / float64(plannedAfter) * 100
 		}
 
 		riskAfter := scheduler.ComputeRisk(scheduler.RiskInput{
@@ -143,6 +169,8 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 			LoggedMin:      loggedAfter,
 			BufferPct:      profile.BufferPct,
 			RecentDailyMin: recentDailyMin,
+			ProgressPct:    progressPctAfter,
+			TimeElapsedPct: timeElapsedPct,
 		})
 
 		if riskAfter.Level == domain.RiskCritical {

@@ -166,6 +166,57 @@ func TestShellExecutor_HelpChatOneShotDoesNotEnterMode(t *testing.T) {
 	assert.False(t, sess.helpChatMode)
 }
 
+func TestShellExecutor_ExitSetsWantExit(t *testing.T) {
+	app := testApp(t)
+	sess := &shellSession{
+		app:   app,
+		cache: newShellProjectCache(),
+	}
+
+	assert.False(t, sess.wantExit)
+	sess.executor("exit")
+	assert.True(t, sess.wantExit)
+}
+
+func TestShellExecutor_QuitSetsWantExit(t *testing.T) {
+	app := testApp(t)
+	sess := &shellSession{
+		app:   app,
+		cache: newShellProjectCache(),
+	}
+
+	assert.False(t, sess.wantExit)
+	sess.executor("quit")
+	assert.True(t, sess.wantExit)
+}
+
+func TestShellExecutor_EmptyInputInDraftModeAdvancesPhase(t *testing.T) {
+	app := testApp(t)
+	sess := &shellSession{
+		app:        app,
+		cache:      newShellProjectCache(),
+		draftMode:  true,
+		draftPhase: draftPhaseStartDate,
+	}
+
+	// Empty Enter in start-date phase should advance to deadline phase.
+	sess.executor("")
+	assert.Equal(t, draftPhaseDeadline, sess.draftPhase)
+}
+
+func TestShellExecutor_EmptyInputInNormalModeIsNoop(t *testing.T) {
+	app := testApp(t)
+	sess := &shellSession{
+		app:   app,
+		cache: newShellProjectCache(),
+	}
+
+	// Should not panic or change any state.
+	sess.executor("")
+	assert.False(t, sess.draftMode)
+	assert.False(t, sess.helpChatMode)
+}
+
 func TestPrepareShellCobraArgs_AutoAddsYesForAsk(t *testing.T) {
 	t.Parallel()
 

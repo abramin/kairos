@@ -21,6 +21,7 @@ func ExtractJSON[T any](raw string, validator SchemaValidator[T]) (T, error) {
 	if jsonStr == "" {
 		return zero, fmt.Errorf("%w: no JSON object found in response", ErrInvalidOutput)
 	}
+	jsonStr = stripJSONComments(jsonStr)
 	jsonStr = normalizeLeadingDecimalNumbers(jsonStr)
 
 	var result T
@@ -104,6 +105,68 @@ func extractJSONBlock(s string) string {
 	}
 
 	return ""
+}
+
+// stripJSONComments removes C-style line comments (// ...) outside of JSON string
+// values. LLMs sometimes emit comments in JSON output despite instructions not to.
+func stripJSONComments(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+
+	inString := false
+	escaped := false
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+
+		if escaped {
+			b.WriteByte(c)
+			escaped = false
+			continue
+		}
+
+		if c == '\\' && inString {
+			b.WriteByte(c)
+			escaped = true
+			continue
+		}
+
+		if c == '"' {
+			b.WriteByte(c)
+			inString = !inString
+			continue
+		}
+
+		if inString {
+			b.WriteByte(c)
+			continue
+		}
+
+		// Line comment: skip to end of line
+		if c == '/' && i+1 < len(s) && s[i+1] == '/' {
+			for i+1 < len(s) && s[i+1] != '\n' {
+				i++
+			}
+			continue
+		}
+
+		// Block comment: skip to closing */
+		if c == '/' && i+1 < len(s) && s[i+1] == '*' {
+			i += 2
+			for i+1 < len(s) {
+				if s[i] == '*' && s[i+1] == '/' {
+					i++
+					break
+				}
+				i++
+			}
+			continue
+		}
+
+		b.WriteByte(c)
+	}
+
+	return b.String()
 }
 
 // normalizeLeadingDecimalNumbers rewrites invalid JSON numeric literals such as

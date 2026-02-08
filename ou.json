@@ -4,12 +4,7 @@
         "name": "OU Course",
         "domain": "education",
         "start_date": "2025-09-27",
-        "target_date": "2026-05-22",
-        "metadata": {
-            "weeks_total": 31,
-            "current_week": 18,
-            "current_week_progress_pct": 75
-        }
+        "target_date": "2026-05-22"
     },
     "defaults": {
         "duration_mode": "estimate",
@@ -21,213 +16,40 @@
         }
     },
     "nodes": [
-        {
-            "ref": "w01",
-            "title": "Week 01",
-            "kind": "week",
-            "order": 1
-        },
-        {
-            "ref": "w02",
-            "title": "Week 02",
-            "kind": "week",
-            "order": 2
-        },
-        {
-            "ref": "w03",
-            "title": "Week 03",
-            "kind": "week",
-            "order": 3
-        },
-        {
-            "ref": "w04",
-            "title": "Week 04",
-            "kind": "week",
-            "order": 4
-        },
-        {
-            "ref": "w05",
-            "title": "Week 05",
-            "kind": "week",
-            "order": 5
-        },
-        {
-            "ref": "w06",
-            "title": "Week 06",
-            "kind": "week",
-            "order": 6
-        },
-        {
-            "ref": "w07",
-            "title": "Week 07",
-            "kind": "week",
-            "order": 7
-        },
-        {
-            "ref": "w08",
-            "title": "Week 08",
-            "kind": "week",
-            "order": 8
-        },
-        {
-            "ref": "w09",
-            "title": "Week 09",
-            "kind": "week",
-            "order": 9
-        },
-        {
-            "ref": "w10",
-            "title": "Week 10",
-            "kind": "week",
-            "order": 10
-        },
-        {
-            "ref": "w11",
-            "title": "Week 11",
-            "kind": "week",
-            "order": 11
-        },
-        {
-            "ref": "w12",
-            "title": "Week 12",
-            "kind": "week",
-            "order": 12
-        },
-        {
-            "ref": "w13",
-            "title": "Week 13",
-            "kind": "week",
-            "order": 13
-        },
-        {
-            "ref": "w14",
-            "title": "Week 14",
-            "kind": "week",
-            "order": 14
-        },
-        {
-            "ref": "w15",
-            "title": "Week 15",
-            "kind": "week",
-            "order": 15
-        },
-        {
-            "ref": "w16",
-            "title": "Week 16",
-            "kind": "week",
-            "order": 16
-        },
-        {
-            "ref": "w17",
-            "title": "Week 17",
-            "kind": "week",
-            "order": 17
-        },
-        {
-            "ref": "w18",
-            "title": "Week 18",
-            "kind": "week",
-            "order": 18,
-            "metadata": {
-                "progress_pct": 75
-            }
-        },
-        {
-            "ref": "w19",
-            "title": "Week 19",
-            "kind": "week",
-            "order": 19
-        },
-        {
-            "ref": "w20",
-            "title": "Week 20",
-            "kind": "week",
-            "order": 20
-        },
-        {
-            "ref": "w21",
-            "title": "Week 21",
-            "kind": "week",
-            "order": 21
-        },
-        {
-            "ref": "w22",
-            "title": "Week 22",
-            "kind": "week",
-            "order": 22
-        },
-        {
-            "ref": "w23",
-            "title": "Week 23",
-            "kind": "week",
-            "order": 23
-        },
-        {
-            "ref": "w24",
-            "title": "Week 24",
-            "kind": "week",
-            "order": 24
-        },
-        {
-            "ref": "w25",
-            "title": "Week 25",
-            "kind": "week",
-            "order": 25
-        },
-        {
-            "ref": "w26",
-            "title": "Week 26",
-            "kind": "week",
-            "order": 26
-        },
-        {
-            "ref": "w27",
-            "title": "Week 27",
-            "kind": "week",
-            "order": 27
-        },
-        {
-            "ref": "w28",
-            "title": "Week 28",
-            "kind": "week",
-            "order": 28
-        },
-        {
-            "ref": "w29",
-            "title": "Week 29",
-            "kind": "week",
-            "order": 29
-        },
-        {
-            "ref": "w30",
-            "title": "Week 30",
-            "kind": "week",
-            "order": 30
-        },
-        {
-            "ref": "w31",
-            "title": "Week 31",
-            "kind": "week",
-            "order": 31
-        },
-        {
-            "ref": "tma4",
-            "title": "TMA 4 (1000-word essay)",
-            "kind": "assessment",
-            "order": 100
-        },
-        {
-            "ref": "tma5",
-            "title": "TMA 5 (presentation + script + graph)",
-            "kind": "assessment",
-            "order": 101
-        },
-        {
-            "ref": "ema",
-            "title": "EMA (1500-word essay)",
-            "kind": "assessment",
-            "order": 102
-        }
+        { "ref": "w01", "title": "Week 01", "kind": "week", "order": 1 },
+        { "ref": "w02", "title": "Week 02", "kind": "week", "order": 2 },
+        { "ref": "w03", "title": "Week 03", "kind": "week", "order": 3 },
+        { "ref": "w04", "title": "Week 04", "kind": "week", "order": 4 },
+        { "ref": "w05", "title": "Week 05", "kind": "week", "order": 5 },
+        { "ref": "w06", "title": "Week 06", "kind": "week", "order": 6 },
+        { "ref": "w07", "title": "Week 07", "kind": "week", "order": 7 },
+        { "ref": "w08", "title": "Week 08", "kind": "week", "order": 8 },
+        { "ref": "w09", "title": "Week 09", "kind": "week", "order": 9 },
+        { "ref": "w10", "title": "Week 10", "kind": "week", "order": 10 },
+        { "ref": "w11", "title": "Week 11", "kind": "week", "order": 11 },
+        { "ref": "w12", "title": "Week 12", "kind": "week", "order": 12 },
+        { "ref": "w13", "title": "Week 13", "kind": "week", "order": 13 },
+        { "ref": "w14", "title": "Week 14", "kind": "week", "order": 14 },
+        { "ref": "w15", "title": "Week 15", "kind": "week", "order": 15 },
+        { "ref": "w16", "title": "Week 16", "kind": "week", "order": 16 },
+        { "ref": "w17", "title": "Week 17", "kind": "week", "order": 17 },
+        { "ref": "w18", "title": "Week 18", "kind": "week", "order": 18 },
+        { "ref": "w19", "title": "Week 19", "kind": "week", "order": 19 },
+        { "ref": "w20", "title": "Week 20", "kind": "week", "order": 20 },
+        { "ref": "w21", "title": "Week 21", "kind": "week", "order": 21 },
+        { "ref": "w22", "title": "Week 22", "kind": "week", "order": 22 },
+        { "ref": "w23", "title": "Week 23", "kind": "week", "order": 23 },
+        { "ref": "w24", "title": "Week 24", "kind": "week", "order": 24 },
+        { "ref": "w25", "title": "Week 25", "kind": "week", "order": 25 },
+        { "ref": "w26", "title": "Week 26", "kind": "week", "order": 26 },
+        { "ref": "w27", "title": "Week 27", "kind": "week", "order": 27 },
+        { "ref": "w28", "title": "Week 28", "kind": "week", "order": 28 },
+        { "ref": "w29", "title": "Week 29", "kind": "week", "order": 29 },
+        { "ref": "w30", "title": "Week 30", "kind": "week", "order": 30 },
+        { "ref": "w31", "title": "Week 31", "kind": "week", "order": 31 },
+        { "ref": "tma4", "title": "TMA 4 (1000-word essay)", "kind": "assessment", "order": 100 },
+        { "ref": "tma5", "title": "TMA 5 (presentation + script + graph)", "kind": "assessment", "order": 101 },
+        { "ref": "ema", "title": "EMA (1500-word essay)", "kind": "assessment", "order": 102 }
     ],
     "work_items": [
         {
@@ -236,9 +58,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w02_read_notes",
@@ -246,9 +66,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w03_read_notes",
@@ -256,9 +74,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w04_read_notes",
@@ -266,9 +82,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w05_read_notes",
@@ -276,9 +90,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w06_read_notes",
@@ -286,9 +98,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w07_read_notes",
@@ -296,9 +106,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w08_read_notes",
@@ -306,9 +114,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w09_read_notes",
@@ -316,9 +122,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w10_read_notes",
@@ -326,9 +130,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w11_read_notes",
@@ -336,9 +138,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w12_read_notes",
@@ -346,9 +146,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w13_read_notes",
@@ -356,9 +154,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w14_read_notes",
@@ -366,9 +162,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w15_read_notes",
@@ -376,9 +170,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w16_read_notes",
@@ -386,9 +178,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w17_read_notes",
@@ -396,9 +186,7 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "done"
-            }
+            "status": "done"
         },
         {
             "ref": "w18_read_notes",
@@ -406,101 +194,113 @@
             "title": "Weekly reading + notes",
             "type": "reading",
             "planned_min": 270,
-            "metadata": {
-                "status": "in_progress",
-                "progress_pct": 75
-            }
+            "status": "in_progress",
+            "logged_min": 200,
+            "due_date": "2026-02-13"
         },
         {
             "ref": "w19_read_notes",
             "node_ref": "w19",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-02-20"
         },
         {
             "ref": "w20_read_notes",
             "node_ref": "w20",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-02-27"
         },
         {
             "ref": "w21_read_notes",
             "node_ref": "w21",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-03-06"
         },
         {
             "ref": "w22_read_notes",
             "node_ref": "w22",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-03-13"
         },
         {
             "ref": "w23_read_notes",
             "node_ref": "w23",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-03-20"
         },
         {
             "ref": "w24_read_notes",
             "node_ref": "w24",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-03-27"
         },
         {
             "ref": "w25_read_notes",
             "node_ref": "w25",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-04-03"
         },
         {
             "ref": "w26_read_notes",
             "node_ref": "w26",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-04-10"
         },
         {
             "ref": "w27_read_notes",
             "node_ref": "w27",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-04-17"
         },
         {
             "ref": "w28_read_notes",
             "node_ref": "w28",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-04-24"
         },
         {
             "ref": "w29_read_notes",
             "node_ref": "w29",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-05-01"
         },
         {
             "ref": "w30_read_notes",
             "node_ref": "w30",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-05-08"
         },
         {
             "ref": "w31_read_notes",
             "node_ref": "w31",
             "title": "Weekly reading + notes",
             "type": "reading",
-            "planned_min": 270
+            "planned_min": 270,
+            "due_date": "2026-05-15"
         },
         {
             "ref": "tma4_brief_requirements",
@@ -508,9 +308,7 @@
             "title": "Read brief + marking rubric, extract requirements",
             "type": "planning",
             "planned_min": 45,
-            "metadata": {
-                "due_date": "2026-03-03"
-            }
+            "due_date": "2026-03-03"
         },
         {
             "ref": "tma4_research_notes",
@@ -560,9 +358,7 @@
             "title": "Read brief + rubric, confirm slide count and graph requirements",
             "type": "planning",
             "planned_min": 45,
-            "metadata": {
-                "due_date": "2026-04-21"
-            }
+            "due_date": "2026-04-21"
         },
         {
             "ref": "tma5_research_storyboard",
@@ -588,7 +384,7 @@
         {
             "ref": "tma5_slides_draft",
             "node_ref": "tma5",
-            "title": "Draft 5–7 slides (layout + headings + visuals)",
+            "title": "Draft 5-7 slides (layout + headings + visuals)",
             "type": "making",
             "planned_min": 180
         },
@@ -619,9 +415,7 @@
             "title": "Read EMA brief + rubric, extract marking criteria",
             "type": "planning",
             "planned_min": 60,
-            "metadata": {
-                "due_date": "2026-05-21"
-            }
+            "due_date": "2026-05-21"
         },
         {
             "ref": "ema_research_notes",
@@ -667,81 +461,24 @@
         }
     ],
     "dependencies": [
-        {
-            "predecessor_ref": "tma4_brief_requirements",
-            "successor_ref": "tma4_research_notes"
-        },
-        {
-            "predecessor_ref": "tma4_research_notes",
-            "successor_ref": "tma4_outline"
-        },
-        {
-            "predecessor_ref": "tma4_outline",
-            "successor_ref": "tma4_draft"
-        },
-        {
-            "predecessor_ref": "tma4_draft",
-            "successor_ref": "tma4_references"
-        },
-        {
-            "predecessor_ref": "tma4_references",
-            "successor_ref": "tma4_edit_polish"
-        },
-        {
-            "predecessor_ref": "tma4_edit_polish",
-            "successor_ref": "tma4_final_checks"
-        },
-        {
-            "predecessor_ref": "tma5_brief_requirements",
-            "successor_ref": "tma5_research_storyboard"
-        },
-        {
-            "predecessor_ref": "tma5_research_storyboard",
-            "successor_ref": "tma5_graph_data"
-        },
-        {
-            "predecessor_ref": "tma5_graph_data",
-            "successor_ref": "tma5_graph_build"
-        },
-        {
-            "predecessor_ref": "tma5_graph_build",
-            "successor_ref": "tma5_slides_draft"
-        },
-        {
-            "predecessor_ref": "tma5_slides_draft",
-            "successor_ref": "tma5_script_write"
-        },
-        {
-            "predecessor_ref": "tma5_script_write",
-            "successor_ref": "tma5_references"
-        },
-        {
-            "predecessor_ref": "tma5_references",
-            "successor_ref": "tma5_polish_rehearse"
-        },
-        {
-            "predecessor_ref": "ema_brief_requirements",
-            "successor_ref": "ema_research_notes"
-        },
-        {
-            "predecessor_ref": "ema_research_notes",
-            "successor_ref": "ema_outline"
-        },
-        {
-            "predecessor_ref": "ema_outline",
-            "successor_ref": "ema_draft"
-        },
-        {
-            "predecessor_ref": "ema_draft",
-            "successor_ref": "ema_references"
-        },
-        {
-            "predecessor_ref": "ema_references",
-            "successor_ref": "ema_edit_polish"
-        },
-        {
-            "predecessor_ref": "ema_edit_polish",
-            "successor_ref": "ema_final_checks"
-        }
+        { "predecessor_ref": "tma4_brief_requirements", "successor_ref": "tma4_research_notes" },
+        { "predecessor_ref": "tma4_research_notes", "successor_ref": "tma4_outline" },
+        { "predecessor_ref": "tma4_outline", "successor_ref": "tma4_draft" },
+        { "predecessor_ref": "tma4_draft", "successor_ref": "tma4_references" },
+        { "predecessor_ref": "tma4_references", "successor_ref": "tma4_edit_polish" },
+        { "predecessor_ref": "tma4_edit_polish", "successor_ref": "tma4_final_checks" },
+        { "predecessor_ref": "tma5_brief_requirements", "successor_ref": "tma5_research_storyboard" },
+        { "predecessor_ref": "tma5_research_storyboard", "successor_ref": "tma5_graph_data" },
+        { "predecessor_ref": "tma5_graph_data", "successor_ref": "tma5_graph_build" },
+        { "predecessor_ref": "tma5_graph_build", "successor_ref": "tma5_slides_draft" },
+        { "predecessor_ref": "tma5_slides_draft", "successor_ref": "tma5_script_write" },
+        { "predecessor_ref": "tma5_script_write", "successor_ref": "tma5_references" },
+        { "predecessor_ref": "tma5_references", "successor_ref": "tma5_polish_rehearse" },
+        { "predecessor_ref": "ema_brief_requirements", "successor_ref": "ema_research_notes" },
+        { "predecessor_ref": "ema_research_notes", "successor_ref": "ema_outline" },
+        { "predecessor_ref": "ema_outline", "successor_ref": "ema_draft" },
+        { "predecessor_ref": "ema_draft", "successor_ref": "ema_references" },
+        { "predecessor_ref": "ema_references", "successor_ref": "ema_edit_polish" },
+        { "predecessor_ref": "ema_edit_polish", "successor_ref": "ema_final_checks" }
     ]
 }

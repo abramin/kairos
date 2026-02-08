@@ -17,6 +17,16 @@ type SchedulableCandidate struct {
 	NodeTitle         string
 	NodeDueDate       *time.Time
 	ProjectTargetDate *time.Time
+	ProjectStartDate  *time.Time
+}
+
+// CompletedWorkSummary holds per-project aggregates for completed (done/skipped) work items.
+type CompletedWorkSummary struct {
+	ProjectID      string
+	PlannedMin     int
+	LoggedMin      int
+	DoneItemCount  int
+	TotalItemCount int
 }
 
 type ProjectRepo interface {
@@ -46,6 +56,7 @@ type WorkItemRepo interface {
 	ListByNode(ctx context.Context, nodeID string) ([]*domain.WorkItem, error)
 	ListByProject(ctx context.Context, projectID string) ([]*domain.WorkItem, error)
 	ListSchedulable(ctx context.Context, includeArchived bool) ([]SchedulableCandidate, error)
+	ListCompletedSummaryByProject(ctx context.Context) ([]CompletedWorkSummary, error)
 	Update(ctx context.Context, w *domain.WorkItem) error
 	Archive(ctx context.Context, id string) error
 	Delete(ctx context.Context, id string) error

@@ -118,6 +118,40 @@ func TestExtractJSON_NegativeLeadingDecimal(t *testing.T) {
 	assert.Equal(t, -0.25, result.Value)
 }
 
+func TestExtractJSON_LineComments(t *testing.T) {
+	raw := `{
+		// This is a comment
+		"intent": "what_now",
+		"confidence": 0.9 // inline comment
+	}`
+	result, err := ExtractJSON[testPayload](raw, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "what_now", result.Intent)
+	assert.Equal(t, 0.9, result.Confidence)
+}
+
+func TestExtractJSON_BlockComments(t *testing.T) {
+	raw := `{
+		/* block comment */
+		"intent": "status",
+		"confidence": 0.85
+	}`
+	result, err := ExtractJSON[testPayload](raw, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "status", result.Intent)
+	assert.Equal(t, 0.85, result.Confidence)
+}
+
+func TestExtractJSON_CommentLikeURLInString(t *testing.T) {
+	type payload struct {
+		URL string `json:"url"`
+	}
+	raw := `{"url": "http://example.com/path"}`
+	result, err := ExtractJSON[payload](raw, nil)
+	require.NoError(t, err)
+	assert.Equal(t, "http://example.com/path", result.URL)
+}
+
 func TestExtractJSON_DecimalLikeStringNotNormalized(t *testing.T) {
 	type payload struct {
 		Note string `json:"note"`

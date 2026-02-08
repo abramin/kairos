@@ -14,6 +14,12 @@ type RiskInput struct {
 	LoggedMin      int
 	BufferPct      float64
 	RecentDailyMin float64
+	// ProgressPct is the weighted progress: sum(done planned_min) / sum(all planned_min) * 100.
+	// Zero means no structural data available (preserves existing behavior).
+	ProgressPct float64
+	// TimeElapsedPct is the % of project timeline elapsed: (now - start) / (target - start) * 100.
+	// Zero means no timeline data available (preserves existing behavior).
+	TimeElapsedPct float64
 }
 
 type RiskResult struct {
@@ -68,9 +74,18 @@ func ComputeRisk(input RiskInput) RiskResult {
 		ProgressTimePct:  progressTimePct,
 	}
 
-	// No recent activity and work remains => critical
+	// Structural progress: if weighted progress >= timeline elapsed, the user is on pace.
+	// This prevents false-critical when recent sessions are missing but overall progress is fine.
+	onPace := input.ProgressPct > 0 && input.TimeElapsedPct > 0 &&
+		input.ProgressPct >= input.TimeElapsedPct
+
+	// No recent activity and work remains => critical (unless structurally on pace)
 	if input.RecentDailyMin == 0 && remaining > 0 {
-		result.Level = domain.RiskCritical
+		if onPace {
+			result.Level = domain.RiskAtRisk
+		} else {
+			result.Level = domain.RiskCritical
+		}
 		return result
 	}
 
@@ -79,7 +94,11 @@ func ComputeRisk(input RiskInput) RiskResult {
 
 	switch {
 	case ratio > 1.5:
-		result.Level = domain.RiskCritical
+		if onPace {
+			result.Level = domain.RiskAtRisk
+		} else {
+			result.Level = domain.RiskCritical
+		}
 	case ratio > 1.0:
 		result.Level = domain.RiskAtRisk
 	case daysLeft <= 3 && float64(remaining) > input.RecentDailyMin*float64(daysLeft):

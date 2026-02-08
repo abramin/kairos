@@ -188,6 +188,10 @@ func validateWorkItems(items []WorkItemImport, nodeRefs map[string]bool, wiRefs 
 			errs = append(errs, fmt.Errorf("%s.duration_mode: invalid value %q", prefix, wi.DurationMode))
 		}
 
+		if wi.LoggedMin != nil && *wi.LoggedMin < 0 {
+			errs = append(errs, fmt.Errorf("%s.logged_min must be non-negative", prefix))
+		}
+
 		if wi.SessionPolicy != nil {
 			errs = append(errs, validateSessionPolicy(prefix+".session_policy", wi.SessionPolicy)...)
 		}

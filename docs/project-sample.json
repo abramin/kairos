@@ -1,0 +1,106 @@
+{
+    "project": {
+        "short_id": "EX01",
+        "name": "Example Project",
+        "domain": "education",
+        "start_date": "2026-01-01",
+        "target_date": "2026-06-30"
+    },
+    "defaults": {
+        "duration_mode": "estimate",
+        "session_policy": {
+            "min_session_min": 15,
+            "max_session_min": 60,
+            "default_session_min": 30,
+            "splittable": true
+        }
+    },
+    "nodes": [
+        {
+            "ref": "phase1",
+            "title": "Phase 1 - Foundation",
+            "kind": "module",
+            "order": 1
+        },
+        {
+            "ref": "phase2",
+            "title": "Phase 2 - Deep Dive",
+            "kind": "module",
+            "order": 2
+        },
+        {
+            "ref": "assessment",
+            "title": "Final Assessment",
+            "kind": "assessment",
+            "order": 3,
+            "due_date": "2026-06-15"
+        }
+    ],
+    "work_items": [
+        {
+            "_comment": "Completed item: status=done auto-sets logged_min=planned_min",
+            "ref": "p1_reading",
+            "node_ref": "phase1",
+            "title": "Foundation reading",
+            "type": "reading",
+            "planned_min": 120,
+            "status": "done"
+        },
+        {
+            "_comment": "Completed item with explicit logged_min (took longer than planned)",
+            "ref": "p1_exercises",
+            "node_ref": "phase1",
+            "title": "Practice exercises",
+            "type": "exercise",
+            "planned_min": 90,
+            "status": "done",
+            "logged_min": 110
+        },
+        {
+            "_comment": "In-progress item with partial logged time",
+            "ref": "p2_reading",
+            "node_ref": "phase2",
+            "title": "Advanced reading",
+            "type": "reading",
+            "planned_min": 180,
+            "status": "in_progress",
+            "logged_min": 60
+        },
+        {
+            "_comment": "Future item: no status defaults to 'todo', no logged_min defaults to 0",
+            "ref": "p2_exercises",
+            "node_ref": "phase2",
+            "title": "Advanced exercises",
+            "type": "exercise",
+            "planned_min": 120
+        },
+        {
+            "ref": "assess_prep",
+            "node_ref": "assessment",
+            "title": "Exam preparation",
+            "type": "review",
+            "planned_min": 240,
+            "due_date": "2026-06-10"
+        },
+        {
+            "ref": "assess_submit",
+            "node_ref": "assessment",
+            "title": "Final submission",
+            "type": "admin",
+            "planned_min": 60,
+            "due_date": "2026-06-15",
+            "session_policy": {
+                "min_session_min": 30,
+                "max_session_min": 60,
+                "splittable": false
+            }
+        }
+    ],
+    "dependencies": [
+        { "predecessor_ref": "p1_reading", "successor_ref": "p1_exercises" },
+        { "predecessor_ref": "p1_exercises", "successor_ref": "p2_reading" },
+        { "predecessor_ref": "p2_reading", "successor_ref": "p2_exercises" },
+        { "predecessor_ref": "p2_exercises", "successor_ref": "assess_prep" },
+        { "predecessor_ref": "assess_prep", "successor_ref": "assess_submit" }
+    ]
+}

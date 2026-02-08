@@ -23,7 +23,7 @@ func TestFormatStatus_IncludesPolicyWarningsAndFallbackDueDate(t *testing.T) {
 				Status:          domain.ProjectActive,
 				RiskLevel:       domain.RiskCritical,
 				DueDate:         &badDueDate,
-				ProgressTimePct: 0.35,
+				ProgressTimePct: 35.0,
 			},
 		},
 		Warnings: []string{"Projected overload this week"},

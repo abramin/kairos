@@ -3,7 +3,6 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -26,6 +25,14 @@ type shellSession struct {
 	helpSpecJSON      string
 	helpCmdInfos      []intelligence.HelpCommandInfo
 	helpConv          *intelligence.HelpConversation
+	draftMode         bool
+	draftPhase        draftPhase
+	draftDescription  string
+	draftStartDate    string
+	draftDeadline     string
+	draftStructure    string
+	draftConv         *intelligence.DraftConversation
+	wantExit          bool
 }
 
 func newShellCmd(app *App) *cobra.Command {
@@ -53,6 +60,9 @@ func runShell(app *App) error {
 		sess.executor,
 		sess.completer,
 		prompt.OptionLivePrefix(sess.livePrefix),
+		prompt.OptionSetExitCheckerOnInput(func(in string, breakline bool) bool {
+			return sess.wantExit
+		}),
 		prompt.OptionTitle("kairos shell"),
 		prompt.OptionPrefixTextColor(prompt.Purple),
 		prompt.OptionSuggestionBGColor(prompt.DarkGray),
@@ -71,6 +81,9 @@ func (s *shellSession) livePrefix() (string, bool) {
 	if s.helpChatMode {
 		return "help> ", true
 	}
+	if s.draftMode {
+		return "draft> ", true
+	}
 	if s.activeProjectID == "" {
 		return "kairos ❯ ", true
 	}
@@ -79,7 +92,11 @@ func (s *shellSession) livePrefix() (string, bool) {
 
 func (s *shellSession) executor(input string) {
 	input = strings.TrimSpace(input)
-	if input == "" {
+	if input == "" && !s.draftMode && !s.helpChatMode {
+		return
+	}
+	if s.draftMode {
+		s.execDraftTurn(input)
 		return
 	}
 	if s.helpChatMode {
@@ -116,9 +133,15 @@ func (s *shellSession) executor(input string) {
 		}
 	case "exit", "quit":
 		fmt.Println(formatter.Dim("Goodbye."))
-		os.Exit(0)
+		s.wantExit = true
 	case "shell":
 		fmt.Println(formatter.StyleYellow.Render("Already in shell mode."))
+	case "project":
+		if len(args) > 0 && args[0] == "draft" {
+			s.execDraft(args[1:])
+		} else {
+			s.execCobra(parts)
+		}
 	default:
 		s.execCobra(parts)
 	}
@@ -440,6 +463,10 @@ func (s *shellSession) execHelpChatTurn(input string) {
 		return
 	case "/commands":
 		fmt.Print(formatter.FormatCommandList(s.helpCmdInfos))
+		return
+	}
+
+	if strings.TrimSpace(input) == "" {
 		return
 	}
 
