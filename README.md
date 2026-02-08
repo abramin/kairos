@@ -244,6 +244,7 @@ kairos project import myproject.json
 - **`ref`** fields are local IDs within the file (not UUIDs). Kairos generates real IDs on import.
 - **`parent_ref`** and **`node_ref`** cross-reference other `ref` values in the same file.
 - **`defaults`** is optional. It sets project-wide session policy and duration mode so you don't repeat them on every work item.
+- **`dependencies`** is optional. If omitted, Kairos infers a sequential chain by node order, then work item order.
 - Nodes must be listed in order: parents before children.
 - Omitted optional fields get sensible defaults (status `todo`, duration mode `estimate`, session bounds `15/60/30`, splittable `true`).
 

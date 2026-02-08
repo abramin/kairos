@@ -2,6 +2,7 @@ package importer
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -152,21 +153,26 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 		workItems = append(workItems, item)
 	}
 
-	// Convert dependencies
+	// Convert dependencies.
+	// If omitted, infer a default linear chain by node order, then work item order.
 	var deps []domain.Dependency
-	for _, d := range schema.Dependencies {
-		predUUID, ok := refMap[d.PredecessorRef]
-		if !ok {
-			return nil, fmt.Errorf("predecessor_ref %q not found", d.PredecessorRef)
+	if len(schema.Dependencies) > 0 {
+		for _, d := range schema.Dependencies {
+			predUUID, ok := refMap[d.PredecessorRef]
+			if !ok {
+				return nil, fmt.Errorf("predecessor_ref %q not found", d.PredecessorRef)
+			}
+			succUUID, ok := refMap[d.SuccessorRef]
+			if !ok {
+				return nil, fmt.Errorf("successor_ref %q not found", d.SuccessorRef)
+			}
+			deps = append(deps, domain.Dependency{
+				PredecessorWorkItemID: predUUID,
+				SuccessorWorkItemID:   succUUID,
+			})
 		}
-		succUUID, ok := refMap[d.SuccessorRef]
-		if !ok {
-			return nil, fmt.Errorf("successor_ref %q not found", d.SuccessorRef)
-		}
-		deps = append(deps, domain.Dependency{
-			PredecessorWorkItemID: predUUID,
-			SuccessorWorkItemID:   succUUID,
-		})
+	} else {
+		deps = inferDefaultDependencies(schema.Nodes, schema.WorkItems, refMap)
 	}
 
 	return &tmpl.GeneratedProject{
@@ -222,4 +228,59 @@ func sessionPolicyBool(sp *SessionPolicyImport) *bool {
 		return nil
 	}
 	return sp.Splittable
+}
+
+func inferDefaultDependencies(nodes []NodeImport, workItems []WorkItemImport, refMap map[string]string) []domain.Dependency {
+	if len(workItems) < 2 {
+		return nil
+	}
+
+	nodePos := make(map[string]int, len(nodes))
+	nodeOrder := make(map[string]int, len(nodes))
+	for i, n := range nodes {
+		nodePos[n.Ref] = i
+		nodeOrder[n.Ref] = n.Order
+	}
+
+	type indexedWI struct {
+		ref       string
+		nodeOrder int
+		nodePos   int
+		wiPos     int
+	}
+
+	ordered := make([]indexedWI, 0, len(workItems))
+	for i, wi := range workItems {
+		ordered = append(ordered, indexedWI{
+			ref:       wi.Ref,
+			nodeOrder: nodeOrder[wi.NodeRef],
+			nodePos:   nodePos[wi.NodeRef],
+			wiPos:     i,
+		})
+	}
+
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if ordered[i].nodeOrder != ordered[j].nodeOrder {
+			return ordered[i].nodeOrder < ordered[j].nodeOrder
+		}
+		if ordered[i].nodePos != ordered[j].nodePos {
+			return ordered[i].nodePos < ordered[j].nodePos
+		}
+		return ordered[i].wiPos < ordered[j].wiPos
+	})
+
+	deps := make([]domain.Dependency, 0, len(ordered)-1)
+	for i := 0; i < len(ordered)-1; i++ {
+		predID := refMap[ordered[i].ref]
+		succID := refMap[ordered[i+1].ref]
+		if predID == "" || succID == "" || predID == succID {
+			continue
+		}
+		deps = append(deps, domain.Dependency{
+			PredecessorWorkItemID: predID,
+			SuccessorWorkItemID:   succID,
+		})
+	}
+
+	return deps
 }

@@ -1,0 +1,326 @@
+{
+    "project": {
+        "short_id": "SPANISH26",
+        "name": "Mastering Spanish: A2 & B1",
+        "domain": "language",
+        "start_date": "2026-02-08",
+        "target_date": "2026-10-31"
+    },
+    "defaults": {
+        "duration_mode": "estimate",
+        "session_policy": {
+            "min_session_min": 20,
+            "max_session_min": 60,
+            "default_session_min": 45,
+            "splittable": true
+        }
+    },
+    "nodes": [
+        {
+            "ref": "a2_01",
+            "title": "A2 Module 1",
+            "kind": "module",
+            "order": 1,
+            "due_date": "2026-02-18"
+        },
+        {
+            "ref": "a2_02",
+            "title": "A2 Module 2",
+            "kind": "module",
+            "order": 2,
+            "due_date": "2026-02-28"
+        },
+        {
+            "ref": "a2_03",
+            "title": "A2 Module 3",
+            "kind": "module",
+            "order": 3,
+            "due_date": "2026-03-10"
+        },
+        {
+            "ref": "a2_04",
+            "title": "A2 Module 4",
+            "kind": "module",
+            "order": 4,
+            "due_date": "2026-03-20"
+        },
+        {
+            "ref": "a2_05",
+            "title": "A2 Module 5",
+            "kind": "module",
+            "order": 5,
+            "due_date": "2026-03-30"
+        },
+        {
+            "ref": "a2_06",
+            "title": "A2 Module 6",
+            "kind": "module",
+            "order": 6,
+            "due_date": "2026-04-09"
+        },
+        {
+            "ref": "a2_07",
+            "title": "A2 Module 7",
+            "kind": "module",
+            "order": 7,
+            "due_date": "2026-04-19"
+        },
+        {
+            "ref": "a2_08",
+            "title": "A2 Module 8",
+            "kind": "module",
+            "order": 8,
+            "due_date": "2026-04-29"
+        },
+        {
+            "ref": "a2_09",
+            "title": "A2 Module 9",
+            "kind": "module",
+            "order": 9,
+            "due_date": "2026-05-09"
+        },
+        {
+            "ref": "b1_01",
+            "title": "B1 Module 1",
+            "kind": "module",
+            "order": 10,
+            "due_date": "2026-05-23"
+        },
+        {
+            "ref": "b1_02",
+            "title": "B1 Module 2",
+            "kind": "module",
+            "order": 11,
+            "due_date": "2026-06-06"
+        },
+        {
+            "ref": "b1_03",
+            "title": "B1 Module 3",
+            "kind": "module",
+            "order": 12,
+            "due_date": "2026-06-20"
+        },
+        {
+            "ref": "b1_04",
+            "title": "B1 Module 4",
+            "kind": "module",
+            "order": 13,
+            "due_date": "2026-07-04"
+        },
+        {
+            "ref": "b1_05",
+            "title": "B1 Module 5",
+            "kind": "module",
+            "order": 14,
+            "due_date": "2026-07-18"
+        },
+        {
+            "ref": "b1_06",
+            "title": "B1 Module 6",
+            "kind": "module",
+            "order": 15,
+            "due_date": "2026-08-01"
+        },
+        {
+            "ref": "b1_07",
+            "title": "B1 Module 7",
+            "kind": "module",
+            "order": 16,
+            "due_date": "2026-08-15"
+        },
+        {
+            "ref": "b1_08",
+            "title": "B1 Module 8",
+            "kind": "module",
+            "order": 17,
+            "due_date": "2026-08-29"
+        },
+        {
+            "ref": "b1_09",
+            "title": "B1 Module 9",
+            "kind": "module",
+            "order": 18,
+            "due_date": "2026-09-12"
+        },
+        {
+            "ref": "b1_10",
+            "title": "B1 Module 10",
+            "kind": "module",
+            "order": 19,
+            "due_date": "2026-09-26"
+        },
+        {
+            "ref": "b1_11",
+            "title": "B1 Module 11",
+            "kind": "module",
+            "order": 20,
+            "due_date": "2026-10-10"
+        },
+        {
+            "ref": "novels",
+            "title": "Reading List",
+            "kind": "collection",
+            "order": 21
+        }
+    ],
+    "work_items": [
+        {
+            "ref": "a2_01_read",
+            "node_ref": "a2_01",
+            "title": "A2.1 Reading",
+            "type": "reading",
+            "planned_min": 45,
+            "status": "todo"
+        },
+        {
+            "ref": "a2_01_ex",
+            "node_ref": "a2_01",
+            "title": "A2.1 Exercises",
+            "type": "exercise",
+            "planned_min": 60
+        },
+        {
+            "ref": "a2_01_gram",
+            "node_ref": "a2_01",
+            "title": "A2.1 Grammar",
+            "type": "drill",
+            "planned_min": 45
+        },
+        {
+            "ref": "a2_02_read",
+            "node_ref": "a2_02",
+            "title": "A2.2 Reading",
+            "type": "reading",
+            "planned_min": 45
+        },
+        {
+            "ref": "a2_02_ex",
+            "node_ref": "a2_02",
+            "title": "A2.2 Exercises",
+            "type": "exercise",
+            "planned_min": 60
+        },
+        {
+            "ref": "a2_02_gram",
+            "node_ref": "a2_02",
+            "title": "A2.2 Grammar",
+            "type": "drill",
+            "planned_min": 45
+        },
+        {
+            "_comment": "Items for A2 modules 3-9 omitted for brevity, but would follow same pattern..."
+        },
+        {
+            "ref": "a2_09_gram",
+            "node_ref": "a2_09",
+            "title": "A2.9 Grammar (Final A2)",
+            "type": "drill",
+            "planned_min": 45
+        },
+        {
+            "_comment": "--- B1 PHASE START ---"
+        },
+        {
+            "ref": "b1_01_read",
+            "node_ref": "b1_01",
+            "title": "B1.1 Reading",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "b1_01_ex",
+            "node_ref": "b1_01",
+            "title": "B1.1 Exercises",
+            "type": "exercise",
+            "planned_min": 90
+        },
+        {
+            "ref": "b1_01_gram",
+            "node_ref": "b1_01",
+            "title": "B1.1 Grammar",
+            "type": "drill",
+            "planned_min": 60
+        },
+        {
+            "ref": "b1_02_read",
+            "node_ref": "b1_02",
+            "title": "B1.2 Reading",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "b1_02_ex",
+            "node_ref": "b1_02",
+            "title": "B1.2 Exercises",
+            "type": "exercise",
+            "planned_min": 90
+        },
+        {
+            "ref": "b1_02_gram",
+            "node_ref": "b1_02",
+            "title": "B1.2 Grammar",
+            "type": "drill",
+            "planned_min": 60
+        },
+        {
+            "_comment": "Items for B1 modules 3-10 omitted for brevity..."
+        },
+        {
+            "ref": "b1_11_gram",
+            "node_ref": "b1_11",
+            "title": "B1.11 Grammar (Final B1)",
+            "type": "drill",
+            "planned_min": 60
+        },
+        {
+            "_comment": "--- OPTIONAL NOVELS ---"
+        },
+        {
+            "ref": "novel_1",
+            "node_ref": "novels",
+            "title": "Read: Short Novel 1 (150pg)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "novel_2",
+            "node_ref": "novels",
+            "title": "Read: Short Novel 2 (150pg)",
+            "type": "reading",
+            "planned_min": 300
+        }
+    ],
+    "dependencies": [
+        {
+            "predecessor_ref": "a2_01_read",
+            "successor_ref": "a2_01_ex"
+        },
+        {
+            "predecessor_ref": "a2_01_ex",
+            "successor_ref": "a2_01_gram"
+        },
+        {
+            "predecessor_ref": "a2_01_gram",
+            "successor_ref": "a2_02_read"
+        },
+        {
+            "predecessor_ref": "a2_02_read",
+            "successor_ref": "a2_02_ex"
+        },
+        {
+            "predecessor_ref": "a2_02_ex",
+            "successor_ref": "a2_02_gram"
+        },
+        {
+            "_comment": "Chain continues through all modules..."
+        },
+        {
+            "predecessor_ref": "a2_09_gram",
+            "successor_ref": "b1_01_read"
+        },
+        {
+            "predecessor_ref": "b1_01_gram",
+            "successor_ref": "b1_02_read"
+        }
+    ]
+}

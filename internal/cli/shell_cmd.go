@@ -9,7 +9,6 @@ import (
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/domain"
-	"github.com/alexanderramin/kairos/internal/importer"
 	"github.com/alexanderramin/kairos/internal/intelligence"
 	prompt "github.com/c-bata/go-prompt"
 	"github.com/spf13/cobra"
@@ -26,23 +25,8 @@ type shellSession struct {
 	helpSpecJSON      string
 	helpCmdInfos      []intelligence.HelpCommandInfo
 	helpConv          *intelligence.HelpConversation
-	draftMode             bool
-	draftPhase            draftPhase
-	draftDescription      string
-	draftStartDate        string
-	draftDeadline         string
-	draftConv             *intelligence.DraftConversation
-	draftGroups           []wizardGroup
-	draftWorkItems        []wizardWorkItem
-	draftSpecialNodes     []wizardSpecialNode
-	draftGroupTotal       int
-	draftCurrentGroupIdx  int
-	draftCurrentGroup     wizardGroup
-	draftCurrentWI        wizardWorkItem
-	draftCurrentSpecial   wizardSpecialNode
-	draftCurrentSpecialWI wizardWorkItem
-	draftWizard           *wizardResult
-	draftSchema           *importer.ImportSchema
+	draftMode bool
+	draft     *draftWizardState
 	wantExit              bool
 }
 

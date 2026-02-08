@@ -193,15 +193,15 @@ func TestShellExecutor_QuitSetsWantExit(t *testing.T) {
 func TestShellExecutor_EmptyInputInDraftModeAdvancesPhase(t *testing.T) {
 	app := testApp(t)
 	sess := &shellSession{
-		app:        app,
-		cache:      newShellProjectCache(),
-		draftMode:  true,
-		draftPhase: draftPhaseStartDate,
+		app:       app,
+		cache:     newShellProjectCache(),
+		draftMode: true,
+		draft:     &draftWizardState{phase: draftPhaseStartDate},
 	}
 
 	// Empty Enter in start-date phase should advance to deadline phase.
 	sess.executor("")
-	assert.Equal(t, draftPhaseDeadline, sess.draftPhase)
+	assert.Equal(t, draftPhaseDeadline, sess.draft.phase)
 }
 
 func TestShellExecutor_EmptyInputInNormalModeIsNoop(t *testing.T) {

@@ -1,0 +1,239 @@
+{
+  "id": "spanish_a2_b1_modules",
+  "name": "Spanish A2 + B1 Modules",
+  "version": "1.0.0",
+  "description": "A2 then B1 module progression with reading, exercises, and grammar per module, plus optional reading-list items.",
+  "domain": "language",
+  "defaults": {
+    "duration_mode": "estimate",
+    "session_policy": {
+      "min_session_min": 20,
+      "max_session_min": 60,
+      "default_session_min": 45,
+      "splittable": true
+    },
+    "buffer_pct": 0.1
+  },
+  "project": {
+    "target_date_mode": "optional",
+    "status": "active"
+  },
+  "generation": {
+    "mode": "upfront",
+    "anchor": "project_start_date"
+  },
+  "variables": [
+    {
+      "key": "a2_modules",
+      "type": "int",
+      "required": false,
+      "default": 9,
+      "min": 1
+    },
+    {
+      "key": "b1_modules",
+      "type": "int",
+      "required": false,
+      "default": 11,
+      "min": 1
+    },
+    {
+      "key": "a2_module_days",
+      "type": "int",
+      "required": false,
+      "default": 10,
+      "min": 1
+    },
+    {
+      "key": "b1_module_days",
+      "type": "int",
+      "required": false,
+      "default": 14,
+      "min": 1
+    },
+    {
+      "key": "novels_count",
+      "type": "int",
+      "required": false,
+      "default": 2,
+      "min": 0,
+      "max": 10
+    }
+  ],
+  "nodes": [
+    {
+      "id": "spanish_root",
+      "title": "Mastering Spanish: A2 & B1",
+      "kind": "stage",
+      "parent_id": null,
+      "order": "1"
+    },
+    {
+      "id": "a2_stage",
+      "title": "A2 Phase",
+      "kind": "stage",
+      "parent_id": "spanish_root",
+      "order": "1"
+    },
+    {
+      "id": "a2_mod_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "a2_modules"
+      },
+      "title": "A2 Module {i}",
+      "kind": "module",
+      "parent_id": "a2_stage",
+      "order": "{i}",
+      "constraints": {
+        "due_date_offset_days": "{i*a2_module_days}"
+      }
+    },
+    {
+      "id": "b1_stage",
+      "title": "B1 Phase",
+      "kind": "stage",
+      "parent_id": "spanish_root",
+      "order": "2"
+    },
+    {
+      "id": "b1_mod_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "b1_modules"
+      },
+      "title": "B1 Module {i}",
+      "kind": "module",
+      "parent_id": "b1_stage",
+      "order": "{i}",
+      "constraints": {
+        "due_date_offset_days": "{a2_modules*a2_module_days + i*b1_module_days}"
+      }
+    },
+    {
+      "id": "reading_list",
+      "title": "Reading List",
+      "kind": "stage",
+      "parent_id": "spanish_root",
+      "order": "3"
+    }
+  ],
+  "work_items": [
+    {
+      "id": "a2_m{i}_read",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "a2_modules"
+      },
+      "node_id": "a2_mod_{i}",
+      "title": "A2.{i} Reading",
+      "type": "reading",
+      "planned_min": 45,
+      "constraints": {
+        "due_date_offset_days": "{i*a2_module_days}"
+      },
+      "estimate_confidence": 0.75
+    },
+    {
+      "id": "a2_m{i}_ex",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "a2_modules"
+      },
+      "node_id": "a2_mod_{i}",
+      "title": "A2.{i} Exercises",
+      "type": "exercise",
+      "planned_min": 60,
+      "constraints": {
+        "due_date_offset_days": "{i*a2_module_days}"
+      },
+      "estimate_confidence": 0.7
+    },
+    {
+      "id": "a2_m{i}_gram",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "a2_modules"
+      },
+      "node_id": "a2_mod_{i}",
+      "title": "A2.{i} Grammar",
+      "type": "drill",
+      "planned_min": 45,
+      "constraints": {
+        "due_date_offset_days": "{i*a2_module_days}"
+      },
+      "estimate_confidence": 0.75
+    },
+    {
+      "id": "b1_m{i}_read",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "b1_modules"
+      },
+      "node_id": "b1_mod_{i}",
+      "title": "B1.{i} Reading",
+      "type": "reading",
+      "planned_min": 60,
+      "constraints": {
+        "due_date_offset_days": "{a2_modules*a2_module_days + i*b1_module_days}"
+      },
+      "estimate_confidence": 0.75
+    },
+    {
+      "id": "b1_m{i}_ex",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "b1_modules"
+      },
+      "node_id": "b1_mod_{i}",
+      "title": "B1.{i} Exercises",
+      "type": "exercise",
+      "planned_min": 90,
+      "constraints": {
+        "due_date_offset_days": "{a2_modules*a2_module_days + i*b1_module_days}"
+      },
+      "estimate_confidence": 0.7
+    },
+    {
+      "id": "b1_m{i}_gram",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "b1_modules"
+      },
+      "node_id": "b1_mod_{i}",
+      "title": "B1.{i} Grammar",
+      "type": "drill",
+      "planned_min": 60,
+      "constraints": {
+        "due_date_offset_days": "{a2_modules*a2_module_days + i*b1_module_days}"
+      },
+      "estimate_confidence": 0.75
+    },
+    {
+      "id": "novel_{i}",
+      "repeat": {
+        "var": "i",
+        "from": 1,
+        "to_var": "novels_count"
+      },
+      "node_id": "reading_list",
+      "title": "Read: Short Novel {i}",
+      "type": "reading",
+      "planned_min": 300,
+      "estimate_confidence": 0.65
+    }
+  ],
+  "validation": {
+    "require_unique_ids": true,
+    "reject_circular_dependencies": true,
+    "enforce_session_bounds": true
+  }
+}

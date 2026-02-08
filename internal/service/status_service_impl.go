@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"math"
 	"sort"
 	"time"
 
@@ -66,97 +65,24 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 			continue
 		}
 
-		// Aggregate work items for this project
 		items, err := s.workItems.ListByProject(ctx, p.ID)
 		if err != nil {
 			return nil, fmt.Errorf("loading work items for project %s: %w", p.ID, err)
 		}
 
-		var plannedTotal, loggedTotal, doneCount, totalCount int
-		for _, item := range items {
-			if item.Status == domain.WorkItemArchived {
-				continue
-			}
-			totalCount++
-			plannedTotal += item.PlannedMin
-			loggedTotal += item.LoggedMin
-			if item.Status == domain.WorkItemDone || item.Status == domain.WorkItemSkipped {
-				doneCount++
-			}
-		}
+		m := aggregateProjectMetrics(items, p, now)
 
-		// Recent sessions for pace
 		recentSessions, err := s.sessions.ListRecentByProject(ctx, p.ID, days)
 		if err != nil {
 			return nil, fmt.Errorf("loading recent sessions for project %s: %w", p.ID, err)
 		}
-		var recentMin int
-		for _, sess := range recentSessions {
-			recentMin += sess.Minutes
-		}
-		recentDailyMin := float64(recentMin) / float64(days)
-		effectiveDailyMin := math.Max(recentDailyMin, float64(profile.BaselineDailyMin))
+		recentDailyMin, effectiveDailyMin := recentDailyPace(recentSessions, days, profile.BaselineDailyMin)
 
-		// Weighted structural progress: done planned_min / all planned_min
-		var donePlannedMin int
-		for _, item := range items {
-			if item.Status == domain.WorkItemArchived {
-				continue
-			}
-			if item.Status == domain.WorkItemDone || item.Status == domain.WorkItemSkipped {
-				donePlannedMin += item.PlannedMin
-			}
-		}
-		var progressPct float64
-		if plannedTotal > 0 {
-			progressPct = float64(donePlannedMin) / float64(plannedTotal) * 100
-		}
-
-		// Timeline elapsed: (now - start) / (target - start)
-		var timeElapsedPct float64
-		if p.TargetDate != nil {
-			totalDays := p.TargetDate.Sub(p.StartDate).Hours() / 24
-			elapsedDays := now.Sub(p.StartDate).Hours() / 24
-			if totalDays > 0 {
-				timeElapsedPct = elapsedDays / totalDays * 100
-			}
-		}
-
-		// Due-date-aware expected progress
-		var dueByNowMin int
-		for _, item := range items {
-			if item.Status == domain.WorkItemArchived || item.Status == domain.WorkItemDone || item.Status == domain.WorkItemSkipped {
-				continue
-			}
-			effectiveDue := item.DueDate
-			if effectiveDue == nil {
-				effectiveDue = p.TargetDate
-			}
-			if effectiveDue != nil && !effectiveDue.After(now) {
-				dueByNowMin += item.PlannedMin
-			}
-		}
-		var dueBasedExpectedPct float64
-		if plannedTotal > 0 {
-			dueBasedExpectedPct = float64(donePlannedMin+dueByNowMin) / float64(plannedTotal) * 100
-		}
-
-		// Risk
-		riskResult := scheduler.ComputeRisk(scheduler.RiskInput{
-			Now:                 now,
-			TargetDate:          p.TargetDate,
-			PlannedMin:          plannedTotal,
-			LoggedMin:           loggedTotal,
-			BufferPct:           profile.BufferPct,
-			RecentDailyMin:      effectiveDailyMin,
-			ProgressPct:         progressPct,
-			TimeElapsedPct:      timeElapsedPct,
-			DueBasedExpectedPct: dueBasedExpectedPct,
-		})
+		riskResult := scheduler.ComputeRisk(buildRiskInput(m, p.TargetDate, profile.BufferPct, effectiveDailyMin, now))
 
 		var structuralPct float64
-		if totalCount > 0 {
-			structuralPct = float64(doneCount) / float64(totalCount) * 100
+		if m.TotalCount > 0 {
+			structuralPct = float64(m.DoneCount) / float64(m.TotalCount) * 100
 		}
 
 		var dueDateStr *string
@@ -174,8 +100,8 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 			DaysLeft:              riskResult.DaysLeft,
 			ProgressTimePct:       riskResult.ProgressTimePct,
 			ProgressStructuralPct: structuralPct,
-			PlannedMinTotal:       plannedTotal,
-			LoggedMinTotal:        loggedTotal,
+			PlannedMinTotal:       m.PlannedMin,
+			LoggedMinTotal:        m.LoggedMin,
 			RemainingMinTotal:     riskResult.RemainingMin,
 			RequiredDailyMin:      riskResult.RequiredDailyMin,
 			RecentDailyMin:        recentDailyMin,

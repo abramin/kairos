@@ -56,6 +56,51 @@ var validWorkItemTypes = map[string]bool{
 	"submission": true,
 }
 
+// collectWorkItem prompts for a single work item (title, type, minutes).
+// Returns nil when the user enters an empty title (signals "done").
+func collectWorkItem(in io.Reader, indent string) (*wizardWorkItem, error) {
+	fmt.Printf("%sTitle (Enter when done): ", indent)
+	title, err := readDraftLine(in)
+	if err != nil {
+		return nil, err
+	}
+	if title == "" {
+		return nil, nil
+	}
+
+	wi := wizardWorkItem{Title: title, Type: "task"}
+
+	fmt.Printf("%s  Type [reading/practice/review/assignment/task/quiz/study]: ", indent)
+	wiType, err := readDraftLine(in)
+	if err != nil {
+		return nil, err
+	}
+	if wiType != "" {
+		wiType = strings.ToLower(wiType)
+		if !validWorkItemTypes[wiType] {
+			fmt.Fprintf(os.Stderr, "%s  Invalid type, using task.\n", indent)
+		} else {
+			wi.Type = wiType
+		}
+	}
+
+	fmt.Printf("%s  Estimated minutes: ", indent)
+	minStr, err := readDraftLine(in)
+	if err != nil {
+		return nil, err
+	}
+	if minStr != "" {
+		mins, err := strconv.Atoi(minStr)
+		if err != nil || mins < 1 {
+			fmt.Fprintf(os.Stderr, "%s  Invalid number, using 30.\n", indent)
+			mins = 30
+		}
+		wi.PlannedMin = mins
+	}
+
+	return &wi, nil
+}
+
 // runStructureWizard collects project structure interactively.
 func runStructureWizard(in io.Reader) (*wizardResult, error) {
 	result := &wizardResult{}
@@ -145,46 +190,14 @@ func runStructureWizard(in io.Reader) (*wizardResult, error) {
 	// --- Work Items ---
 	fmt.Print("\n  --- Work Items (applied to every node) ---\n")
 	for {
-		fmt.Print("  Title (Enter when done): ")
-		title, err := readDraftLine(in)
+		wi, err := collectWorkItem(in, "  ")
 		if err != nil {
 			return nil, err
 		}
-		if title == "" {
+		if wi == nil {
 			break
 		}
-
-		wi := wizardWorkItem{Title: title, Type: "task"}
-
-		fmt.Print("    Type [reading/practice/review/assignment/task/quiz/study]: ")
-		wiType, err := readDraftLine(in)
-		if err != nil {
-			return nil, err
-		}
-		if wiType != "" {
-			wiType = strings.ToLower(wiType)
-			if !validWorkItemTypes[wiType] {
-				fmt.Fprintf(os.Stderr, "    Invalid type, using task.\n")
-			} else {
-				wi.Type = wiType
-			}
-		}
-
-		fmt.Print("    Estimated minutes: ")
-		minStr, err := readDraftLine(in)
-		if err != nil {
-			return nil, err
-		}
-		if minStr != "" {
-			mins, err := strconv.Atoi(minStr)
-			if err != nil || mins < 1 {
-				fmt.Fprintf(os.Stderr, "    Invalid number, using 30.\n")
-				mins = 30
-			}
-			wi.PlannedMin = mins
-		}
-
-		result.WorkItems = append(result.WorkItems, wi)
+		result.WorkItems = append(result.WorkItems, *wi)
 	}
 
 	// --- Special Nodes ---
@@ -230,46 +243,14 @@ func runStructureWizard(in io.Reader) (*wizardResult, error) {
 
 		// Collect work items for the special node.
 		for {
-			fmt.Print("    Work item title (Enter when done): ")
-			wiTitle, err := readDraftLine(in)
+			wi, err := collectWorkItem(in, "    ")
 			if err != nil {
 				return nil, err
 			}
-			if wiTitle == "" {
+			if wi == nil {
 				break
 			}
-
-			wi := wizardWorkItem{Title: wiTitle, Type: "task"}
-
-			fmt.Print("      Type [reading/practice/review/assignment/task/quiz/study]: ")
-			wiType, err := readDraftLine(in)
-			if err != nil {
-				return nil, err
-			}
-			if wiType != "" {
-				wiType = strings.ToLower(wiType)
-				if !validWorkItemTypes[wiType] {
-					fmt.Fprintf(os.Stderr, "      Invalid type, using task.\n")
-				} else {
-					wi.Type = wiType
-				}
-			}
-
-			fmt.Print("      Estimated minutes: ")
-			minStr, err := readDraftLine(in)
-			if err != nil {
-				return nil, err
-			}
-			if minStr != "" {
-				mins, err := strconv.Atoi(minStr)
-				if err != nil || mins < 1 {
-					fmt.Fprintf(os.Stderr, "      Invalid number, using 30.\n")
-					mins = 30
-				}
-				wi.PlannedMin = mins
-			}
-
-			sn.WorkItems = append(sn.WorkItems, wi)
+			sn.WorkItems = append(sn.WorkItems, *wi)
 		}
 
 		result.SpecialNodes = append(result.SpecialNodes, sn)

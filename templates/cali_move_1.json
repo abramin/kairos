@@ -1,0 +1,299 @@
+{
+    "id": "calimove_level_1_complete",
+    "name": "Calimove Level 1 (Complete Schedule)",
+    "version": "1.0.0",
+    "description": "Full 19-week schedule including Test Weeks and Phased Workouts (A/B/C).",
+    "domain": "fitness",
+    "defaults": {
+        "timezone": "Europe/Madrid",
+        "duration_mode": "fixed",
+        "session_policy": {
+            "min_session_min": 45,
+            "max_session_min": 75,
+            "default_session_min": 60,
+            "splittable": false
+        },
+        "buffer_pct": 0.10
+    },
+    "project": {
+        "target_date_mode": "optional",
+        "status": "active"
+    },
+    "generation": {
+        "mode": "upfront",
+        "anchor": "project_start_date"
+    },
+    "variables": [
+        {
+            "key": "weeks",
+            "type": "int",
+            "default": 19,
+            "required": true
+        }
+    ],
+    "nodes": [
+        {
+            "id": "root",
+            "title": "Calimove Level 1",
+            "kind": "stage",
+            "order": "1"
+        },
+        {
+            "id": "week_{i}",
+            "repeat": {
+                "var": "i",
+                "from": 1,
+                "to": 19
+            },
+            "title": "Week {i}",
+            "kind": "week",
+            "parent_id": "root",
+            "order": "{i}",
+            "constraints": {
+                "not_before_offset_days": "{(i-1)*7}",
+                "not_after_offset_days": "{i*7-1}"
+            }
+        }
+    ],
+    "work_items": [
+        {
+            "_comment": "=== PHASE 1: TEST WEEK (Week 1) ===",
+            "id": "w1_t1",
+            "node_id": "week_1",
+            "title": "Test 1-1 (Basics)",
+            "type": "test_session",
+            "planned_min": 45,
+            "status": "todo"
+        },
+        {
+            "id": "w1_t2",
+            "node_id": "week_1",
+            "title": "Test 1-2 (Max Reps)",
+            "type": "test_session",
+            "planned_min": 45,
+            "status": "todo"
+        },
+        {
+            "_comment": "=== PHASE 1: STANDARD (Weeks 2-3) ===",
+            "id": "w{i}_1a",
+            "repeat": {
+                "var": "i",
+                "from": 2,
+                "to": 3
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 1A",
+            "type": "workout",
+            "planned_min": 60
+        },
+        {
+            "id": "w{i}_1b",
+            "repeat": {
+                "var": "i",
+                "from": 2,
+                "to": 3
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 1B",
+            "type": "workout",
+            "planned_min": 60
+        },
+        {
+            "_comment": "=== PHASE 1: HIGH VOLUME (Week 4) ===",
+            "id": "w4_1a_1",
+            "node_id": "week_4",
+            "title": "Workout 1A",
+            "type": "workout",
+            "planned_min": 60
+        },
+        {
+            "id": "w4_1b",
+            "node_id": "week_4",
+            "title": "Workout 1B",
+            "type": "workout",
+            "planned_min": 60
+        },
+        {
+            "id": "w4_1a_2",
+            "node_id": "week_4",
+            "title": "Workout 1A (Extra)",
+            "type": "workout",
+            "planned_min": 60
+        },
+        {
+            "_comment": "=== PHASE 2: TEST WEEK (Week 5) ===",
+            "id": "w5_t1",
+            "node_id": "week_5",
+            "title": "Test 2-1",
+            "type": "test_session",
+            "planned_min": 45
+        },
+        {
+            "id": "w5_t2",
+            "node_id": "week_5",
+            "title": "Test 2-2",
+            "type": "test_session",
+            "planned_min": 45
+        },
+        {
+            "id": "w5_t3",
+            "node_id": "week_5",
+            "title": "Test 2-3",
+            "type": "test_session",
+            "planned_min": 45
+        },
+        {
+            "_comment": "=== PHASE 2: STANDARD (Weeks 6-9) ===",
+            "id": "w{i}_2a",
+            "repeat": {
+                "var": "i",
+                "from": 6,
+                "to": 9
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 2A",
+            "type": "workout",
+            "planned_min": 65
+        },
+        {
+            "id": "w{i}_2b",
+            "repeat": {
+                "var": "i",
+                "from": 6,
+                "to": 9
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 2B",
+            "type": "workout",
+            "planned_min": 65
+        },
+        {
+            "id": "w{i}_2c",
+            "repeat": {
+                "var": "i",
+                "from": 6,
+                "to": 9
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 2C",
+            "type": "workout",
+            "planned_min": 65
+        },
+        {
+            "_comment": "=== PHASE 3: TEST WEEK (Week 10) ===",
+            "id": "w10_t1",
+            "node_id": "week_10",
+            "title": "Test 3-1",
+            "type": "test_session",
+            "planned_min": 45
+        },
+        {
+            "id": "w10_t2",
+            "node_id": "week_10",
+            "title": "Test 3-2",
+            "type": "test_session",
+            "planned_min": 45
+        },
+        {
+            "_comment": "=== PHASE 3: STANDARD (Weeks 11-14) ===",
+            "id": "w{i}_3a",
+            "repeat": {
+                "var": "i",
+                "from": 11,
+                "to": 14
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 3A",
+            "type": "workout",
+            "planned_min": 70
+        },
+        {
+            "id": "w{i}_3b",
+            "repeat": {
+                "var": "i",
+                "from": 11,
+                "to": 14
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 3B",
+            "type": "workout",
+            "planned_min": 70
+        },
+        {
+            "id": "w{i}_3c",
+            "repeat": {
+                "var": "i",
+                "from": 11,
+                "to": 14
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 3C",
+            "type": "workout",
+            "planned_min": 70
+        },
+        {
+            "_comment": "=== PHASE 4: TEST WEEK (Week 15) ===",
+            "id": "w15_t1",
+            "node_id": "week_15",
+            "title": "Test 4-1",
+            "type": "test_session",
+            "planned_min": 45
+        },
+        {
+            "id": "w15_t2",
+            "node_id": "week_15",
+            "title": "Test 4-2",
+            "type": "test_session",
+            "planned_min": 45
+        },
+        {
+            "id": "w15_t3",
+            "node_id": "week_15",
+            "title": "Test 4-3",
+            "type": "test_session",
+            "planned_min": 45
+        },
+        {
+            "_comment": "=== PHASE 4: FINAL BLOCK (Weeks 16-19) ===",
+            "id": "w{i}_4a",
+            "repeat": {
+                "var": "i",
+                "from": 16,
+                "to": 19
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 4A",
+            "type": "workout",
+            "planned_min": 75
+        },
+        {
+            "id": "w{i}_4b",
+            "repeat": {
+                "var": "i",
+                "from": 16,
+                "to": 19
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 4B",
+            "type": "workout",
+            "planned_min": 75
+        },
+        {
+            "id": "w{i}_4c",
+            "repeat": {
+                "var": "i",
+                "from": 16,
+                "to": 19
+            },
+            "node_id": "week_{i}",
+            "title": "Workout 4C",
+            "type": "workout",
+            "planned_min": 75
+        }
+    ],
+    "dependencies": [],
+    "validation": {
+        "require_unique_ids": true,
+        "enforce_session_bounds": true
+    }
+}

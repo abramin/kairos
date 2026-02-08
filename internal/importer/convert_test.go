@@ -93,6 +93,68 @@ func TestConvert_FullProjectWithHierarchy(t *testing.T) {
 	assert.Equal(t, gen.WorkItems[1].ID, gen.Dependencies[0].SuccessorWorkItemID)   // w2
 }
 
+func TestConvert_InferSequentialDependencies_WhenOmitted(t *testing.T) {
+	schema := &ImportSchema{
+		Project: ProjectImport{
+			ShortID:   "SEQ01",
+			Name:      "Sequential",
+			Domain:    "test",
+			StartDate: "2025-02-01",
+		},
+		Nodes: []NodeImport{
+			{Ref: "n2", Title: "Node 2", Kind: "module", Order: 2},
+			{Ref: "n1", Title: "Node 1", Kind: "module", Order: 1},
+		},
+		WorkItems: []WorkItemImport{
+			{Ref: "w_n2_1", NodeRef: "n2", Title: "Node2 Task1", Type: "task"},
+			{Ref: "w_n1_1", NodeRef: "n1", Title: "Node1 Task1", Type: "task"},
+			{Ref: "w_n1_2", NodeRef: "n1", Title: "Node1 Task2", Type: "task"},
+			{Ref: "w_n2_2", NodeRef: "n2", Title: "Node2 Task2", Type: "task"},
+		},
+	}
+
+	gen, err := Convert(schema)
+	require.NoError(t, err)
+	require.Len(t, gen.WorkItems, 4)
+
+	// Default order should be by node order, then work item declaration order.
+	require.Len(t, gen.Dependencies, 3)
+	assert.Equal(t, gen.WorkItems[1].ID, gen.Dependencies[0].PredecessorWorkItemID) // w_n1_1
+	assert.Equal(t, gen.WorkItems[2].ID, gen.Dependencies[0].SuccessorWorkItemID)   // w_n1_2
+	assert.Equal(t, gen.WorkItems[2].ID, gen.Dependencies[1].PredecessorWorkItemID) // w_n1_2
+	assert.Equal(t, gen.WorkItems[0].ID, gen.Dependencies[1].SuccessorWorkItemID)   // w_n2_1
+	assert.Equal(t, gen.WorkItems[0].ID, gen.Dependencies[2].PredecessorWorkItemID) // w_n2_1
+	assert.Equal(t, gen.WorkItems[3].ID, gen.Dependencies[2].SuccessorWorkItemID)   // w_n2_2
+}
+
+func TestConvert_ExplicitDependenciesOverrideDefaultInference(t *testing.T) {
+	schema := &ImportSchema{
+		Project: ProjectImport{
+			ShortID:   "EXP01",
+			Name:      "Explicit",
+			Domain:    "test",
+			StartDate: "2025-02-01",
+		},
+		Nodes: []NodeImport{
+			{Ref: "n1", Title: "Node 1", Kind: "module", Order: 1},
+		},
+		WorkItems: []WorkItemImport{
+			{Ref: "w1", NodeRef: "n1", Title: "Task 1", Type: "task"},
+			{Ref: "w2", NodeRef: "n1", Title: "Task 2", Type: "task"},
+			{Ref: "w3", NodeRef: "n1", Title: "Task 3", Type: "task"},
+		},
+		Dependencies: []DependencyImport{
+			{PredecessorRef: "w1", SuccessorRef: "w3"},
+		},
+	}
+
+	gen, err := Convert(schema)
+	require.NoError(t, err)
+	require.Len(t, gen.Dependencies, 1)
+	assert.Equal(t, gen.WorkItems[0].ID, gen.Dependencies[0].PredecessorWorkItemID) // w1
+	assert.Equal(t, gen.WorkItems[2].ID, gen.Dependencies[0].SuccessorWorkItemID)   // w3
+}
+
 func TestConvert_DefaultsApplication(t *testing.T) {
 	schema := validMinimalSchema()
 

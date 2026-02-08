@@ -155,6 +155,57 @@ func TestExecute_Constraints(t *testing.T) {
 	assert.Equal(t, "2025-01-13", result.Nodes[1].NotBefore.Format("2006-01-02"))
 }
 
+func TestExecute_InferSequentialDependencies_WhenOmitted(t *testing.T) {
+	schema := &TemplateSchema{
+		ID: "seq", Name: "Sequential", Domain: "test", Version: "1.0",
+		Nodes: []NodeConfig{
+			{ID: "n2", Title: "Node 2", Kind: "module", Order: "2"},
+			{ID: "n1", Title: "Node 1", Kind: "module", Order: "1"},
+		},
+		WorkItems: []WorkItemConfig{
+			{ID: "w_n2_1", NodeID: "n2", Title: "Node2 Task1", Type: "task"},
+			{ID: "w_n1_1", NodeID: "n1", Title: "Node1 Task1", Type: "task"},
+			{ID: "w_n1_2", NodeID: "n1", Title: "Node1 Task2", Type: "task"},
+			{ID: "w_n2_2", NodeID: "n2", Title: "Node2 Task2", Type: "task"},
+		},
+	}
+
+	result, err := Execute(schema, "Test", "2025-01-01", nil, nil)
+	require.NoError(t, err)
+	require.Len(t, result.WorkItems, 4)
+	require.Len(t, result.Dependencies, 3)
+
+	assert.Equal(t, result.WorkItems[1].ID, result.Dependencies[0].PredecessorWorkItemID) // w_n1_1
+	assert.Equal(t, result.WorkItems[2].ID, result.Dependencies[0].SuccessorWorkItemID)   // w_n1_2
+	assert.Equal(t, result.WorkItems[2].ID, result.Dependencies[1].PredecessorWorkItemID) // w_n1_2
+	assert.Equal(t, result.WorkItems[0].ID, result.Dependencies[1].SuccessorWorkItemID)   // w_n2_1
+	assert.Equal(t, result.WorkItems[0].ID, result.Dependencies[2].PredecessorWorkItemID) // w_n2_1
+	assert.Equal(t, result.WorkItems[3].ID, result.Dependencies[2].SuccessorWorkItemID)   // w_n2_2
+}
+
+func TestExecute_ExplicitDependenciesOverrideDefaultInference(t *testing.T) {
+	schema := &TemplateSchema{
+		ID: "exp", Name: "Explicit", Domain: "test", Version: "1.0",
+		Nodes: []NodeConfig{
+			{ID: "n1", Title: "Node 1", Kind: "module", Order: "1"},
+		},
+		WorkItems: []WorkItemConfig{
+			{ID: "w1", NodeID: "n1", Title: "Task 1", Type: "task"},
+			{ID: "w2", NodeID: "n1", Title: "Task 2", Type: "task"},
+			{ID: "w3", NodeID: "n1", Title: "Task 3", Type: "task"},
+		},
+		Dependencies: []DependencyConfig{
+			{Predecessor: "w1", Successor: "w3"},
+		},
+	}
+
+	result, err := Execute(schema, "Test", "2025-01-01", nil, nil)
+	require.NoError(t, err)
+	require.Len(t, result.Dependencies, 1)
+	assert.Equal(t, result.WorkItems[0].ID, result.Dependencies[0].PredecessorWorkItemID)
+	assert.Equal(t, result.WorkItems[2].ID, result.Dependencies[0].SuccessorWorkItemID)
+}
+
 func mustMarshal(v any) json.RawMessage {
 	data, _ := json.Marshal(v)
 	return data

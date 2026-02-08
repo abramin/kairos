@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
+	"unicode"
 
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/google/uuid"
@@ -267,25 +270,15 @@ func Execute(schema *TemplateSchema, projectName, startDate string, dueDate *str
 		}
 	}
 
-	// Generate dependencies
+	// Generate dependencies.
+	// If omitted, infer a default linear chain by node order, then work item order.
 	var deps []domain.Dependency
-	for _, dc := range schema.Dependencies {
-		// Dependencies may also have repeat patterns embedded in their IDs.
-		// We expand each using the same variable space.
-		// For non-repeated deps, we just expand once with base vars.
-		predIDs := expandDependencyID(dc.Predecessor, idMap)
-		succIDs := expandDependencyID(dc.Successor, idMap)
-
-		// Match by expanded pattern: for each resolved predecessor, pair with its successor
-		for tmplID, realID := range predIDs {
-			// Find the matching successor with the same loop values
-			if succReal, ok := succIDs[tmplID]; ok {
-				deps = append(deps, domain.Dependency{
-					PredecessorWorkItemID: realID,
-					SuccessorWorkItemID:   succReal,
-				})
-			}
+	if len(schema.Dependencies) > 0 {
+		for _, dc := range schema.Dependencies {
+			deps = append(deps, generateDependencyLinks(dc.Predecessor, dc.Successor, idMap, vars)...)
 		}
+	} else {
+		deps = inferTemplateDefaultDependencies(nodes, workItems)
 	}
 
 	return &GeneratedProject{
@@ -404,32 +397,6 @@ func evalIntExpr(expr string, vars map[string]int) (int, error) {
 	return EvalExpr(expr, vars)
 }
 
-// expandDependencyID finds all entries in idMap that match a template pattern.
-// For simple IDs (no braces), returns a single match.
-// For patterns like "w{i}_draft", finds all matching expanded IDs.
-func expandDependencyID(pattern string, idMap map[string]string) map[string]string {
-	matches := make(map[string]string)
-
-	// If pattern has no braces, it's a literal
-	if !containsBrace(pattern) {
-		if realID, ok := idMap[pattern]; ok {
-			matches[pattern] = realID
-		}
-		return matches
-	}
-
-	// For patterns with variables, find all idMap entries that could match.
-	// We use a simplified approach: iterate all idMap keys and check if
-	// they match the pattern structurally.
-	prefix, suffix := splitPatternAroundFirstBrace(pattern)
-	for key, realID := range idMap {
-		if matchesPattern(key, prefix, suffix) {
-			matches[key] = realID
-		}
-	}
-	return matches
-}
-
 func containsBrace(s string) bool {
 	for _, c := range s {
 		if c == '{' {
@@ -439,39 +406,167 @@ func containsBrace(s string) bool {
 	return false
 }
 
-func splitPatternAroundFirstBrace(pattern string) (string, string) {
-	for i, c := range pattern {
-		if c == '{' {
-			// Find closing brace
-			for j := i + 1; j < len(pattern); j++ {
-				if pattern[j] == '}' {
-					return pattern[:i], pattern[j+1:]
-				}
-			}
+func generateDependencyLinks(predecessorPattern, successorPattern string, idMap map[string]string, vars map[string]int) []domain.Dependency {
+	loopVars := dependencyLoopVars(predecessorPattern, successorPattern, vars)
+	var deps []domain.Dependency
+	seen := make(map[string]bool)
+
+	err := iterateDependencyVars(loopVars, vars, func(loop map[string]int) error {
+		expandedPred, err := expandDependencyPattern(predecessorPattern, loop)
+		if err != nil {
+			return nil
+		}
+		expandedSucc, err := expandDependencyPattern(successorPattern, loop)
+		if err != nil {
+			return nil
+		}
+
+		predID, okPred := idMap[expandedPred]
+		succID, okSucc := idMap[expandedSucc]
+		if !okPred || !okSucc {
+			return nil
+		}
+
+		key := predID + "->" + succID
+		if seen[key] {
+			return nil
+		}
+		seen[key] = true
+		deps = append(deps, domain.Dependency{
+			PredecessorWorkItemID: predID,
+			SuccessorWorkItemID:   succID,
+		})
+		return nil
+	})
+	if err != nil {
+		return deps
+	}
+
+	return deps
+}
+
+func expandDependencyPattern(pattern string, loopVars map[string]int) (string, error) {
+	if !containsBrace(pattern) {
+		return pattern, nil
+	}
+	return ExpandTemplate(pattern, loopVars)
+}
+
+func dependencyLoopVars(predecessorPattern, successorPattern string, vars map[string]int) []string {
+	set := make(map[string]bool)
+	for _, name := range extractPatternVars(predecessorPattern) {
+		if max, ok := vars[name]; ok && max > 0 {
+			set[name] = true
 		}
 	}
-	return pattern, ""
+	for _, name := range extractPatternVars(successorPattern) {
+		if max, ok := vars[name]; ok && max > 0 {
+			set[name] = true
+		}
+	}
+
+	names := make([]string, 0, len(set))
+	for name := range set {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
-func matchesPattern(key, prefix, suffix string) bool {
-	if len(key) < len(prefix)+len(suffix) {
-		return false
+func iterateDependencyVars(varNames []string, vars map[string]int, fn func(loop map[string]int) error) error {
+	if len(varNames) == 0 {
+		return fn(copyVars(vars))
 	}
-	if prefix != "" && !hasPrefix(key, prefix) {
-		return false
+
+	var rec func(idx int, current map[string]int) error
+	rec = func(idx int, current map[string]int) error {
+		if idx >= len(varNames) {
+			return fn(current)
+		}
+		name := varNames[idx]
+		maxVal, ok := vars[name]
+		if !ok || maxVal <= 0 {
+			return nil
+		}
+		for i := 1; i <= maxVal; i++ {
+			next := copyVars(current)
+			next[name] = i
+			if err := rec(idx+1, next); err != nil {
+				return err
+			}
+		}
+		return nil
 	}
-	if suffix != "" && !hasSuffix(key, suffix) {
-		return false
-	}
-	return true
+
+	return rec(0, copyVars(vars))
 }
 
-func hasPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
+func extractPatternVars(pattern string) []string {
+	set := make(map[string]bool)
+	for _, expr := range extractBraceExpressions(pattern) {
+		for _, token := range tokenizeExprIdentifiers(expr) {
+			set[token] = true
+		}
+	}
+	names := make([]string, 0, len(set))
+	for name := range set {
+		names = append(names, name)
+	}
+	return names
 }
 
-func hasSuffix(s, suffix string) bool {
-	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
+func extractBraceExpressions(s string) []string {
+	var exprs []string
+	var b strings.Builder
+	inExpr := false
+
+	for _, r := range s {
+		if r == '{' {
+			inExpr = true
+			b.Reset()
+			continue
+		}
+		if r == '}' {
+			if inExpr {
+				exprs = append(exprs, b.String())
+			}
+			inExpr = false
+			continue
+		}
+		if inExpr {
+			b.WriteRune(r)
+		}
+	}
+
+	return exprs
+}
+
+func tokenizeExprIdentifiers(expr string) []string {
+	var names []string
+	seen := make(map[string]bool)
+	for i := 0; i < len(expr); {
+		r := rune(expr[i])
+		if unicode.IsLetter(r) || r == '_' {
+			start := i
+			i++
+			for i < len(expr) {
+				rr := rune(expr[i])
+				if unicode.IsLetter(rr) || unicode.IsDigit(rr) || rr == '_' {
+					i++
+					continue
+				}
+				break
+			}
+			name := expr[start:i]
+			if !seen[name] {
+				seen[name] = true
+				names = append(names, name)
+			}
+			continue
+		}
+		i++
+	}
+	return names
 }
 
 func defaultDurationMode(d *DefaultsConfig) string {
@@ -508,4 +603,57 @@ func sessionPolicyBool(sp *SessionPolicyConfig) *bool {
 		return nil
 	}
 	return sp.Splittable
+}
+
+func inferTemplateDefaultDependencies(nodes []*domain.PlanNode, workItems []*domain.WorkItem) []domain.Dependency {
+	if len(workItems) < 2 {
+		return nil
+	}
+
+	nodePos := make(map[string]int, len(nodes))
+	nodeOrder := make(map[string]int, len(nodes))
+	for i, n := range nodes {
+		nodePos[n.ID] = i
+		nodeOrder[n.ID] = n.OrderIndex
+	}
+
+	type indexedWI struct {
+		id        string
+		nodeOrder int
+		nodePos   int
+		wiPos     int
+	}
+
+	ordered := make([]indexedWI, 0, len(workItems))
+	for i, wi := range workItems {
+		ordered = append(ordered, indexedWI{
+			id:        wi.ID,
+			nodeOrder: nodeOrder[wi.NodeID],
+			nodePos:   nodePos[wi.NodeID],
+			wiPos:     i,
+		})
+	}
+
+	sort.SliceStable(ordered, func(i, j int) bool {
+		if ordered[i].nodeOrder != ordered[j].nodeOrder {
+			return ordered[i].nodeOrder < ordered[j].nodeOrder
+		}
+		if ordered[i].nodePos != ordered[j].nodePos {
+			return ordered[i].nodePos < ordered[j].nodePos
+		}
+		return ordered[i].wiPos < ordered[j].wiPos
+	})
+
+	deps := make([]domain.Dependency, 0, len(ordered)-1)
+	for i := 0; i < len(ordered)-1; i++ {
+		if ordered[i].id == ordered[i+1].id {
+			continue
+		}
+		deps = append(deps, domain.Dependency{
+			PredecessorWorkItemID: ordered[i].id,
+			SuccessorWorkItemID:   ordered[i+1].id,
+		})
+	}
+
+	return deps
 }

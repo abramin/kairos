@@ -23,10 +23,10 @@ func writeImportJSON(t *testing.T, schema *importer.ImportSchema) string {
 	return path
 }
 
-func ptrStr(s string) *string       { return &s }
-func ptrInt(i int) *int             { return &i }
-func ptrFloat(f float64) *float64   { return &f }
-func ptrBool(b bool) *bool          { return &b }
+func ptrStr(s string) *string     { return &s }
+func ptrInt(i int) *int           { return &i }
+func ptrFloat(f float64) *float64 { return &f }
+func ptrBool(b bool) *bool        { return &b }
 
 func TestImportProject_FullStructure(t *testing.T) {
 	projects, nodes, workItems, deps, _, _ := setupRepos(t)
@@ -157,6 +157,37 @@ func TestImportProject_MinimalWithDefaults(t *testing.T) {
 	assert.Equal(t, 60, wi.MaxSessionMin)
 	assert.Equal(t, 30, wi.DefaultSessionMin)
 	assert.True(t, wi.Splittable)
+}
+
+func TestImportProject_InferSequentialDependenciesWhenOmitted(t *testing.T) {
+	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	ctx := context.Background()
+
+	svc := NewImportService(projects, nodes, workItems, deps)
+
+	schema := &importer.ImportSchema{
+		Project: importer.ProjectImport{
+			ShortID:   "SEQ01",
+			Name:      "Sequential Defaults",
+			Domain:    "test",
+			StartDate: "2025-01-01",
+		},
+		Nodes: []importer.NodeImport{
+			{Ref: "n1", Title: "Node 1", Kind: "generic", Order: 1},
+		},
+		WorkItems: []importer.WorkItemImport{
+			{Ref: "w1", NodeRef: "n1", Title: "Task 1", Type: "task"},
+			{Ref: "w2", NodeRef: "n1", Title: "Task 2", Type: "task"},
+			{Ref: "w3", NodeRef: "n1", Title: "Task 3", Type: "task"},
+		},
+	}
+
+	path := writeImportJSON(t, schema)
+	result, err := svc.ImportProject(ctx, path)
+	require.NoError(t, err)
+
+	assert.Equal(t, 3, result.WorkItemCount)
+	assert.Equal(t, 2, result.DependencyCount)
 }
 
 func TestImportProject_ValidationFailure(t *testing.T) {

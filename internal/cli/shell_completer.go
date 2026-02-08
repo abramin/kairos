@@ -58,7 +58,7 @@ func (s *shellSession) completer(d prompt.Document) []prompt.Suggest {
 			{Text: "/quit", Description: "Exit help chat and return to shell"},
 		}, d.GetWordBeforeCursor(), true)
 	}
-	if s.draftMode && s.draftPhase >= draftPhaseConversation {
+	if s.draftMode && s.draft != nil && s.draft.phase >= draftPhaseConversation {
 		return prompt.FilterHasPrefix([]prompt.Suggest{
 			{Text: "/show", Description: "Show current draft as a tree"},
 			{Text: "/accept", Description: "Accept the current draft"},
