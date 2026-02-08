@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -118,6 +119,35 @@ func TestOllamaClient_Generate_RetryOnTransientError(t *testing.T) {
 	assert.Equal(t, 2, attempts)
 }
 
+func TestOllamaClient_Generate_RetryAfterTimeout(t *testing.T) {
+	var attempts atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		n := attempts.Add(1)
+		if n == 1 {
+			time.Sleep(120 * time.Millisecond)
+		}
+		resp := ollamaResponse{Model: "llama3.2", Response: "ok"}
+		json.NewEncoder(w).Encode(resp)
+	}))
+	defer srv.Close()
+
+	cfg := testConfig(srv.URL)
+	cfg.MaxRetries = 1
+	cfg.Tasks = map[TaskType]TaskConfig{
+		TaskParse: {Temperature: 0.1, MaxTokens: 512, TimeoutMs: 50},
+	}
+
+	client := NewOllamaClient(cfg, NoopObserver{})
+	resp, err := client.Generate(context.Background(), GenerateRequest{
+		Task:       TaskParse,
+		UserPrompt: "test",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, "ok", resp.Text)
+	assert.Equal(t, int32(2), attempts.Load())
+}
+
 func TestOllamaClient_Generate_ServerError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
@@ -175,6 +205,33 @@ func TestOllamaClient_ObserverCalled(t *testing.T) {
 	assert.Equal(t, "llama3.2", captured.Model)
 	assert.True(t, captured.Success)
 	assert.GreaterOrEqual(t, captured.LatencyMs, int64(0))
+}
+
+func TestOllamaClient_ObserverTimeoutErrorCode(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(200 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	cfg := testConfig(srv.URL)
+	cfg.MaxRetries = 0
+	cfg.Tasks = map[TaskType]TaskConfig{
+		TaskParse: {Temperature: 0.1, MaxTokens: 512, TimeoutMs: 50},
+	}
+
+	var captured LLMCallEvent
+	obs := &captureObserver{fn: func(e LLMCallEvent) { captured = e }}
+	client := NewOllamaClient(cfg, obs)
+
+	_, err := client.Generate(context.Background(), GenerateRequest{
+		Task:       TaskParse,
+		UserPrompt: "test",
+	})
+
+	assert.ErrorIs(t, err, ErrTimeout)
+	assert.False(t, captured.Success)
+	assert.Equal(t, "TIMEOUT", captured.ErrorCode)
 }
 
 type captureObserver struct {

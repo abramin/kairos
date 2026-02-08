@@ -39,8 +39,8 @@ type LLMClient interface {
 
 // ollamaClient implements LLMClient using the Ollama HTTP API.
 type ollamaClient struct {
-	cfg    LLMConfig
-	http   *http.Client
+	cfg      LLMConfig
+	http     *http.Client
 	observer Observer
 }
 
@@ -64,11 +64,11 @@ func NewOllamaClient(cfg LLMConfig, observer Observer) LLMClient {
 
 // ollamaRequest is the JSON body sent to POST /api/generate.
 type ollamaRequest struct {
-	Model   string         `json:"model"`
-	System  string         `json:"system,omitempty"`
-	Prompt  string         `json:"prompt"`
-	Stream  bool           `json:"stream"`
-	Options ollamaOptions  `json:"options,omitempty"`
+	Model   string        `json:"model"`
+	System  string        `json:"system,omitempty"`
+	Prompt  string        `json:"prompt"`
+	Stream  bool          `json:"stream"`
+	Options ollamaOptions `json:"options,omitempty"`
 }
 
 type ollamaOptions struct {
@@ -96,8 +96,7 @@ func (c *ollamaClient) Generate(ctx context.Context, req GenerateRequest) (*Gene
 	}
 
 	timeoutMs := c.cfg.TaskTimeout(req.Task)
-	ctx, cancel := context.WithTimeout(ctx, time.Duration(timeoutMs)*time.Millisecond)
-	defer cancel()
+	attemptTimeout := time.Duration(timeoutMs) * time.Millisecond
 
 	body := ollamaRequest{
 		Model:  c.cfg.Model,
@@ -114,7 +113,9 @@ func (c *ollamaClient) Generate(ctx context.Context, req GenerateRequest) (*Gene
 	attempts := 1 + c.cfg.MaxRetries
 
 	for i := 0; i < attempts; i++ {
-		resp, err := c.doRequest(ctx, body)
+		attemptCtx, cancel := context.WithTimeout(ctx, attemptTimeout)
+		resp, err := c.doRequest(attemptCtx, body)
+		cancel()
 		if err == nil {
 			latency := time.Since(start).Milliseconds()
 			c.observer.OnCallComplete(LLMCallEvent{
@@ -131,7 +132,7 @@ func (c *ollamaClient) Generate(ctx context.Context, req GenerateRequest) (*Gene
 		}
 		lastErr = err
 
-		// Don't retry on context cancellation/timeout
+		// Parent context cancellation should stop retries immediately.
 		if ctx.Err() != nil {
 			break
 		}
@@ -147,7 +148,7 @@ func (c *ollamaClient) Generate(ctx context.Context, req GenerateRequest) (*Gene
 		ErrorCode: errCode,
 	})
 
-	if ctx.Err() != nil {
+	if ctx.Err() != nil || isTimeoutError(lastErr) {
 		return nil, ErrTimeout
 	}
 	if isConnectionError(lastErr) {
@@ -225,6 +226,8 @@ func errorCode(err error) string {
 	switch {
 	case err == nil:
 		return ""
+	case isTimeoutError(err):
+		return "TIMEOUT"
 	case errors.Is(err, ErrTimeout):
 		return "TIMEOUT"
 	case errors.Is(err, ErrOllamaUnavailable):
@@ -234,4 +237,15 @@ func errorCode(err error) string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+func isTimeoutError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }

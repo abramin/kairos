@@ -256,6 +256,28 @@ kairos project import myproject.json
 | Project metadata | Inside the JSON file | Passed via CLI flags |
 | File location | Any path | Must be in templates directory |
 
+## Interactive shell
+
+Kairos includes an interactive shell with session state, autocomplete, and styled output:
+
+```bash
+kairos shell
+```
+
+Once inside, you can set an active project and run commands without repeating IDs:
+
+```
+kairos ❯ projects
+kairos ❯ use PHI01
+kairos (PHI01) ❯ inspect
+kairos (PHI01) ❯ what-now 45
+kairos (PHI01) ❯ status
+```
+
+Shell-native commands like `inspect`, `what-now`, and `status` automatically scope to the active project. All other CLI commands work directly inside the shell too (e.g. `project add`, `session log`, `replan`).
+
+Type `help` for the full command list, or press Tab for autocomplete.
+
 ## Core commands
 
 ```bash
@@ -268,6 +290,7 @@ kairos status
 kairos what-now --minutes 60
 kairos replan
 kairos template list
+kairos shell
 ```
 
 ## Documentation map

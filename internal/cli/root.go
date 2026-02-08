@@ -69,6 +69,7 @@ Quick usage: kairos <minutes> is shorthand for kairos what-now --minutes <minute
 		newStatusCmd(app),
 		newReplanCmd(app),
 		newTemplateCmd(app),
+		newShellCmd(app),
 		// v2 intelligence commands
 		newAskCmd(app),
 		newExplainCmd(app),

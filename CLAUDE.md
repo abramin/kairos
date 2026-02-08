@@ -18,9 +18,10 @@ make test                                             # go test ./... -count=1
 make test-race                                        # tests with race detector
 make vet                                              # go vet ./...
 make lint                                             # vet alias
+make test-cover                                       # tests with coverage report → coverage.out
 make all                                              # vet + test + build
 make install                                          # build + copy to $GOPATH/bin
-make clean                                            # remove built binary
+make clean                                            # remove built binary + coverage.out
 go test -run TestFunctionName ./internal/scheduler/   # single test
 ```
 
@@ -31,7 +32,7 @@ go test -run TestFunctionName ./internal/scheduler/   # single test
 ```
 cmd/kairos/main.go              (CLI entry point — wires all deps, runs Cobra root)
   ↓
-internal/cli/                    (Cobra command definitions + App struct)
+internal/cli/                    (Cobra command definitions + App struct + shell REPL)
   ├→ internal/cli/formatter/     (terminal output: tables, trees, colors, progress bars)
   ├→ internal/service/           (orchestrates repos + scheduler)
   │    ├→ internal/contract/     (transport-agnostic request/response DTOs)
@@ -83,7 +84,9 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 - `TemplateDraftService` — NL→template JSON generation. LLM output is validated against `template.ValidateSchema`
 - `ProjectDraftService` — Multi-turn NL→project structure drafting. Interactive conversation produces `ImportSchema`, validated via `importer.ValidateImportSchema`, then imported via `ImportService`
 
-**`internal/cli`** — Cobra command tree. `App` struct holds all service interfaces; v2 intelligence fields are nil when LLM is disabled. Commands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `ask`, `explain`, `review`. Note: `kairos 45` is a shortcut for `kairos what-now --minutes 45`.
+**`internal/cli`** — Cobra command tree. `App` struct holds all service interfaces; v2 intelligence fields are nil when LLM is disabled. Commands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `shell`, `ask`, `explain` (subcommands: `now`, `why-not`), `review` (subcommand: `weekly`). Note: `kairos 45` is a shortcut for `kairos what-now --minutes 45`.
+
+**`internal/cli/shell_cmd.go`** — Interactive REPL via `kairos shell`. Uses `go-prompt` for autocomplete. Built-in commands: `projects`, `use <id>`, `inspect [id]`, `status`, `what-now [min]`, `clear`, `help`, `exit`. Unrecognized input falls through to the full Cobra command tree. Prompt shows active project context: `kairos (proj_id) ❯`.
 
 **`internal/cli/formatter`** — Terminal output formatting with lipgloss: tables, tree views, progress bars, color helpers. Separate formatters for what-now, status, explain, ask, and draft output.
 
@@ -144,6 +147,10 @@ Key design patterns:
 | `KAIROS_LLM_ENDPOINT` | `http://localhost:11434` | Ollama server URL |
 | `KAIROS_LLM_MODEL` | `llama3.2` | Ollama model name |
 | `KAIROS_LLM_TIMEOUT_MS` | `10000` | Global LLM timeout |
+| `KAIROS_LLM_PARSE_TIMEOUT_MS` | `10000` | `ask`/intent parser timeout override |
+| `KAIROS_LLM_EXPLAIN_TIMEOUT_MS` | `6000` | explain/review timeout override |
+| `KAIROS_LLM_TEMPLATE_DRAFT_TIMEOUT_MS` | `8000` | template draft timeout override |
+| `KAIROS_LLM_PROJECT_DRAFT_TIMEOUT_MS` | `30000` | project draft timeout override |
 | `KAIROS_LLM_MAX_RETRIES` | `1` | LLM retry count |
 | `KAIROS_LLM_CONFIDENCE_THRESHOLD` | `0.85` | Auto-execute threshold for read-only intents |
 
@@ -151,6 +158,7 @@ Key design patterns:
 
 - `modernc.org/sqlite` — pure Go SQLite driver (**no CGO** — this is intentional, do not switch to `mattn/go-sqlite3`)
 - `github.com/stretchr/testify` — test assertions use `assert`/`require` packages (not `testing` stdlib alone)
+- `github.com/c-bata/go-prompt` — interactive REPL autocomplete for `kairos shell`
 
 ## Testing Patterns
 
@@ -168,6 +176,11 @@ Scheduler tests use pure functions with no DB setup needed — just construct `S
 ## Reference Documents
 
 - `docs/prd.md` — Domain model, features, duration/progress rules, CLI UX requirements
+- `docs/prd-v2.md` — v2 intelligence layer requirements
 - `docs/contracts.md` — WhatNow/Status/Replan request/response types and invariants
+- `docs/llm-contracts.md` — LLM service contracts and prompt specifications
 - `docs/orchestrator.md` — Build strategy, technical guardrails, checkpoints, mandatory tests
+- `docs/orchestrator-v2.md` — v2 intelligence build strategy
+- `docs/design.md` — System design notes
+- `docs/repl.md` — Interactive shell design and command reference
 - `docs/template-sample.json` — Example template schema for project scaffolding

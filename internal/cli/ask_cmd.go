@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/intelligence"
+	"github.com/alexanderramin/kairos/internal/llm"
 	"github.com/spf13/cobra"
 )
 
@@ -30,6 +32,9 @@ func newAskCmd(app *App) *cobra.Command {
 
 			resolution, err := app.Intent.Parse(context.Background(), args[0])
 			if err != nil {
+				if errors.Is(err, llm.ErrTimeout) {
+					return fmt.Errorf("parse failed: %w (set KAIROS_LLM_PARSE_TIMEOUT_MS, e.g. 15000)", err)
+				}
 				return fmt.Errorf("parse failed: %w", err)
 			}
 

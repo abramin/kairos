@@ -44,7 +44,7 @@ func DefaultConfig() LLMConfig {
 		MaxRetries:          1,
 		ConfidenceThreshold: 0.85,
 		Tasks: map[TaskType]TaskConfig{
-			TaskParse:         {Temperature: 0.1, MaxTokens: 512, TimeoutMs: 3000},
+			TaskParse:         {Temperature: 0.1, MaxTokens: 512, TimeoutMs: 10000},
 			TaskExplain:       {Temperature: 0.3, MaxTokens: 1024, TimeoutMs: 6000},
 			TaskTemplateDraft: {Temperature: 0.2, MaxTokens: 2048, TimeoutMs: 8000},
 			TaskProjectDraft:  {Temperature: 0.3, MaxTokens: 4096, TimeoutMs: 30000},
@@ -82,6 +82,11 @@ func LoadConfig() LLMConfig {
 		}
 	}
 
+	applyTaskTimeoutEnv(&cfg, TaskParse, "KAIROS_LLM_PARSE_TIMEOUT_MS")
+	applyTaskTimeoutEnv(&cfg, TaskExplain, "KAIROS_LLM_EXPLAIN_TIMEOUT_MS")
+	applyTaskTimeoutEnv(&cfg, TaskTemplateDraft, "KAIROS_LLM_TEMPLATE_DRAFT_TIMEOUT_MS")
+	applyTaskTimeoutEnv(&cfg, TaskProjectDraft, "KAIROS_LLM_PROJECT_DRAFT_TIMEOUT_MS")
+
 	return cfg
 }
 
@@ -92,4 +97,18 @@ func (c LLMConfig) TaskTimeout(task TaskType) int {
 		return tc.TimeoutMs
 	}
 	return c.TimeoutMs
+}
+
+func applyTaskTimeoutEnv(cfg *LLMConfig, task TaskType, envName string) {
+	v := os.Getenv(envName)
+	if v == "" {
+		return
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return
+	}
+	tc := cfg.Tasks[task]
+	tc.TimeoutMs = n
+	cfg.Tasks[task] = tc
 }
