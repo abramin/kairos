@@ -64,7 +64,7 @@ func RelativeDateFrom(t time.Time, now time.Time) string {
 // RelativeDateStyled returns RelativeDate with urgency coloring applied.
 func RelativeDateStyled(t time.Time) string {
 	text := RelativeDate(t)
-	days := int(math.Round(t.Sub(time.Now()).Hours() / 24))
+	days := int(math.Round(time.Until(t).Hours() / 24))
 
 	if days >= 0 && days <= 2 {
 		return StyleRed.Render(text)

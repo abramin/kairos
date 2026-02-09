@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/alexanderramin/kairos/internal/domain"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // ProjectInspectData holds all data needed to render a project inspect view.
@@ -48,46 +49,68 @@ func FormatProjectList(projects []*domain.Project) string {
 	return RenderBox("Projects", table)
 }
 
-// FormatProjectInspect renders a styled project inspect card with tree view.
+// FormatProjectInspect renders a styled project inspect card with side-by-side layout.
 func FormatProjectInspect(data ProjectInspectData) string {
-	p := data.Project
+	// Build left panel (metadata)
+	leftPanel := buildMetadataPanel(data.Project)
+
+	// Build right panel (tree)
+	rightPanel := buildTreePanel(data.RootNodes, data.ChildMap, data.WorkItems)
+
+	// Join panels horizontally with spacing
+	spacing := "    "
+	combined := lipgloss.JoinHorizontal(lipgloss.Top, leftPanel, spacing, rightPanel)
+
+	return RenderBox("", combined)
+}
+
+// buildMetadataPanel creates the left panel with project metadata.
+func buildMetadataPanel(p *domain.Project) string {
 	var b strings.Builder
 
-	// Title line: Project Name + Domain Badge
-	titleLine := fmt.Sprintf("%s  %s", StyleBold.Render(p.Name), DomainBadge(p.Domain))
-	b.WriteString(titleLine + "\n\n")
+	// Title + Domain Badge
+	b.WriteString(StyleBold.Render(p.Name) + "\n")
+	b.WriteString(DomainBadge(p.Domain) + "\n\n")
 
-	// Metadata section
-	b.WriteString(fmt.Sprintf("  %s  %s\n", StyleDim.Render("STATUS"), StatusPill(p.Status)))
-	b.WriteString(fmt.Sprintf("  %s  %s\n", StyleDim.Render("ID    "), Dim(p.ShortID)))
-	b.WriteString(fmt.Sprintf("  %s  %s\n", StyleDim.Render("UUID  "), TruncID(p.ID)))
-	b.WriteString(fmt.Sprintf("  %s  %s\n", StyleDim.Render("START "), StyleFg.Render(HumanDate(p.StartDate))))
+	// Metadata fields
+	b.WriteString(fmt.Sprintf("%s  %s\n", StyleDim.Render("STATUS"), StatusPill(p.Status)))
+	b.WriteString(fmt.Sprintf("%s  %s\n", StyleDim.Render("ID    "), Dim(p.ShortID)))
+	b.WriteString(fmt.Sprintf("%s  %s\n", StyleDim.Render("UUID  "), TruncID(p.ID)))
+	b.WriteString(fmt.Sprintf("%s  %s\n", StyleDim.Render("START "), StyleFg.Render(HumanDate(p.StartDate))))
 
 	if p.TargetDate != nil {
 		dueRelative := RelativeDateStyled(*p.TargetDate)
 		dueAbsolute := p.TargetDate.Format("Jan 2, 2006")
-		b.WriteString(fmt.Sprintf("  %s  %s %s\n", StyleDim.Render("DUE   "), dueRelative, Dim("("+dueAbsolute+")")))
+		b.WriteString(fmt.Sprintf("%s  %s %s\n", StyleDim.Render("DUE   "), dueRelative, Dim("("+dueAbsolute+")")))
 	}
 
 	if p.ArchivedAt != nil {
-		b.WriteString(fmt.Sprintf("  %s  %s\n", StyleDim.Render("ARCHVD"), HumanTimestamp(*p.ArchivedAt)))
+		b.WriteString(fmt.Sprintf("%s  %s\n", StyleDim.Render("ARCHVD"), HumanTimestamp(*p.ArchivedAt)))
 	}
 
-	b.WriteString(fmt.Sprintf("  %s  %s\n", StyleDim.Render("UPDATED"), HumanTimestamp(p.UpdatedAt)))
+	b.WriteString(fmt.Sprintf("%s  %s\n", StyleDim.Render("UPDATED"), HumanTimestamp(p.UpdatedAt)))
 
-	// Tree section: nodes and work items
-	if len(data.RootNodes) > 0 {
-		b.WriteString("\n")
-		b.WriteString(Header("Plan"))
-		b.WriteString("\n")
+	// Constrain to fixed width for consistent left panel
+	panel := lipgloss.NewStyle().Width(45).Render(b.String())
+	return panel
+}
 
-		items := buildProjectTree(data.RootNodes, data.ChildMap, data.WorkItems, 0)
-		if len(items) > 0 {
-			b.WriteString(RenderTree(items))
-		}
+// buildTreePanel creates the right panel with the plan tree.
+func buildTreePanel(rootNodes []*domain.PlanNode, childMap map[string][]*domain.PlanNode, workItems map[string][]*domain.WorkItem) string {
+	if len(rootNodes) == 0 {
+		return StyleDim.Render("No plan nodes")
 	}
 
-	return RenderBox("", b.String())
+	var b strings.Builder
+	b.WriteString(Header("Plan"))
+	b.WriteString("\n")
+
+	items := buildProjectTree(rootNodes, childMap, workItems, 0)
+	if len(items) > 0 {
+		b.WriteString(RenderTree(items))
+	}
+
+	return b.String()
 }
 
 // buildProjectTree recursively converts nodes and work items into TreeItems.

@@ -248,10 +248,6 @@ func dispatchProjectUpdateIntent(app *App, args map[string]interface{}) error {
 	return nil
 }
 
-func confirmPrompt() bool {
-	return promptYesNoWithDefault("Confirm? [Y/n]: ", true)
-}
-
 func confirmPromptIO(in io.Reader, out io.Writer) bool {
 	if in == nil {
 		in = os.Stdin

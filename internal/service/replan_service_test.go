@@ -173,3 +173,121 @@ func TestReplan_RiskDeltaCalculated(t *testing.T) {
 	assert.NotEmpty(t, string(delta.RiskBefore))
 	assert.NotEmpty(t, string(delta.RiskAfter))
 }
+
+func TestReplan_Idempotency_UnchangedInputProducesZeroChanges(t *testing.T) {
+	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	target := now.AddDate(0, 2, 0)
+
+	// Create project with work items that have NO unit tracking
+	// (so no re-estimation occurs, and planned min stays constant)
+	proj := testutil.NewTestProject("Stable Project", testutil.WithTargetDate(target))
+	require.NoError(t, projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Week 1")
+	require.NoError(t, nodes.Create(ctx, node))
+
+	// Work item without unit tracking: planned = 100, logged = 50
+	// No units defined => no re-estimation => planned stays 100
+	wi := testutil.NewTestWorkItem(node.ID, "Task",
+		testutil.WithPlannedMin(100),
+		testutil.WithLoggedMin(50),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, workItems.Create(ctx, wi))
+
+	// Add a session so project has recent activity
+	sess := testutil.NewTestSession(wi.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
+	require.NoError(t, sessions.Create(ctx, sess))
+
+	svc := NewReplanService(projects, workItems, sessions, profiles)
+	req := contract.NewReplanRequest(domain.TriggerManual)
+	req.Now = &now
+
+	// First replan
+	resp1, err := svc.Replan(ctx, req)
+	require.NoError(t, err)
+	require.Len(t, resp1.Deltas, 1)
+
+	// Capture planned min and risk levels after first replan
+	wi1, err := workItems.GetByID(ctx, wi.ID)
+	require.NoError(t, err)
+	plannedAfterFirstReplan := wi1.PlannedMin
+	riskAfterFirstReplan := resp1.Deltas[0].RiskAfter
+
+	// Second replan with identical input (same timestamp, no DB changes between calls)
+	resp2, err := svc.Replan(ctx, req)
+	require.NoError(t, err)
+	require.Len(t, resp2.Deltas, 1)
+
+	// Verify second replan produces zero changes
+	assert.Equal(t, 0, resp2.Deltas[0].ChangedItemsCount,
+		"second replan with unchanged input should report zero changed items")
+
+	// Verify planned min unchanged after second replan
+	wi2, err := workItems.GetByID(ctx, wi.ID)
+	require.NoError(t, err)
+	assert.Equal(t, plannedAfterFirstReplan, wi2.PlannedMin,
+		"planned min should not change between replans")
+
+	// Verify risk level unchanged
+	assert.Equal(t, riskAfterFirstReplan, resp2.Deltas[0].RiskAfter,
+		"risk level should remain consistent")
+}
+
+func TestReplan_Idempotency_MultipleCallsConvergeThenStabilize(t *testing.T) {
+	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	target := now.AddDate(0, 2, 0)
+
+	proj := testutil.NewTestProject("Study", testutil.WithTargetDate(target))
+	require.NoError(t, projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Week 1")
+	require.NoError(t, nodes.Create(ctx, node))
+
+	// Work item with unit tracking that converges after a few iterations
+	wi := testutil.NewTestWorkItem(node.ID, "Read",
+		testutil.WithPlannedMin(100),
+		testutil.WithLoggedMin(60),
+		testutil.WithUnits("chapters", 10, 3),
+		testutil.WithDurationMode(domain.DurationEstimate),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, workItems.Create(ctx, wi))
+
+	sess := testutil.NewTestSession(wi.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
+	require.NoError(t, sessions.Create(ctx, sess))
+
+	svc := NewReplanService(projects, workItems, sessions, profiles)
+	req := contract.NewReplanRequest(domain.TriggerManual)
+	req.Now = &now
+
+	// Run replan until convergence (changes = 0)
+	var convergedAfter int
+	for i := 0; i < 30; i++ {
+		resp, err := svc.Replan(ctx, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Deltas, 1)
+
+		if resp.Deltas[0].ChangedItemsCount == 0 {
+			convergedAfter = i
+			break
+		}
+	}
+
+	require.Greater(t, convergedAfter, 0, "should converge within 30 iterations")
+
+	// After convergence, subsequent replans should always report zero changes
+	for i := 0; i < 5; i++ {
+		resp, err := svc.Replan(ctx, req)
+		require.NoError(t, err)
+		require.Len(t, resp.Deltas, 1)
+		assert.Equal(t, 0, resp.Deltas[0].ChangedItemsCount,
+			"after convergence, all subsequent replans should report zero changes (iteration %d)", i)
+	}
+}

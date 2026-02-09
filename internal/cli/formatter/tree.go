@@ -18,7 +18,6 @@ const (
 	treeBranch = "├─ "
 	treeCorner = "└─ "
 	treePipe   = "│  "
-	treeSpace  = "   "
 )
 
 // RenderTree renders a list of TreeItems as an indented tree using

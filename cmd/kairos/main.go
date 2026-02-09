@@ -34,11 +34,17 @@ func run() error {
 	// Determine template directory
 	templateDir := os.Getenv("KAIROS_TEMPLATES")
 	if templateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return fmt.Errorf("finding home directory: %w", err)
+		// Check for ./templates in current directory first (development)
+		if stat, err := os.Stat("./templates"); err == nil && stat.IsDir() {
+			templateDir = "./templates"
+		} else {
+			// Fall back to ~/.kairos/templates (production)
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("finding home directory: %w", err)
+			}
+			templateDir = filepath.Join(home, ".kairos", "templates")
 		}
-		templateDir = filepath.Join(home, ".kairos", "templates")
 	}
 
 	// Open database

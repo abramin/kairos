@@ -114,3 +114,168 @@ func TestAllocateSlices_Invariant_NoOverAllocatePastRemaining(t *testing.T) {
 			"should still respect min session bound")
 	}
 }
+
+// ============ EDGE CASE TESTS ============
+
+// TestAllocateSlices_BoundsEnforcement_ExtremeCases tests session bounds
+// with extreme available time values (1 minute, 999 minutes) and edge conditions.
+func TestAllocateSlices_BoundsEnforcement_ExtremeCases(t *testing.T) {
+	due := time.Now().AddDate(0, 0, 7)
+
+	tests := []struct {
+		name         string
+		availableMin int
+		minSession   int
+		maxSession   int
+		defSession   int
+		plannedMin   int
+		loggedMin    int
+		expectSlice  bool
+		expectMin    int // expected allocation if slice created
+		expectMax    int // expected allocation if slice created
+	}{
+		// Extreme: 1 minute available, minimum bounds
+		{
+			name:         "1 min available, min=5 - insufficient",
+			availableMin: 1,
+			minSession:   5,
+			maxSession:   60,
+			defSession:   30,
+			plannedMin:   100,
+			loggedMin:    0,
+			expectSlice:  false,
+			expectMin:    0,
+			expectMax:    0,
+		},
+
+		// Edge: exact minimum match
+		{
+			name:         "5 min available, min=5 - exact fit",
+			availableMin: 5,
+			minSession:   5,
+			maxSession:   60,
+			defSession:   30,
+			plannedMin:   100,
+			loggedMin:    0,
+			expectSlice:  true,
+			expectMin:    5,
+			expectMax:    5,
+		},
+
+		// Extreme: 999 minutes available, allocate default (bounded by default or max)
+		{
+			name:         "999 min available, default=30, max=60 - uses default",
+			availableMin: 999,
+			minSession:   15,
+			maxSession:   60,
+			defSession:   30,
+			plannedMin:   100,
+			loggedMin:    0,
+			expectSlice:  true,
+			expectMin:    30,
+			expectMax:    30,
+		},
+
+		// Bounded by remaining work
+		{
+			name:         "30 min available, work remaining=10, min=5 - capped at remaining",
+			availableMin: 30,
+			minSession:   5,
+			maxSession:   60,
+			defSession:   30,
+			plannedMin:   100,
+			loggedMin:    90, // Only 10 min remaining
+			expectSlice:  true,
+			expectMin:    5,
+			expectMax:    10,
+		},
+
+		// min == max (exact session only)
+		{
+			name:         "min=max=30 - exact session",
+			availableMin: 60,
+			minSession:   30,
+			maxSession:   30,
+			defSession:   30,
+			plannedMin:   100,
+			loggedMin:    0,
+			expectSlice:  true,
+			expectMin:    30,
+			expectMax:    30,
+		},
+
+		// Edge: just enough for minimum
+		{
+			name:         "work remaining=5, min=5, max=60 - exact for min",
+			availableMin: 100,
+			minSession:   5,
+			maxSession:   60,
+			defSession:   30,
+			plannedMin:   100,
+			loggedMin:    95, // Exactly 5 min remaining
+			expectSlice:  true,
+			expectMin:    5,
+			expectMax:    5,
+		},
+
+		// Default between min and max
+		{
+			name:         "default between min and max",
+			availableMin: 100,
+			minSession:   10,
+			maxSession:   50,
+			defSession:   25,
+			plannedMin:   200,
+			loggedMin:    0,
+			expectSlice:  true,
+			expectMin:    25,
+			expectMax:    25,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			candidates := []ScoredCandidate{
+				{
+					Input: ScoringInput{
+						WorkItemID:        "wi-1",
+						ProjectID:         "p-1",
+						ProjectName:       "Project",
+						Title:             "Task",
+						DueDate:           &due,
+						ProjectRisk:       domain.RiskOnTrack,
+						MinSessionMin:     tc.minSession,
+						MaxSessionMin:     tc.maxSession,
+						DefaultSessionMin: tc.defSession,
+						PlannedMin:        tc.plannedMin,
+						LoggedMin:         tc.loggedMin,
+						NodeID:            "n-1",
+					},
+					Score: 50.0,
+				},
+			}
+
+			slices, _ := AllocateSlices(candidates, tc.availableMin, 5, false)
+
+			if tc.expectSlice {
+				assert.Len(t, slices, 1, "should allocate exactly one slice")
+
+				s := slices[0]
+				assert.GreaterOrEqual(t, s.AllocatedMin, tc.expectMin,
+					"allocated %d should be >= min %d", s.AllocatedMin, tc.expectMin)
+				assert.LessOrEqual(t, s.AllocatedMin, tc.expectMax,
+					"allocated %d should be <= max %d", s.AllocatedMin, tc.expectMax)
+				assert.GreaterOrEqual(t, s.AllocatedMin, tc.minSession,
+					"allocated %d should respect session min %d", s.AllocatedMin, tc.minSession)
+				assert.LessOrEqual(t, s.AllocatedMin, tc.maxSession,
+					"allocated %d should respect session max %d", s.AllocatedMin, tc.maxSession)
+				assert.LessOrEqual(t, s.AllocatedMin, tc.availableMin,
+					"allocated %d should not exceed available %d", s.AllocatedMin, tc.availableMin)
+			} else {
+				assert.Empty(t, slices, "should not allocate when constraints can't be met")
+				// Blockers may or may not be generated depending on the allocator implementation
+				// The key invariant is: when no slices are returned, constraints were not satisfiable
+			}
+		})
+	}
+}

@@ -20,7 +20,7 @@ func setupWorkItemService(t *testing.T) (WorkItemService, repository.ProjectRepo
 	return NewWorkItemService(wiRepo), projRepo, nodeRepo
 }
 
-func setupWorkItemWithProject(t *testing.T, svc WorkItemService, projRepo repository.ProjectRepo, nodeRepo repository.PlanNodeRepo) (string, string) {
+func setupWorkItemWithProject(t *testing.T, projRepo repository.ProjectRepo, nodeRepo repository.PlanNodeRepo) (string, string) {
 	t.Helper()
 	ctx := context.Background()
 
@@ -35,7 +35,7 @@ func setupWorkItemWithProject(t *testing.T, svc WorkItemService, projRepo reposi
 
 func TestWorkItemService_Create(t *testing.T) {
 	svc, projRepo, nodeRepo := setupWorkItemService(t)
-	_, nodeID := setupWorkItemWithProject(t, svc, projRepo, nodeRepo)
+	_, nodeID := setupWorkItemWithProject(t, projRepo, nodeRepo)
 	ctx := context.Background()
 
 	wi := testutil.NewTestWorkItem(nodeID, "Read Chapter 1", testutil.WithPlannedMin(60))
@@ -48,7 +48,7 @@ func TestWorkItemService_Create(t *testing.T) {
 
 func TestWorkItemService_Create_DefaultStatus(t *testing.T) {
 	svc, projRepo, nodeRepo := setupWorkItemService(t)
-	_, nodeID := setupWorkItemWithProject(t, svc, projRepo, nodeRepo)
+	_, nodeID := setupWorkItemWithProject(t, projRepo, nodeRepo)
 	ctx := context.Background()
 
 	wi := testutil.NewTestWorkItem(nodeID, "Task")
@@ -62,7 +62,7 @@ func TestWorkItemService_Create_DefaultStatus(t *testing.T) {
 
 func TestWorkItemService_GetByID(t *testing.T) {
 	svc, projRepo, nodeRepo := setupWorkItemService(t)
-	_, nodeID := setupWorkItemWithProject(t, svc, projRepo, nodeRepo)
+	_, nodeID := setupWorkItemWithProject(t, projRepo, nodeRepo)
 	ctx := context.Background()
 
 	wi := testutil.NewTestWorkItem(nodeID, "Exercises", testutil.WithPlannedMin(90))
@@ -76,7 +76,7 @@ func TestWorkItemService_GetByID(t *testing.T) {
 
 func TestWorkItemService_ListByNode(t *testing.T) {
 	svc, projRepo, nodeRepo := setupWorkItemService(t)
-	_, nodeID := setupWorkItemWithProject(t, svc, projRepo, nodeRepo)
+	_, nodeID := setupWorkItemWithProject(t, projRepo, nodeRepo)
 	ctx := context.Background()
 
 	wi1 := testutil.NewTestWorkItem(nodeID, "Task1")
@@ -91,7 +91,7 @@ func TestWorkItemService_ListByNode(t *testing.T) {
 
 func TestWorkItemService_ListByProject(t *testing.T) {
 	svc, projRepo, nodeRepo := setupWorkItemService(t)
-	projID, nodeID := setupWorkItemWithProject(t, svc, projRepo, nodeRepo)
+	projID, nodeID := setupWorkItemWithProject(t, projRepo, nodeRepo)
 	ctx := context.Background()
 
 	wi := testutil.NewTestWorkItem(nodeID, "ProjTask")
@@ -105,7 +105,7 @@ func TestWorkItemService_ListByProject(t *testing.T) {
 
 func TestWorkItemService_Update(t *testing.T) {
 	svc, projRepo, nodeRepo := setupWorkItemService(t)
-	_, nodeID := setupWorkItemWithProject(t, svc, projRepo, nodeRepo)
+	_, nodeID := setupWorkItemWithProject(t, projRepo, nodeRepo)
 	ctx := context.Background()
 
 	wi := testutil.NewTestWorkItem(nodeID, "OrigTask")
@@ -123,7 +123,7 @@ func TestWorkItemService_Update(t *testing.T) {
 
 func TestWorkItemService_MarkDone(t *testing.T) {
 	svc, projRepo, nodeRepo := setupWorkItemService(t)
-	_, nodeID := setupWorkItemWithProject(t, svc, projRepo, nodeRepo)
+	_, nodeID := setupWorkItemWithProject(t, projRepo, nodeRepo)
 	ctx := context.Background()
 
 	wi := testutil.NewTestWorkItem(nodeID, "MarkMe")
@@ -146,7 +146,7 @@ func TestWorkItemService_MarkDone_NonexistentItem(t *testing.T) {
 
 func TestWorkItemService_Archive(t *testing.T) {
 	svc, projRepo, nodeRepo := setupWorkItemService(t)
-	_, nodeID := setupWorkItemWithProject(t, svc, projRepo, nodeRepo)
+	_, nodeID := setupWorkItemWithProject(t, projRepo, nodeRepo)
 	ctx := context.Background()
 
 	wi := testutil.NewTestWorkItem(nodeID, "ArchiveMe")
@@ -161,7 +161,7 @@ func TestWorkItemService_Archive(t *testing.T) {
 
 func TestWorkItemService_Delete(t *testing.T) {
 	svc, projRepo, nodeRepo := setupWorkItemService(t)
-	_, nodeID := setupWorkItemWithProject(t, svc, projRepo, nodeRepo)
+	_, nodeID := setupWorkItemWithProject(t, projRepo, nodeRepo)
 	ctx := context.Background()
 
 	wi := testutil.NewTestWorkItem(nodeID, "DeleteMe")
