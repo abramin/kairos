@@ -32,6 +32,10 @@ type App struct {
 	ProjectDraft  intelligence.ProjectDraftService
 	Help          intelligence.HelpService
 
+	// IsInteractive reports whether stdin is a terminal.
+	// Set by main; tests override to return false.
+	IsInteractive func() bool
+
 	// Cached command spec (populated lazily by getCommandSpec).
 	cmdSpec     *CommandSpec
 	cmdSpecOnce sync.Once
@@ -48,6 +52,13 @@ func NewRootCmd(app *App) *cobra.Command {
 Quick usage: kairos <minutes> is shorthand for kairos what-now --minutes <minutes>`,
 		Args: cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				// TTY → launch interactive shell; non-TTY → show help.
+				if app.IsInteractive != nil && app.IsInteractive() {
+					return runShell(app)
+				}
+				return cmd.Help()
+			}
 			if len(args) != 1 {
 				return cmd.Help()
 			}

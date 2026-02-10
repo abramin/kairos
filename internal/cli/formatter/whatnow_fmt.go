@@ -37,10 +37,15 @@ func FormatWhatNowWithProjectIDs(resp *contract.WhatNowResponse, projectIDs map[
 			num := fmt.Sprintf("%d.", i+1)
 			riskBadge := RiskIndicator(rec.RiskLevel)
 
-			// Title line: "1. Title  (25m)  ● ON TRACK"
+			// Title line: "1. #5 Title  (25m)  ● ON TRACK"
+			seqLabel := ""
+			if rec.WorkItemSeq > 0 {
+				seqLabel = StyleDim.Render(fmt.Sprintf("#%d ", rec.WorkItemSeq))
+			}
 			titleLine := fmt.Sprintf(
-				"%s %s  %s  %s",
+				"%s %s%s  %s  %s",
 				Bold(num),
+				seqLabel,
 				StyleFg.Render(rec.Title),
 				StyleBlue.Render(fmt.Sprintf("(%s)", FormatMinutes(rec.AllocatedMin))),
 				riskBadge,

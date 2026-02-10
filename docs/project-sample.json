@@ -96,11 +96,27 @@
             }
         }
     ],
+    "_comment": "dependencies can be left out if workitems must be completed in simple sequence",
     "dependencies": [
-        { "predecessor_ref": "p1_reading", "successor_ref": "p1_exercises" },
-        { "predecessor_ref": "p1_exercises", "successor_ref": "p2_reading" },
-        { "predecessor_ref": "p2_reading", "successor_ref": "p2_exercises" },
-        { "predecessor_ref": "p2_exercises", "successor_ref": "assess_prep" },
-        { "predecessor_ref": "assess_prep", "successor_ref": "assess_submit" }
+        {
+            "predecessor_ref": "p1_reading",
+            "successor_ref": "p1_exercises"
+        },
+        {
+            "predecessor_ref": "p1_exercises",
+            "successor_ref": "p2_reading"
+        },
+        {
+            "predecessor_ref": "p2_reading",
+            "successor_ref": "p2_exercises"
+        },
+        {
+            "predecessor_ref": "p2_exercises",
+            "successor_ref": "assess_prep"
+        },
+        {
+            "predecessor_ref": "assess_prep",
+            "successor_ref": "assess_submit"
+        }
     ]
 }

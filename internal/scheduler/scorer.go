@@ -14,7 +14,7 @@ type ScoringWeights struct {
 	Variation        float64
 }
 
-func DefaultWeights() ScoringWeights {
+func defaultWeights() ScoringWeights {
 	return ScoringWeights{
 		DeadlinePressure: 1.0,
 		BehindPace:       0.8,
@@ -25,6 +25,7 @@ func DefaultWeights() ScoringWeights {
 
 type ScoringInput struct {
 	WorkItemID          string
+	WorkItemSeq         int
 	ProjectID           string
 	ProjectName         string
 	NodeTitle           string

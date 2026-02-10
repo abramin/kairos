@@ -119,6 +119,12 @@ func (s *whatNowService) Recommend(ctx context.Context, req contract.WhatNowRequ
 	return s.buildResponse(now, mode, req.AvailableMin, slices, blockers, agg), nil
 }
 
+// projectIndex holds intermediate per-project data used to compute risks.
+type projectIndex struct {
+	dueByNow           map[string]int
+	completedByProject map[string]repository.CompletedWorkSummary
+}
+
 // computeProjectAggregates builds per-project risk, totals, and recent session data from candidates.
 func (s *whatNowService) computeProjectAggregates(
 	candidates []repository.SchedulableCandidate,
@@ -128,6 +134,18 @@ func (s *whatNowService) computeProjectAggregates(
 	bufferPct float64,
 	baselineDailyMin int,
 ) projectAggregates {
+	agg, idx := buildProjectIndex(candidates, completedSummaries, recentSessions, now)
+	computeProjectRisks(&agg, idx, now, bufferPct, baselineDailyMin)
+	return agg
+}
+
+// buildProjectIndex accumulates per-project totals and indexes from raw data.
+func buildProjectIndex(
+	candidates []repository.SchedulableCandidate,
+	completedSummaries []repository.CompletedWorkSummary,
+	recentSessions []*domain.WorkSessionLog,
+	now time.Time,
+) (projectAggregates, projectIndex) {
 	agg := projectAggregates{
 		risks:      make(map[string]scheduler.RiskResult),
 		names:      make(map[string]string),
@@ -140,7 +158,7 @@ func (s *whatNowService) computeProjectAggregates(
 
 	// Build work-item-to-project index for O(1) session lookups
 	workItemToProject := make(map[string]string, len(candidates))
-	dueByNow := make(map[string]int) // sum of PlannedMin for schedulable items due by now
+	dueByNow := make(map[string]int)
 	for _, c := range candidates {
 		agg.planned[c.ProjectID] += c.WorkItem.PlannedMin
 		agg.logged[c.ProjectID] += c.WorkItem.LoggedMin
@@ -159,7 +177,6 @@ func (s *whatNowService) computeProjectAggregates(
 		}
 	}
 
-	// Index completed work summaries by project
 	completedByProject := make(map[string]repository.CompletedWorkSummary, len(completedSummaries))
 	for _, cs := range completedSummaries {
 		completedByProject[cs.ProjectID] = cs
@@ -171,11 +188,15 @@ func (s *whatNowService) computeProjectAggregates(
 		}
 	}
 
+	return agg, projectIndex{dueByNow: dueByNow, completedByProject: completedByProject}
+}
+
+// computeProjectRisks computes risk levels for each project using timeline math.
+func computeProjectRisks(agg *projectAggregates, idx projectIndex, now time.Time, bufferPct float64, baselineDailyMin int) {
 	for pid := range agg.planned {
-		cs := completedByProject[pid]
+		cs := idx.completedByProject[pid]
 
 		// Weighted structural progress: done planned_min / all planned_min.
-		// Uses full project totals (done + remaining) for the denominator.
 		allPlanned := agg.planned[pid] + cs.PlannedMin
 		var progressPct float64
 		if allPlanned > 0 {
@@ -193,7 +214,7 @@ func (s *whatNowService) computeProjectAggregates(
 		}
 
 		// Due-date-aware expected progress: what % of total work should be done by now?
-		expectedDoneMin := cs.PlannedMin + dueByNow[pid]
+		expectedDoneMin := cs.PlannedMin + idx.dueByNow[pid]
 		var dueBasedExpectedPct float64
 		if allPlanned > 0 {
 			dueBasedExpectedPct = float64(expectedDoneMin) / float64(allPlanned) * 100
@@ -213,8 +234,6 @@ func (s *whatNowService) computeProjectAggregates(
 			DueBasedExpectedPct: dueBasedExpectedPct,
 		})
 	}
-
-	return agg
 }
 
 // scoreCandidates checks constraints and scores each candidate, returning scored items and blockers.
@@ -270,6 +289,7 @@ func (s *whatNowService) scoreCandidates(
 
 		input := scheduler.ScoringInput{
 			WorkItemID:          c.WorkItem.ID,
+			WorkItemSeq:         c.WorkItem.Seq,
 			ProjectID:           c.ProjectID,
 			ProjectName:         c.ProjectName,
 			NodeTitle:           c.NodeTitle,

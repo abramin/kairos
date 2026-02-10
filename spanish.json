@@ -159,7 +159,7 @@
         {
             "ref": "novels",
             "title": "Reading List",
-            "kind": "collection",
+            "kind": "section",
             "order": 21
         }
     ],
@@ -208,17 +208,11 @@
             "planned_min": 45
         },
         {
-            "_comment": "Items for A2 modules 3-9 omitted for brevity, but would follow same pattern..."
-        },
-        {
             "ref": "a2_09_gram",
             "node_ref": "a2_09",
             "title": "A2.9 Grammar (Final A2)",
             "type": "drill",
             "planned_min": 45
-        },
-        {
-            "_comment": "--- B1 PHASE START ---"
         },
         {
             "ref": "b1_01_read",
@@ -263,17 +257,11 @@
             "planned_min": 60
         },
         {
-            "_comment": "Items for B1 modules 3-10 omitted for brevity..."
-        },
-        {
             "ref": "b1_11_gram",
             "node_ref": "b1_11",
             "title": "B1.11 Grammar (Final B1)",
             "type": "drill",
             "planned_min": 60
-        },
-        {
-            "_comment": "--- OPTIONAL NOVELS ---"
         },
         {
             "ref": "novel_1",
@@ -310,9 +298,6 @@
         {
             "predecessor_ref": "a2_02_ex",
             "successor_ref": "a2_02_gram"
-        },
-        {
-            "_comment": "Chain continues through all modules..."
         },
         {
             "predecessor_ref": "a2_09_gram",

@@ -1,0 +1,16 @@
+╭────────────────────────────────────────────────────────────────────╮
+│                                                                    │
+│  STATUS                                                            │
+│                                                                    │
+│  NAME             STATUS    PROGRESS           RISK        DUE     │
+│  ───────────────  ────────  ─────────────────  ──────────  ──────  │
+│  Urgent Paper     ● Active  [█░░░░░░░░░]  17%  ● CRITICAL  In 4w   │
+│  Midterm Prep     ● Active  [███░░░░░░░]  33%  ● AT RISK   In 3mo  │
+│  Leisure Reading  ● Active  [█████░░░░░]  50%  ● ON TRACK  In 7mo  │
+│                                                                    │
+│  1 Critical, 1 At Risk, 1 On Track                                 │
+│                                                                    │
+│  Critical work requires immediate attention                        │
+│                                                                    │
+│                                                                    │
+╰────────────────────────────────────────────────────────────────────╯

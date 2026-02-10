@@ -82,7 +82,7 @@ func TestEnforceWriteSafety_ReadOnlyIntentUnchanged(t *testing.T) {
 
 func TestIsWriteIntent(t *testing.T) {
 	writeIntentsList := []IntentName{
-		IntentReplan, IntentProjectAdd, IntentProjectUpdate,
+		IntentReplan, IntentProjectAdd, IntentProjectImport, IntentProjectUpdate,
 		IntentProjectArchive, IntentProjectRemove,
 		IntentNodeAdd, IntentNodeUpdate, IntentNodeRemove,
 		IntentWorkAdd, IntentWorkUpdate, IntentWorkDone, IntentWorkRemove,

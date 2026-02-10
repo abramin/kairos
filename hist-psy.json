@@ -1,0 +1,293 @@
+{
+    "project": {
+        "short_id": "PSY-HIST01",
+        "name": "History of Psychology (Independent Study)",
+        "domain": "education",
+        "start_date": "2026-02-09"
+    },
+    "defaults": {
+        "duration_mode": "estimate",
+        "session_policy": {
+            "min_session_min": 15,
+            "max_session_min": 60,
+            "default_session_min": 30,
+            "splittable": true
+        }
+    },
+    "nodes": [
+        {
+            "ref": "w1",
+            "title": "Week 1 - Can there be a science of mind?",
+            "kind": "module",
+            "order": 1
+        },
+        {
+            "ref": "w2",
+            "title": "Week 2 - Physiology and measurement",
+            "kind": "module",
+            "order": 2
+        },
+        {
+            "ref": "w3",
+            "title": "Week 3 - Phrenology and scientific overreach",
+            "kind": "module",
+            "order": 3
+        },
+        {
+            "ref": "w4",
+            "title": "Week 4 - Darwin and evolutionary mind",
+            "kind": "module",
+            "order": 4
+        },
+        {
+            "ref": "w5",
+            "title": "Week 5 - Wundt and experimental psychology",
+            "kind": "module",
+            "order": 5
+        },
+        {
+            "ref": "w6",
+            "title": "Week 6 - Freud and the unconscious",
+            "kind": "module",
+            "order": 6
+        },
+        {
+            "ref": "w7",
+            "title": "Week 7 - Behaviorism",
+            "kind": "module",
+            "order": 7
+        },
+        {
+            "ref": "w8",
+            "title": "Week 8 - Gestalt psychology",
+            "kind": "module",
+            "order": 8
+        },
+        {
+            "ref": "w9",
+            "title": "Week 9 - Crisis of behaviorism",
+            "kind": "module",
+            "order": 9
+        },
+        {
+            "ref": "w10",
+            "title": "Week 10 - Cognitive psychology",
+            "kind": "module",
+            "order": 10
+        },
+        {
+            "ref": "w11",
+            "title": "Week 11 - Psychology and society",
+            "kind": "module",
+            "order": 11
+        },
+        {
+            "ref": "w12",
+            "title": "Week 12 - What kind of science is psychology?",
+            "kind": "module",
+            "order": 12
+        },
+        {
+            "ref": "final",
+            "title": "Final Paper (3,000 words)",
+            "kind": "assessment",
+            "order": 13
+        }
+    ],
+    "work_items": [
+        {
+            "ref": "w1_read",
+            "node_ref": "w1",
+            "title": "Readings (Descartes, Smith, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w1_write",
+            "node_ref": "w1",
+            "title": "500-word reflection on conditions for psychology",
+            "type": "writing",
+            "planned_min": 90
+        },
+        {
+            "ref": "w2_read",
+            "node_ref": "w2",
+            "title": "Readings (Helmholtz, Mandler, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w2_write",
+            "node_ref": "w2",
+            "title": "Diagram physiology as measurement",
+            "type": "exercise",
+            "planned_min": 60
+        },
+        {
+            "ref": "w3_read",
+            "node_ref": "w3",
+            "title": "Readings (Gall, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w3_write",
+            "node_ref": "w3",
+            "title": "Critique of phrenology’s appeal",
+            "type": "writing",
+            "planned_min": 60
+        },
+        {
+            "ref": "w4_read",
+            "node_ref": "w4",
+            "title": "Readings (Darwin, Richards, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w4_write",
+            "node_ref": "w4",
+            "title": "Darwin’s psychology: openings and limits",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w5_read",
+            "node_ref": "w5",
+            "title": "Readings (Wundt, Boring, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w5_write",
+            "node_ref": "w5",
+            "title": "Wundt vs modern experimentation",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w6_read",
+            "node_ref": "w6",
+            "title": "Readings (Freud, Sulloway, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w6_write",
+            "node_ref": "w6",
+            "title": "Freud and the new psychological subject",
+            "type": "writing",
+            "planned_min": 90
+        },
+        {
+            "ref": "w7_read",
+            "node_ref": "w7",
+            "title": "Readings (Watson, Skinner, Greenwood, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w7_write",
+            "node_ref": "w7",
+            "title": "What behaviorism excludes, and why",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w8_read",
+            "node_ref": "w8",
+            "title": "Readings (Wertheimer, Köhler, Ash, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w8_write",
+            "node_ref": "w8",
+            "title": "Why Gestalt psychology failed to dominate",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w9_read",
+            "node_ref": "w9",
+            "title": "Readings (Chomsky, Gardner, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w9_write",
+            "node_ref": "w9",
+            "title": "Cognitive revolution or rebranding?",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w10_read",
+            "node_ref": "w10",
+            "title": "Readings (Neisser, Mandler, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w10_write",
+            "node_ref": "w10",
+            "title": "Implicit metaphors of cognition",
+            "type": "exercise",
+            "planned_min": 60
+        },
+        {
+            "ref": "w11_read",
+            "node_ref": "w11",
+            "title": "Readings (Piaget, Rose, Danziger)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "w11_write",
+            "node_ref": "w11",
+            "title": "Psychology and personhood",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w12_read",
+            "node_ref": "w12",
+            "title": "Readings (Kuhn, Hacking)",
+            "type": "reading",
+            "planned_min": 240
+        },
+        {
+            "ref": "w12_write",
+            "node_ref": "w12",
+            "title": "Final paper thesis statement",
+            "type": "writing",
+            "planned_min": 60
+        },
+        {
+            "ref": "final_plan",
+            "node_ref": "final",
+            "title": "Select question and outline argument",
+            "type": "review",
+            "planned_min": 120
+        },
+        {
+            "ref": "final_draft",
+            "node_ref": "final",
+            "title": "Draft final paper",
+            "type": "writing",
+            "planned_min": 600
+        },
+        {
+            "ref": "final_submit",
+            "node_ref": "final",
+            "title": "Submit final paper",
+            "type": "admin",
+            "planned_min": 60,
+            "session_policy": {
+                "min_session_min": 30,
+                "max_session_min": 60,
+                "splittable": false
+            }
+        }
+    ]
+}

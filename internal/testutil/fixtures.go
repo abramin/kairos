@@ -27,12 +27,6 @@ func WithProjectStatus(s domain.ProjectStatus) ProjectOption {
 	}
 }
 
-func WithProjectDomain(d string) ProjectOption {
-	return func(p *domain.Project) {
-		p.Domain = d
-	}
-}
-
 func WithShortID(id string) ProjectOption {
 	return func(p *domain.Project) {
 		p.ShortID = id
@@ -165,21 +159,9 @@ func WithUnits(kind string, total, done int) WorkItemOption {
 	}
 }
 
-func WithSplittable(s bool) WorkItemOption {
-	return func(w *domain.WorkItem) {
-		w.Splittable = s
-	}
-}
-
 func WithDurationMode(m domain.DurationMode) WorkItemOption {
 	return func(w *domain.WorkItem) {
 		w.DurationMode = m
-	}
-}
-
-func WithWorkItemType(t string) WorkItemOption {
-	return func(w *domain.WorkItem) {
-		w.Type = t
 	}
 }
 

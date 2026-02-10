@@ -30,22 +30,9 @@ var (
 	StyleDim    = lipgloss.NewStyle().Foreground(ColorDim)
 	StyleFg     = lipgloss.NewStyle().Foreground(ColorFg)
 	StyleHeader = lipgloss.NewStyle().Foreground(ColorHeader).Bold(true)
-	StyleBold   = lipgloss.NewStyle().Foreground(ColorFg).Bold(true)
+	StyleBold       = lipgloss.NewStyle().Foreground(ColorFg).Bold(true)
+	StyleYellowBold = lipgloss.NewStyle().Foreground(ColorYellow).Bold(true)
 )
-
-// RiskColor returns the lipgloss style corresponding to the given risk level.
-func RiskColor(risk domain.RiskLevel) lipgloss.Style {
-	switch risk {
-	case domain.RiskCritical:
-		return StyleRed
-	case domain.RiskAtRisk:
-		return StyleYellow
-	case domain.RiskOnTrack:
-		return StyleGreen
-	default:
-		return StyleDim
-	}
-}
 
 // RiskIndicator returns a colored risk indicator string such as "● CRITICAL".
 func RiskIndicator(risk domain.RiskLevel) string {

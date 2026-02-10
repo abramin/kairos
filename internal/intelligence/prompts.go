@@ -5,7 +5,7 @@ const parseSystemPrompt = `You are a command parser for a CLI project planner ca
 Your task is to convert natural language into a structured JSON intent.
 
 You must output ONLY a JSON object with these exact fields:
-- intent: one of [what_now, status, replan, project_add, project_update, project_archive, project_remove, node_add, node_update, node_remove, work_add, work_update, work_done, work_remove, session_log, session_remove, template_list, template_show, template_draft, template_validate, project_init_from_template, explain_now, explain_why_not, review_weekly, simulate]
+- intent: one of [what_now, status, replan, project_add, project_import, project_update, project_archive, project_remove, node_add, node_update, node_remove, work_add, work_update, work_done, work_remove, session_log, session_remove, template_list, template_show, template_draft, template_validate, project_init_from_template, explain_now, explain_why_not, review_weekly, simulate]
 - risk: "read_only" or "write"
 - arguments: object with intent-specific fields (see below)
 - confidence: number 0 to 1 (how sure you are)
@@ -18,6 +18,7 @@ Intent argument schemas:
 - status: { project_scope?: string[], recalc?: boolean }
 - replan: { trigger?: string, project_scope?: string[], strategy?: "rebalance"|"deadline_first" }
 - project_add: { name: string, domain?: string, start_date?: "YYYY-MM-DD", target_date?: "YYYY-MM-DD" }
+- project_import: { file_path: string }
 - project_update: { project_id: string, name?: string, target_date?: string|null, status?: "active"|"paused"|"done"|"archived" }
 - project_archive: { project_id: string }
 - project_remove: { project_id: string, hard_delete?: boolean }
@@ -32,7 +33,7 @@ Intent argument schemas:
 
 Risk classification rules:
 - read_only: what_now, status, explain_now, explain_why_not, review_weekly, simulate, template_list, template_show
-- write: ALL other intents (add, update, remove, archive, replan, session_log, template_draft, template_validate, project_init_from_template)
+- write: ALL other intents (add, import, update, remove, archive, replan, session_log, template_draft, template_validate, project_init_from_template)
 
 CRITICAL RULES:
 1. All write intents MUST have requires_confirmation=true

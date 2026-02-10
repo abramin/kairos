@@ -97,6 +97,21 @@ func (s *templateService) InitProject(ctx context.Context, templateName, project
 	// Set short ID on generated project
 	generated.Project.ShortID = shortID
 
+	// Assign sequential IDs in tree order
+	wiByNode := make(map[string][]*domain.WorkItem, len(generated.Nodes))
+	for _, wi := range generated.WorkItems {
+		wiByNode[wi.NodeID] = append(wiByNode[wi.NodeID], wi)
+	}
+	seq := 1
+	for _, node := range generated.Nodes {
+		node.Seq = seq
+		seq++
+		for _, wi := range wiByNode[node.ID] {
+			wi.Seq = seq
+			seq++
+		}
+	}
+
 	// Persist project
 	if err := s.projects.Create(ctx, generated.Project); err != nil {
 		return nil, fmt.Errorf("creating project: %w", err)

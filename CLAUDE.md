@@ -85,11 +85,21 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 - `ProjectDraftService` — Multi-turn NL→project structure drafting. Interactive conversation produces `ImportSchema`, validated via `importer.ValidateImportSchema`, then imported via `ImportService`
 - `HelpService` — LLM-powered Q&A about using Kairos. Supports one-shot questions and multi-turn chat (`StartChat`/`NextTurn`). Uses grounding validation to filter hallucinated commands/flags and a domain glossary embedded in the system prompt. Falls back to `DeterministicHelp()` (fuzzy-matching against the command spec) when LLM is unavailable
 
-**`internal/cli`** — Cobra command tree. `App` struct holds all service interfaces; v2 intelligence fields (`Intent`, `Explain`, `TemplateDraft`, `ProjectDraft`, `Help`) are nil when LLM is disabled. Commands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `shell`, `ask`, `explain` (subcommands: `now`, `why-not`), `review` (subcommand: `weekly`), `help` (subcommand: `chat`). Note: `kairos 45` is a shortcut for `kairos what-now --minutes 45`.
+**`internal/cli`** — Cobra command tree + bubbletea shell REPL. `App` struct holds all service interfaces; v2 intelligence fields (`Intent`, `Explain`, `TemplateDraft`, `ProjectDraft`, `Help`) are nil when LLM is disabled. **Shell-first**: running `kairos` with no args on a TTY launches the interactive shell directly. `kairos 45` is a shortcut for `kairos what-now --minutes 45`. Cobra subcommands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `shell`, `ask`, `explain` (subcommands: `now`, `why-not`), `review` (subcommand: `weekly`), `help` (subcommand: `chat`).
 
 **`internal/cli/draft_wizard.go`** — Interactive structure wizard for guided project creation without LLM. Collects node groups (label, count, kind, day spacing), work item templates stamped on every node, and special one-off nodes (exams, milestones). Produces an `ImportSchema` that goes through the same validation and import pipeline as LLM-drafted projects. `generateShortID()` creates human-friendly IDs (e.g., `"PHYS01"`) from project descriptions.
 
-**`internal/cli/shell_cmd.go`** — Interactive REPL via `kairos shell`. Uses `go-prompt` for autocomplete. Built-in commands: `projects`, `use <id>`, `inspect [id]`, `status`, `what-now [min]`, `draft [description]`, `clear`, `help`, `exit`. Unrecognized input falls through to the full Cobra command tree. Prompt shows active project context: `kairos (proj_id) ❯`.
+**`internal/cli/shell_model.go`** — Bubbletea `shellModel` powering the interactive shell. Five modes: `modePrompt` (normal input), `modeWizard` (huh form active), `modeConfirm` (y/n for destructive ops), `modeDraft` (project drafting), `modeHelpChat` (interactive help). Manages context state (active project, active item, last duration) and command history.
+
+**`internal/cli/shell_cmd.go`** — Shell command implementations. Built-in commands: `projects`, `use <id>`, `inspect [id]`, `status`, `what-now [min]`, `log [#item] [minutes]`, `start [#item]`, `finish [#item]`, `context [clear|project|item]`, `draft [description]`, `clear`, `help [chat]`, `exit`. Bare creation commands (`work add`, `node add`, `session log`) auto-launch wizard forms. Destructive commands (`remove`, `archive`) require y/n confirmation. Unrecognized input falls through to the full Cobra command tree. Prompt shows active project context: `kairos (proj_id) ❯`.
+
+**`internal/cli/wizard.go`** — Reusable huh form builders for shell wizards: `wizardSelectProject`, `wizardSelectWorkItem`, `wizardSelectNode`, `wizardInputDuration`, `wizardInputText`, `wizardSelectNodeKind`, `wizardSelectWorkItemType`, `wizardConfirm`. All use the Gruvbox-themed `kairosHuhTheme()`.
+
+**`internal/cli/resolve.go`** — ID resolution helpers (`resolveNodeID`, `resolveWorkItemID`, `resolveProjectForFlag`) that accept numeric seq IDs or UUIDs and resolve to full UUIDs using project context.
+
+**`internal/cli/shell_history.go`** — Persistent command history stored at `~/.kairos/shell_history` (max 500 lines). Arrow keys navigate history in the shell.
+
+**`internal/cli/command_hint.go`** — Maps `ParsedIntent` (from LLM intent parsing) to concrete CLI command strings for display in `ask` output.
 
 **`internal/cli/shell_draft.go`** — Draft mode within the shell REPL. Two flows: (1) **Wizard flow** (no args / LLM disabled): phase-by-phase interactive collection via `draftPhase` state machine → preview → accept/refine/cancel. (2) **LLM conversational flow** (`draft <description>`): multi-turn AI drafting reusing `ProjectDraftService`. Both flows produce an `ImportSchema` and go through the same validation/import pipeline.
 
@@ -165,7 +175,10 @@ Key design patterns:
 
 - `modernc.org/sqlite` — pure Go SQLite driver (**no CGO** — this is intentional, do not switch to `mattn/go-sqlite3`)
 - `github.com/stretchr/testify` — test assertions use `assert`/`require` packages (not `testing` stdlib alone)
-- `github.com/c-bata/go-prompt` — interactive REPL autocomplete for `kairos shell`
+- `github.com/charmbracelet/bubbletea` — TUI framework powering the interactive shell (Elm-architecture Model/Update/View)
+- `github.com/charmbracelet/bubbles` — text input component with suggestions and history
+- `github.com/charmbracelet/huh` — form/wizard components for interactive input (selects, text inputs, confirms)
+- `github.com/charmbracelet/lipgloss` — terminal styling (colors, bold, dim)
 
 ## Testing Patterns
 

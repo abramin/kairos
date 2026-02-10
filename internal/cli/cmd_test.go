@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/alexanderramin/kairos/internal/service"
@@ -31,7 +32,7 @@ func testApp(t *testing.T) *App {
 	return &App{
 		Projects:  service.NewProjectService(projRepo),
 		Nodes:     service.NewNodeService(nodeRepo),
-		WorkItems: service.NewWorkItemService(wiRepo),
+		WorkItems: service.NewWorkItemService(wiRepo, nodeRepo),
 		Sessions:  service.NewSessionService(sessRepo, wiRepo),
 		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo),
 		Status:    service.NewStatusService(projRepo, wiRepo, sessRepo, profRepo),
@@ -274,7 +275,7 @@ func testAppFull(t *testing.T) *App {
 	return &App{
 		Projects:  service.NewProjectService(projRepo),
 		Nodes:     service.NewNodeService(nodeRepo),
-		WorkItems: service.NewWorkItemService(wiRepo),
+		WorkItems: service.NewWorkItemService(wiRepo, nodeRepo),
 		Sessions:  service.NewSessionService(sessRepo, wiRepo),
 		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo),
 		Status:    service.NewStatusService(projRepo, wiRepo, sessRepo, profRepo),
@@ -753,4 +754,444 @@ func TestTemplateDraftCmd_LLMDisabled(t *testing.T) {
 
 	_, err := executeCmd(t, app, "template", "draft", "a study plan for calculus")
 	assert.Error(t, err)
+}
+
+// =============================================================================
+// E2E CLI Round-Trip Tests
+// =============================================================================
+
+// seedCriticalAndOnTrack creates two projects: one critical (due soon, no work logged)
+// and one on-track (distant deadline). Returns project IDs.
+func seedCriticalAndOnTrack(t *testing.T, app *App) (criticalProjID, onTrackProjID string) {
+	t.Helper()
+	ctx := context.Background()
+
+	// Critical project: due in 3 days, 120 min planned, 0 logged.
+	critDeadline := time.Now().UTC().AddDate(0, 0, 3)
+	critProj := testutil.NewTestProject("Urgent Paper",
+		testutil.WithShortID("URG01"),
+		testutil.WithTargetDate(critDeadline),
+	)
+	require.NoError(t, app.Projects.Create(ctx, critProj))
+
+	critNode := testutil.NewTestNode(critProj.ID, "Section 1", testutil.WithNodeKind(domain.NodeModule))
+	require.NoError(t, app.Nodes.Create(ctx, critNode))
+
+	critWI := testutil.NewTestWorkItem(critNode.ID, "Write Introduction",
+		testutil.WithPlannedMin(120),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, app.WorkItems.Create(ctx, critWI))
+
+	// On-track project: due in 6 months, 60 min planned.
+	otDeadline := time.Now().UTC().AddDate(0, 6, 0)
+	otProj := testutil.NewTestProject("Leisurely Reading",
+		testutil.WithShortID("LEI01"),
+		testutil.WithTargetDate(otDeadline),
+	)
+	require.NoError(t, app.Projects.Create(ctx, otProj))
+
+	otNode := testutil.NewTestNode(otProj.ID, "Chapter 1", testutil.WithNodeKind(domain.NodeModule))
+	require.NoError(t, app.Nodes.Create(ctx, otNode))
+
+	otWI := testutil.NewTestWorkItem(otNode.ID, "Read Chapter 1",
+		testutil.WithPlannedMin(60),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, app.WorkItems.Create(ctx, otWI))
+
+	return critProj.ID, otProj.ID
+}
+
+func TestWhatNowCLI_RoundTrip(t *testing.T) {
+	app := testApp(t)
+	critProjID, _ := seedCriticalAndOnTrack(t, app)
+
+	// CLI round-trip: Cobra parses flags → service → DB → formatter.
+	_, err := executeCmd(t, app, "what-now", "--minutes", "60")
+	require.NoError(t, err, "what-now CLI should succeed with critical+on-track data")
+
+	// Verify the service produces the expected response for the same input.
+	ctx := context.Background()
+	resp, err := app.WhatNow.Recommend(ctx, contract.NewWhatNowRequest(60))
+	require.NoError(t, err)
+
+	assert.NotEmpty(t, resp.Recommendations, "should have recommendations")
+	// The critical project's item should be recommended first.
+	assert.Equal(t, critProjID, resp.Recommendations[0].ProjectID,
+		"critical project should be first recommendation")
+	assert.Equal(t, "Write Introduction", resp.Recommendations[0].Title)
+	assert.LessOrEqual(t, resp.AllocatedMin, 60,
+		"allocated_min must not exceed requested 60")
+}
+
+func TestWhatNowCLI_RoundTrip_CriticalMode(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	// Past-due project guarantees RiskCritical → ModeCritical.
+	pastDue := time.Now().UTC().AddDate(0, 0, -1)
+	critProj := testutil.NewTestProject("Overdue Paper",
+		testutil.WithShortID("OVD01"),
+		testutil.WithTargetDate(pastDue),
+	)
+	require.NoError(t, app.Projects.Create(ctx, critProj))
+
+	critNode := testutil.NewTestNode(critProj.ID, "Section 1", testutil.WithNodeKind(domain.NodeModule))
+	require.NoError(t, app.Nodes.Create(ctx, critNode))
+
+	critWI := testutil.NewTestWorkItem(critNode.ID, "Write Introduction",
+		testutil.WithPlannedMin(120),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, app.WorkItems.Create(ctx, critWI))
+
+	// CLI round-trip: 30 min available with an overdue project.
+	_, err := executeCmd(t, app, "what-now", "--minutes", "30")
+	require.NoError(t, err)
+
+	// Verify critical mode behavior via service.
+	resp, err := app.WhatNow.Recommend(ctx, contract.NewWhatNowRequest(30))
+	require.NoError(t, err)
+
+	assert.Equal(t, domain.ModeCritical, resp.Mode,
+		"should be in critical mode with a past-due project")
+	for _, rec := range resp.Recommendations {
+		assert.Equal(t, critProj.ID, rec.ProjectID,
+			"in critical mode, only critical project items should be recommended")
+	}
+}
+
+func TestStatusCLI_RoundTrip(t *testing.T) {
+	app := testApp(t)
+	seedCriticalAndOnTrack(t, app)
+
+	// CLI round-trip: status command should succeed.
+	_, err := executeCmd(t, app, "status")
+	require.NoError(t, err)
+
+	// Verify the service returns both projects with correct risk levels.
+	ctx := context.Background()
+	resp, err := app.Status.GetStatus(ctx, contract.NewStatusRequest())
+	require.NoError(t, err)
+
+	assert.Len(t, resp.Projects, 2, "should show both projects")
+
+	riskMap := map[string]domain.RiskLevel{}
+	for _, p := range resp.Projects {
+		riskMap[p.ProjectName] = p.RiskLevel
+	}
+	assert.Equal(t, domain.RiskAtRisk, riskMap["Urgent Paper"],
+		"project due in 3 days with no work should be at risk")
+	assert.Equal(t, domain.RiskOnTrack, riskMap["Leisurely Reading"],
+		"project due in 6 months should be on track")
+}
+
+func TestStatusCLI_RoundTrip_ScopedToProject(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Scoped Status", testutil.WithShortID("SCP01"),
+		testutil.WithTargetDate(time.Now().UTC().AddDate(0, 3, 0)))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Week 1", testutil.WithNodeKind(domain.NodeWeek))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	wi := testutil.NewTestWorkItem(node.ID, "Study",
+		testutil.WithPlannedMin(60),
+		testutil.WithSessionBounds(15, 60, 30))
+	require.NoError(t, app.WorkItems.Create(ctx, wi))
+
+	// CLI round-trip with --project flag.
+	_, err := executeCmd(t, app, "status", "--project", proj.ID)
+	require.NoError(t, err)
+
+	// Verify scoping via service.
+	req := contract.NewStatusRequest()
+	req.ProjectScope = []string{proj.ID}
+	resp, err := app.Status.GetStatus(ctx, req)
+	require.NoError(t, err)
+	require.Len(t, resp.Projects, 1)
+	assert.Equal(t, "Scoped Status", resp.Projects[0].ProjectName)
+}
+
+func TestReplanCLI_RoundTrip(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	target := time.Now().UTC().AddDate(0, 3, 0)
+	proj := testutil.NewTestProject("Replan Project",
+		testutil.WithShortID("RPL01"),
+		testutil.WithTargetDate(target),
+	)
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Module 1", testutil.WithNodeKind(domain.NodeModule))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	wi := testutil.NewTestWorkItem(node.ID, "Reading",
+		testutil.WithPlannedMin(60),
+		testutil.WithSessionBounds(15, 60, 30),
+		testutil.WithUnits("pages", 20, 0),
+	)
+	require.NoError(t, app.WorkItems.Create(ctx, wi))
+
+	// Log a session so replan has data to work with.
+	// 5 of 20 pages done in 30 min → implied pace: 30*20/5 = 120 min total.
+	_, err := executeCmd(t, app, "session", "log", "--work-item", wi.ID, "--minutes", "30", "--units-done", "5")
+	require.NoError(t, err)
+
+	// Session logging already applies SmoothReEstimate: 0.7*60 + 0.3*120 = 78.
+	wiAfterLog, err := app.WorkItems.GetByID(ctx, wi.ID)
+	require.NoError(t, err)
+	plannedAfterLog := wiAfterLog.PlannedMin
+	assert.Greater(t, plannedAfterLog, 60,
+		"session log should have smoothed planned min upward")
+
+	_, err = executeCmd(t, app, "replan")
+	require.NoError(t, err)
+
+	// Replan applies a second smoothing pass: 0.7*78 + 0.3*120 ≈ 91.
+	wiAfterReplan, err := app.WorkItems.GetByID(ctx, wi.ID)
+	require.NoError(t, err)
+	assert.Greater(t, wiAfterReplan.PlannedMin, plannedAfterLog,
+		"replan should further adjust planned minutes via smoothing")
+}
+
+// =============================================================================
+// resolveProjectID Integration Tests
+// =============================================================================
+
+func TestResolveProjectID_ExactShortID(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Resolvable", testutil.WithShortID("RESO01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	resolved, err := resolveProjectID(ctx, app, "RESO01")
+	require.NoError(t, err)
+	assert.Equal(t, proj.ID, resolved)
+}
+
+func TestResolveProjectID_CaseInsensitive(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Case Test", testutil.WithShortID("CASE01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	resolved, err := resolveProjectID(ctx, app, "case01")
+	require.NoError(t, err)
+	assert.Equal(t, proj.ID, resolved)
+
+	resolved2, err := resolveProjectID(ctx, app, "Case01")
+	require.NoError(t, err)
+	assert.Equal(t, proj.ID, resolved2)
+}
+
+func TestResolveProjectID_ExactUUID(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("UUID Test", testutil.WithShortID("UUID01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	resolved, err := resolveProjectID(ctx, app, proj.ID)
+	require.NoError(t, err)
+	assert.Equal(t, proj.ID, resolved)
+}
+
+func TestResolveProjectID_UUIDPrefix(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Prefix Test", testutil.WithShortID("PFX01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	// Use the first 8 chars of the UUID as prefix.
+	prefix := proj.ID[:8]
+	resolved, err := resolveProjectID(ctx, app, prefix)
+	require.NoError(t, err)
+	assert.Equal(t, proj.ID, resolved)
+}
+
+func TestResolveProjectID_NotFound(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	_, err := resolveProjectID(ctx, app, "NOPE99")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestResolveProjectID_EmptyInput(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	_, err := resolveProjectID(ctx, app, "")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "required")
+}
+
+// =============================================================================
+// resolveWorkItemID Fallback Tests
+// =============================================================================
+
+func TestResolveWorkItemID_FallbackToNodeSeq(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Fallback Test", testutil.WithShortID("FBK01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Homer – The Odyssey", testutil.WithNodeKind(domain.NodeModule))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	wi := testutil.NewTestWorkItem(node.ID, "Read The Odyssey", testutil.WithPlannedMin(720))
+	require.NoError(t, app.WorkItems.Create(ctx, wi))
+
+	// Node gets seq=1, work item gets seq=2.
+	// Requesting work item by node's seq (1) should fall back to the single work item.
+	resolved, err := resolveWorkItemID(ctx, app, "1", proj.ID)
+	require.NoError(t, err)
+	assert.Equal(t, wi.ID, resolved)
+}
+
+func TestResolveWorkItemID_NoFallbackMultipleWorkItems(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Multi WI", testutil.WithShortID("MWI01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Week 1", testutil.WithNodeKind(domain.NodeWeek))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	wi1 := testutil.NewTestWorkItem(node.ID, "Reading", testutil.WithPlannedMin(60))
+	require.NoError(t, app.WorkItems.Create(ctx, wi1))
+	wi2 := testutil.NewTestWorkItem(node.ID, "Exercises", testutil.WithPlannedMin(30))
+	require.NoError(t, app.WorkItems.Create(ctx, wi2))
+
+	// Node gets seq=1 with 2 work items → fallback should NOT resolve.
+	_, err := resolveWorkItemID(ctx, app, "1", proj.ID)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestResolveWorkItemID_DirectSeqStillWorks(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Direct Seq", testutil.WithShortID("DIR01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Chapter 1", testutil.WithNodeKind(domain.NodeModule))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	wi := testutil.NewTestWorkItem(node.ID, "Read Chapter", testutil.WithPlannedMin(60))
+	require.NoError(t, app.WorkItems.Create(ctx, wi))
+
+	// Direct work item seq (2) should resolve without needing fallback.
+	resolved, err := resolveWorkItemID(ctx, app, "2", proj.ID)
+	require.NoError(t, err)
+	assert.Equal(t, wi.ID, resolved)
+}
+
+func TestResolveProjectID_IncludesArchivedProjects(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Archived", testutil.WithShortID("ARC99"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+	require.NoError(t, app.Projects.Archive(ctx, proj.ID))
+
+	// resolveProjectID lists with includeArchived=true, so archived should resolve.
+	resolved, err := resolveProjectID(ctx, app, "ARC99")
+	require.NoError(t, err)
+	assert.Equal(t, proj.ID, resolved)
+}
+
+// =============================================================================
+// Project Import → What-Now E2E
+// =============================================================================
+
+func TestProjectImportThenWhatNow_E2E(t *testing.T) {
+	app := testAppFull(t)
+
+	importJSON := `{
+		"project": {
+			"short_id": "IMP99",
+			"name": "Imported for WhatNow",
+			"domain": "education",
+			"start_date": "2026-01-15",
+			"target_date": "2026-06-01"
+		},
+		"nodes": [
+			{"ref": "n1", "title": "Week 1", "kind": "week", "order": 0},
+			{"ref": "n2", "title": "Week 2", "kind": "week", "order": 1}
+		],
+		"work_items": [
+			{"ref": "w1", "node_ref": "n1", "title": "Reading Ch1", "type": "reading", "planned_min": 45},
+			{"ref": "w2", "node_ref": "n1", "title": "Practice Ch1", "type": "practice", "planned_min": 30},
+			{"ref": "w3", "node_ref": "n2", "title": "Reading Ch2", "type": "reading", "planned_min": 45}
+		]
+	}`
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "import_e2e.json")
+	require.NoError(t, os.WriteFile(path, []byte(importJSON), 0644))
+
+	// Step 1: Import the project.
+	_, err := executeCmd(t, app, "project", "import", path)
+	require.NoError(t, err)
+
+	// Step 2: Verify project exists.
+	projects, err := app.Projects.List(context.Background(), false)
+	require.NoError(t, err)
+	require.Len(t, projects, 1)
+	assert.Equal(t, "IMP99", projects[0].ShortID)
+
+	// Step 3: Run what-now and verify imported items appear as candidates.
+	_, err = executeCmd(t, app, "what-now", "--minutes", "90")
+	require.NoError(t, err)
+
+	// Verify via service that imported items are schedulable.
+	resp, err := app.WhatNow.Recommend(context.Background(), contract.NewWhatNowRequest(90))
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.Recommendations, "imported items should be schedulable")
+
+	foundImported := false
+	for _, rec := range resp.Recommendations {
+		if rec.Title == "Reading Ch1" || rec.Title == "Practice Ch1" || rec.Title == "Reading Ch2" {
+			foundImported = true
+			break
+		}
+	}
+	assert.True(t, foundImported, "at least one imported work item should appear in recommendations")
+}
+
+// =============================================================================
+// Review Weekly & Explain Now E2E
+// =============================================================================
+
+func TestReviewWeeklyCLI_RoundTrip(t *testing.T) {
+	app := testApp(t)
+	seedProjectWithWork(t, app)
+
+	// review weekly uses fmt.Print → output goes to real stdout, not Cobra buffer.
+	// We verify the command completes without error (deterministic fallback path).
+	_, err := executeCmd(t, app, "review", "weekly")
+	require.NoError(t, err)
+}
+
+func TestExplainNowCLI_RoundTrip(t *testing.T) {
+	app := testApp(t)
+	seedProjectWithWork(t, app)
+
+	// explain now uses fmt.Print → output goes to real stdout, not Cobra buffer.
+	// We verify the command completes without error (deterministic fallback path).
+	_, err := executeCmd(t, app, "explain", "now", "--minutes", "60")
+	require.NoError(t, err)
 }

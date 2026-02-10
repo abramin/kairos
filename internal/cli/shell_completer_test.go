@@ -2,69 +2,65 @@ package cli
 
 import (
 	"context"
-	"reflect"
 	"testing"
-	"unsafe"
 
-	prompt "github.com/c-bata/go-prompt"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func docWithCursorAtEnd(text string) prompt.Document {
-	d := prompt.Document{Text: text}
-	v := reflect.ValueOf(&d).Elem().FieldByName("cursorPosition")
-	reflect.NewAt(v.Type(), unsafe.Pointer(v.UnsafeAddr())).Elem().SetInt(int64(len([]rune(text))))
-	return d
+func TestFilterSuggestions_MatchesPrefix(t *testing.T) {
+	pool := []string{"projects", "project", "status", "start"}
+	got := filterSuggestions(pool, "pro")
+	assert.Equal(t, []string{"projects", "project"}, got)
 }
 
-func hasSuggestion(suggestions []prompt.Suggest, want string) bool {
-	for _, s := range suggestions {
-		if s.Text == want {
-			return true
+func TestFilterSuggestions_EmptyPrefixReturnsAll(t *testing.T) {
+	pool := []string{"projects", "status"}
+	got := filterSuggestions(pool, "")
+	assert.Equal(t, pool, got)
+}
+
+func TestFilterSuggestions_CaseInsensitive(t *testing.T) {
+	pool := []string{"Projects", "status"}
+	got := filterSuggestions(pool, "proj")
+	assert.Equal(t, []string{"Projects"}, got)
+}
+
+func TestFilterSuggestions_NoMatch(t *testing.T) {
+	pool := []string{"projects", "status"}
+	got := filterSuggestions(pool, "xyz")
+	assert.Nil(t, got)
+}
+
+func TestAllCommandNames_ContainsNewCommands(t *testing.T) {
+	names := allCommandNames()
+	has := func(name string) bool {
+		for _, n := range names {
+			if n == name {
+				return true
+			}
 		}
+		return false
 	}
-	return false
+	assert.True(t, has("log"), "should have log")
+	assert.True(t, has("start"), "should have start")
+	assert.True(t, has("finish"), "should have finish")
+	assert.True(t, has("context"), "should have context")
+	assert.True(t, has("projects"), "should have projects")
+	assert.True(t, has("what-now"), "should have what-now")
+	assert.True(t, has("draft"), "should have draft")
 }
 
-func TestShellLivePrefix(t *testing.T) {
-	sess := &shellSession{}
-
-	prefix, ok := sess.livePrefix()
-	require.True(t, ok)
-	assert.Equal(t, "kairos ❯ ", prefix)
-
-	sess.activeProjectID = "project-1"
-	sess.activeShortID = "ABC01"
-	prefix, ok = sess.livePrefix()
-	require.True(t, ok)
-	assert.Equal(t, "kairos (ABC01) ❯ ", prefix)
-
-	sess.helpChatMode = true
-	prefix, ok = sess.livePrefix()
-	require.True(t, ok)
-	assert.Equal(t, "help> ", prefix)
+func TestSubcommandNames_HasExpectedGroups(t *testing.T) {
+	subs := subcommandNames()
+	assert.Contains(t, subs, "project")
+	assert.Contains(t, subs, "node")
+	assert.Contains(t, subs, "work")
+	assert.Contains(t, subs, "session")
+	assert.Contains(t, subs, "explain")
 }
 
-func TestShellCompleter_CommandSuggestions(t *testing.T) {
-	sess := &shellSession{}
-	suggestions := sess.completer(docWithCursorAtEnd("wh"))
-	assert.True(t, hasSuggestion(suggestions, "what-now"))
-}
-
-func TestShellCompleter_HelpChatSuggestion(t *testing.T) {
-	sess := &shellSession{}
-	suggestions := sess.completer(docWithCursorAtEnd("help ch"))
-	assert.True(t, hasSuggestion(suggestions, "chat"))
-}
-
-func TestShellCompleter_HelpChatModeSlashSuggestions(t *testing.T) {
-	sess := &shellSession{helpChatMode: true}
-	suggestions := sess.completer(docWithCursorAtEnd("/c"))
-	assert.True(t, hasSuggestion(suggestions, "/commands"))
-}
-
-func TestShellCompleter_ProjectSuggestionsForUse(t *testing.T) {
+func TestShellProjectCache_ReturnsProjects(t *testing.T) {
 	app := testApp(t)
 	_, err := executeCmd(t, app, "project", "add",
 		"--id", "CMP01",
@@ -74,15 +70,13 @@ func TestShellCompleter_ProjectSuggestionsForUse(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	sess := &shellSession{
-		app:   app,
-		cache: newShellProjectCache(),
-	}
-	suggestions := sess.completer(docWithCursorAtEnd("use CM"))
-	assert.True(t, hasSuggestion(suggestions, "CMP01"))
+	cache := newShellProjectCache()
+	projects := cache.get(app)
+	require.Len(t, projects, 1)
+	assert.Equal(t, "CMP01", projects[0].ShortID)
 }
 
-func TestShellProjectSuggestions_FallsBackToUUIDPrefix(t *testing.T) {
+func TestShellProjectCache_FallsBackToUUIDPrefix(t *testing.T) {
 	app := testApp(t)
 	_, err := executeCmd(t, app, "project", "add",
 		"--id", "CMP02",
@@ -98,11 +92,8 @@ func TestShellProjectSuggestions_FallsBackToUUIDPrefix(t *testing.T) {
 	projects[0].ShortID = ""
 	require.NoError(t, app.Projects.Update(context.Background(), projects[0]))
 
-	sess := &shellSession{
-		app:   app,
-		cache: newShellProjectCache(),
-	}
-	suggestions := sess.projectSuggestions("")
+	m := newShellModel(app)
+	suggestions := m.projectSuggestionsPlain("")
 	require.NotEmpty(t, suggestions)
-	assert.Equal(t, projects[0].ID[:8], suggestions[0].Text)
+	assert.Equal(t, projects[0].ID[:8], suggestions[0])
 }

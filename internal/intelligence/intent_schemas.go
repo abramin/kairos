@@ -20,6 +20,7 @@ var intentArgValidators = map[IntentName]argValidator{
 	IntentStatus:            validateStatusArgs,
 	IntentReplan:            validateReplanArgs,
 	IntentProjectAdd:        validateProjectAddArgs,
+	IntentProjectImport:     validateProjectImportArgs,
 	IntentProjectUpdate:     validateProjectUpdateArgs,
 	IntentProjectArchive:    validateRequireProjectID,
 	IntentProjectRemove:     validateRequireProjectID,
@@ -67,6 +68,13 @@ func validateReplanArgs(args map[string]interface{}) *ParsedIntentError {
 func validateProjectAddArgs(args map[string]interface{}) *ParsedIntentError {
 	if _, ok := getString(args, "name"); !ok {
 		return argError("name is required for project_add")
+	}
+	return nil
+}
+
+func validateProjectImportArgs(args map[string]interface{}) *ParsedIntentError {
+	if _, ok := getString(args, "file_path"); !ok {
+		return argError("file_path is required for project_import")
 	}
 	return nil
 }

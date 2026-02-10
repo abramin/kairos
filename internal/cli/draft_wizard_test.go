@@ -1,10 +1,15 @@
 package cli
 
 import (
+	"context"
 	"strings"
 	"testing"
 
+	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/importer"
+	"github.com/alexanderramin/kairos/internal/repository"
+	"github.com/alexanderramin/kairos/internal/service"
+	"github.com/alexanderramin/kairos/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -373,4 +378,84 @@ func TestStartWithDraft_SeedsConversation(t *testing.T) {
 	assert.Equal(t, "Test Project", gen.Project.Name)
 	assert.Len(t, gen.Nodes, 2)
 	assert.Len(t, gen.WorkItems, 2)
+}
+
+// =============================================================================
+// Draft Wizard Full Pipeline Integration Test
+// =============================================================================
+
+// TestDraftWizard_FullPipeline exercises the complete wizard → validate → import → schedule flow.
+func TestDraftWizard_FullPipeline(t *testing.T) {
+	// Step 1: Build wizard result (simulating user input).
+	result := &wizardResult{
+		Description: "Physics Study Plan",
+		StartDate:   "2026-02-08",
+		Deadline:    "2026-06-30",
+		Groups: []wizardGroup{
+			{Label: "Chapter", Count: 3, Kind: "module", DaysPer: 14},
+		},
+		WorkItems: []wizardWorkItem{
+			{Title: "Reading", Type: "reading", PlannedMin: 60},
+			{Title: "Problems", Type: "practice", PlannedMin: 45},
+		},
+		SpecialNodes: []wizardSpecialNode{
+			{
+				Title:   "Final Exam",
+				Kind:    "assessment",
+				DueDate: "2026-06-25",
+				WorkItems: []wizardWorkItem{
+					{Title: "Exam Prep", Type: "review", PlannedMin: 120},
+				},
+			},
+		},
+	}
+
+	// Step 2: Build schema from wizard.
+	schema := buildSchemaFromWizard(result)
+	require.NotNil(t, schema)
+
+	// Step 3: Validate schema.
+	errs := importer.ValidateImportSchema(schema)
+	require.Empty(t, errs, "wizard schema should validate: %v", errs)
+
+	// Step 4: Import into a real in-memory DB.
+	db := testutil.NewTestDB(t)
+	projRepo := repository.NewSQLiteProjectRepo(db)
+	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
+	wiRepo := repository.NewSQLiteWorkItemRepo(db)
+	depRepo := repository.NewSQLiteDependencyRepo(db)
+	sessRepo := repository.NewSQLiteSessionRepo(db)
+	profRepo := repository.NewSQLiteUserProfileRepo(db)
+
+	importSvc := service.NewImportService(projRepo, nodeRepo, wiRepo, depRepo)
+	ctx := context.Background()
+
+	importResult, err := importSvc.ImportProjectFromSchema(ctx, schema)
+	require.NoError(t, err)
+	assert.Equal(t, "Physics Study Plan", importResult.Project.Name)
+	assert.Equal(t, 4, importResult.NodeCount)    // 3 chapters + 1 final exam
+	assert.Equal(t, 7, importResult.WorkItemCount) // 3*2 regular + 1 exam prep
+
+	// Step 5: Verify items are schedulable via what-now.
+	whatNowSvc := service.NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo)
+	req := contract.NewWhatNowRequest(120)
+	resp, err := whatNowSvc.Recommend(ctx, req)
+	require.NoError(t, err)
+	assert.NotEmpty(t, resp.Recommendations,
+		"imported wizard items should appear as schedulable candidates")
+
+	// Verify at least one of the wizard work items appears.
+	var titles []string
+	for _, rec := range resp.Recommendations {
+		titles = append(titles, rec.Title)
+	}
+	hasWizardItem := false
+	for _, title := range titles {
+		if strings.Contains(title, "Reading") || strings.Contains(title, "Problems") || strings.Contains(title, "Exam Prep") {
+			hasWizardItem = true
+			break
+		}
+	}
+	assert.True(t, hasWizardItem,
+		"expected wizard work item in recommendations, got: %v", titles)
 }

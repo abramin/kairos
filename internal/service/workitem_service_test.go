@@ -17,7 +17,7 @@ func setupWorkItemService(t *testing.T) (WorkItemService, repository.ProjectRepo
 	projRepo := repository.NewSQLiteProjectRepo(db)
 	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
 	wiRepo := repository.NewSQLiteWorkItemRepo(db)
-	return NewWorkItemService(wiRepo), projRepo, nodeRepo
+	return NewWorkItemService(wiRepo, nodeRepo), projRepo, nodeRepo
 }
 
 func setupWorkItemWithProject(t *testing.T, projRepo repository.ProjectRepo, nodeRepo repository.PlanNodeRepo) (string, string) {

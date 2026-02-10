@@ -22,6 +22,9 @@ func Migrate(db *sql.DB) error {
 	if err := migratePlanNodesAssessmentKind(db); err != nil {
 		return fmt.Errorf("migrating plan_nodes kind constraint: %w", err)
 	}
+	if err := migrateBackfillSeq(db); err != nil {
+		return fmt.Errorf("backfilling seq values: %w", err)
+	}
 	return nil
 }
 
@@ -216,4 +219,112 @@ var migrations = []string{
 	// Add short_id column to projects
 	`ALTER TABLE projects ADD COLUMN short_id TEXT NOT NULL DEFAULT ''`,
 	`CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_short_id ON projects(short_id) WHERE short_id != ''`,
+
+	// Add seq column to plan_nodes and work_items (project-scoped sequential IDs)
+	`ALTER TABLE plan_nodes ADD COLUMN seq INTEGER NOT NULL DEFAULT 0`,
+	`ALTER TABLE work_items ADD COLUMN seq INTEGER NOT NULL DEFAULT 0`,
+}
+
+// migrateBackfillSeq assigns sequential IDs to existing nodes and work items
+// that don't have one yet (seq = 0). Walks the tree in order: for each project,
+// iterate nodes by order_index, and for each node iterate its work items by created_at.
+// Idempotent: skips projects where all items already have seq > 0.
+func migrateBackfillSeq(db *sql.DB) error {
+	ctx := context.Background()
+
+	// Check if any rows need backfilling
+	var count int
+	err := db.QueryRowContext(ctx, `SELECT COUNT(*) FROM plan_nodes WHERE seq = 0`).Scan(&count)
+	if err != nil {
+		// Table may not have seq column yet (fresh DB where CREATE TABLE already includes it)
+		// In that case the ALTER TABLE was a no-op and there's nothing to backfill.
+		if strings.Contains(err.Error(), "no such column") {
+			return nil
+		}
+		return fmt.Errorf("checking plan_nodes seq: %w", err)
+	}
+	var wiCount int
+	_ = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM work_items WHERE seq = 0`).Scan(&wiCount)
+
+	if count == 0 && wiCount == 0 {
+		return nil // nothing to backfill
+	}
+
+	// Get all project IDs
+	projRows, err := db.QueryContext(ctx, `SELECT DISTINCT project_id FROM plan_nodes ORDER BY project_id`)
+	if err != nil {
+		return fmt.Errorf("listing projects for seq backfill: %w", err)
+	}
+	var projectIDs []string
+	for projRows.Next() {
+		var pid string
+		if err := projRows.Scan(&pid); err != nil {
+			projRows.Close()
+			return fmt.Errorf("scanning project id: %w", err)
+		}
+		projectIDs = append(projectIDs, pid)
+	}
+	projRows.Close()
+
+	for _, pid := range projectIDs {
+		if err := backfillProjectSeq(ctx, db, pid); err != nil {
+			return fmt.Errorf("backfilling seq for project %s: %w", pid, err)
+		}
+	}
+	return nil
+}
+
+func backfillProjectSeq(ctx context.Context, db *sql.DB, projectID string) error {
+	// Load nodes in tree order (order_index)
+	nodeRows, err := db.QueryContext(ctx,
+		`SELECT id FROM plan_nodes WHERE project_id = ? ORDER BY order_index, created_at`, projectID)
+	if err != nil {
+		return fmt.Errorf("listing nodes: %w", err)
+	}
+	var nodeIDs []string
+	for nodeRows.Next() {
+		var nid string
+		if err := nodeRows.Scan(&nid); err != nil {
+			nodeRows.Close()
+			return err
+		}
+		nodeIDs = append(nodeIDs, nid)
+	}
+	nodeRows.Close()
+
+	seq := 1
+	for _, nid := range nodeIDs {
+		// Assign seq to node
+		if _, err := db.ExecContext(ctx,
+			`UPDATE plan_nodes SET seq = ? WHERE id = ? AND seq = 0`, seq, nid); err != nil {
+			return fmt.Errorf("updating node seq: %w", err)
+		}
+		seq++
+
+		// Assign seq to work items under this node
+		wiRows, err := db.QueryContext(ctx,
+			`SELECT id FROM work_items WHERE node_id = ? ORDER BY created_at`, nid)
+		if err != nil {
+			return fmt.Errorf("listing work items for node: %w", err)
+		}
+		var wiIDs []string
+		for wiRows.Next() {
+			var wid string
+			if err := wiRows.Scan(&wid); err != nil {
+				wiRows.Close()
+				return err
+			}
+			wiIDs = append(wiIDs, wid)
+		}
+		wiRows.Close()
+
+		for _, wid := range wiIDs {
+			if _, err := db.ExecContext(ctx,
+				`UPDATE work_items SET seq = ? WHERE id = ? AND seq = 0`, seq, wid); err != nil {
+				return fmt.Errorf("updating work item seq: %w", err)
+			}
+			seq++
+		}
+	}
+	return nil
 }

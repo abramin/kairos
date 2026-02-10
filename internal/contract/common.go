@@ -25,6 +25,7 @@ type RecommendationReason struct {
 
 type WorkSlice struct {
 	WorkItemID        string
+	WorkItemSeq       int
 	ProjectID         string
 	NodeID            string
 	Title             string
@@ -58,9 +59,7 @@ type ConstraintBlockerCode string
 
 const (
 	BlockerNotBefore              ConstraintBlockerCode = "NOT_BEFORE"
-	BlockerNotAfter               ConstraintBlockerCode = "NOT_AFTER"
 	BlockerDependency             ConstraintBlockerCode = "DEPENDENCY"
-	BlockerArchived               ConstraintBlockerCode = "ARCHIVED"
 	BlockerStatusDone             ConstraintBlockerCode = "STATUS_DONE"
 	BlockerSessionMinExceedsAvail ConstraintBlockerCode = "SESSION_MIN_EXCEEDS_AVAILABLE"
 )
@@ -72,7 +71,3 @@ type ConstraintBlocker struct {
 	Message    string
 }
 
-type TimeWindow struct {
-	From *string
-	To   *string
-}

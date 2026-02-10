@@ -72,13 +72,19 @@ func newNodeAddCmd(app *App) *cobra.Command {
 }
 
 func newNodeInspectCmd(app *App) *cobra.Command {
-	return &cobra.Command{
+	var projectFlag string
+	cmd := &cobra.Command{
 		Use:   "inspect ID",
 		Short: "Show node details",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			n, err := app.Nodes.GetByID(ctx, args[0])
+			projectID, _ := resolveProjectForFlag(ctx, app, projectFlag)
+			nodeID, err := resolveNodeID(ctx, app, args[0], projectID)
+			if err != nil {
+				return err
+			}
+			n, err := app.Nodes.GetByID(ctx, nodeID)
 			if err != nil {
 				return err
 			}
@@ -91,7 +97,11 @@ func newNodeInspectCmd(app *App) *cobra.Command {
 			var b strings.Builder
 
 			b.WriteString(fmt.Sprintf("%s  %s\n\n", formatter.Bold(n.Title), formatter.Dim(string(n.Kind))))
-			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("ID     "), formatter.TruncID(n.ID)))
+			if n.Seq > 0 {
+				b.WriteString(fmt.Sprintf("  %s  #%d\n", formatter.Dim("ID     "), n.Seq))
+			} else {
+				b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("ID     "), formatter.TruncID(n.ID)))
+			}
 			b.WriteString(fmt.Sprintf("  %s  %s\n", formatter.Dim("PROJECT"), projectDisplayID))
 			b.WriteString(fmt.Sprintf("  %s  %d\n", formatter.Dim("ORDER  "), n.OrderIndex))
 			if n.ParentID != nil {
@@ -139,10 +149,12 @@ func newNodeInspectCmd(app *App) *cobra.Command {
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&projectFlag, "project", "", "Project context for numeric IDs")
+	return cmd
 }
 
 func newNodeUpdateCmd(app *App) *cobra.Command {
-	var title, kind string
+	var title, kind, projectFlag string
 	var order int
 
 	cmd := &cobra.Command{
@@ -151,7 +163,12 @@ func newNodeUpdateCmd(app *App) *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.Background()
-			n, err := app.Nodes.GetByID(ctx, args[0])
+			projectID, _ := resolveProjectForFlag(ctx, app, projectFlag)
+			nodeID, err := resolveNodeID(ctx, app, args[0], projectID)
+			if err != nil {
+				return err
+			}
+			n, err := app.Nodes.GetByID(ctx, nodeID)
 			if err != nil {
 				return err
 			}
@@ -179,21 +196,31 @@ func newNodeUpdateCmd(app *App) *cobra.Command {
 	cmd.Flags().StringVar(&title, "title", "", "Node title")
 	cmd.Flags().StringVar(&kind, "kind", "", "Node kind (week|module|book|stage|section|assessment|generic)")
 	cmd.Flags().IntVar(&order, "order", 0, "Order index")
+	cmd.Flags().StringVar(&projectFlag, "project", "", "Project context for numeric IDs")
 
 	return cmd
 }
 
 func newNodeRemoveCmd(app *App) *cobra.Command {
-	return &cobra.Command{
+	var projectFlag string
+	cmd := &cobra.Command{
 		Use:   "remove ID",
 		Short: "Remove a plan node",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := app.Nodes.Delete(context.Background(), args[0]); err != nil {
+			ctx := context.Background()
+			projectID, _ := resolveProjectForFlag(ctx, app, projectFlag)
+			nodeID, err := resolveNodeID(ctx, app, args[0], projectID)
+			if err != nil {
 				return err
 			}
-			fmt.Printf("Removed node %s\n", args[0])
+			if err := app.Nodes.Delete(ctx, nodeID); err != nil {
+				return err
+			}
+			fmt.Printf("Removed node %s\n", nodeID)
 			return nil
 		},
 	}
+	cmd.Flags().StringVar(&projectFlag, "project", "", "Project context for numeric IDs")
+	return cmd
 }

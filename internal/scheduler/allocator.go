@@ -113,6 +113,7 @@ func tryAllocate(c ScoredCandidate, remaining int) (*contract.WorkSlice, *contra
 
 	slice := &contract.WorkSlice{
 		WorkItemID:        c.Input.WorkItemID,
+		WorkItemSeq:       c.Input.WorkItemSeq,
 		ProjectID:         c.Input.ProjectID,
 		NodeID:            c.Input.NodeID,
 		Title:             c.Input.Title,

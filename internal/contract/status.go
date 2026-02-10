@@ -62,8 +62,6 @@ type StatusErrorCode string
 
 const (
 	StatusErrInvalidScope StatusErrorCode = "INVALID_SCOPE"
-	StatusErrDataIntegrity StatusErrorCode = "DATA_INTEGRITY"
-	StatusErrInternal      StatusErrorCode = "INTERNAL_ERROR"
 )
 
 type StatusError struct {

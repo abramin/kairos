@@ -16,6 +16,36 @@ import (
 func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 	now := time.Now().UTC()
 
+	project, err := convertProject(schema, now)
+	if err != nil {
+		return nil, err
+	}
+
+	refMap := make(map[string]string) // ref -> UUID
+	nodes := convertNodes(schema.Nodes, project.ID, refMap, now)
+
+	workItems, err := convertWorkItems(schema, refMap, now)
+	if err != nil {
+		return nil, err
+	}
+
+	assignSequentialIDs(nodes, workItems)
+
+	deps, err := convertDependencies(schema, refMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return &tmpl.GeneratedProject{
+		Project:      project,
+		Nodes:        nodes,
+		WorkItems:    workItems,
+		Dependencies: deps,
+	}, nil
+}
+
+// convertProject parses dates and builds the domain.Project.
+func convertProject(schema *ImportSchema, now time.Time) (*domain.Project, error) {
 	startDate, err := time.Parse("2006-01-02", schema.Project.StartDate)
 	if err != nil {
 		return nil, fmt.Errorf("parsing start_date: %w", err)
@@ -30,7 +60,7 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 		targetDate = &t
 	}
 
-	project := &domain.Project{
+	return &domain.Project{
 		ID:         uuid.New().String(),
 		ShortID:    strings.ToUpper(schema.Project.ShortID),
 		Name:       schema.Project.Name,
@@ -40,13 +70,13 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 		Status:     domain.ProjectActive,
 		CreatedAt:  now,
 		UpdatedAt:  now,
-	}
+	}, nil
+}
 
-	refMap := make(map[string]string) // ref -> UUID
-
-	// Convert nodes
-	nodes := make([]*domain.PlanNode, 0, len(schema.Nodes))
-	for _, n := range schema.Nodes {
+// convertNodes builds domain.PlanNode objects from schema nodes, populating refMap.
+func convertNodes(schemaNodes []NodeImport, projectID string, refMap map[string]string, now time.Time) []*domain.PlanNode {
+	nodes := make([]*domain.PlanNode, 0, len(schemaNodes))
+	for _, n := range schemaNodes {
 		realID := uuid.New().String()
 		refMap[n.Ref] = realID
 
@@ -64,7 +94,7 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 
 		node := &domain.PlanNode{
 			ID:               realID,
-			ProjectID:        project.ID,
+			ProjectID:        projectID,
 			ParentID:         parentID,
 			Title:            n.Title,
 			Kind:             domain.NodeKind(kind),
@@ -78,8 +108,11 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 		}
 		nodes = append(nodes, node)
 	}
+	return nodes
+}
 
-	// Convert work items
+// convertWorkItems builds domain.WorkItem objects from schema work items, applying defaults cascade.
+func convertWorkItems(schema *ImportSchema, refMap map[string]string, now time.Time) ([]*domain.WorkItem, error) {
 	workItems := make([]*domain.WorkItem, 0, len(schema.WorkItems))
 	for _, wi := range schema.WorkItems {
 		realID := uuid.New().String()
@@ -152,35 +185,48 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 		}
 		workItems = append(workItems, item)
 	}
+	return workItems, nil
+}
 
-	// Convert dependencies.
-	// If omitted, infer a default linear chain by node order, then work item order.
-	var deps []domain.Dependency
-	if len(schema.Dependencies) > 0 {
-		for _, d := range schema.Dependencies {
-			predUUID, ok := refMap[d.PredecessorRef]
-			if !ok {
-				return nil, fmt.Errorf("predecessor_ref %q not found", d.PredecessorRef)
-			}
-			succUUID, ok := refMap[d.SuccessorRef]
-			if !ok {
-				return nil, fmt.Errorf("successor_ref %q not found", d.SuccessorRef)
-			}
-			deps = append(deps, domain.Dependency{
-				PredecessorWorkItemID: predUUID,
-				SuccessorWorkItemID:   succUUID,
-			})
+// assignSequentialIDs assigns Seq values in tree order: node, then its work items, then next node.
+func assignSequentialIDs(nodes []*domain.PlanNode, workItems []*domain.WorkItem) {
+	wiByNode := make(map[string][]*domain.WorkItem, len(nodes))
+	for _, wi := range workItems {
+		wiByNode[wi.NodeID] = append(wiByNode[wi.NodeID], wi)
+	}
+	seq := 1
+	for _, node := range nodes {
+		node.Seq = seq
+		seq++
+		for _, wi := range wiByNode[node.ID] {
+			wi.Seq = seq
+			seq++
 		}
-	} else {
-		deps = inferDefaultDependencies(schema.Nodes, schema.WorkItems, refMap)
+	}
+}
+
+// convertDependencies builds explicit dependencies or infers a default linear chain.
+func convertDependencies(schema *ImportSchema, refMap map[string]string) ([]domain.Dependency, error) {
+	if len(schema.Dependencies) == 0 {
+		return inferDefaultDependencies(schema.Nodes, schema.WorkItems, refMap), nil
 	}
 
-	return &tmpl.GeneratedProject{
-		Project:      project,
-		Nodes:        nodes,
-		WorkItems:    workItems,
-		Dependencies: deps,
-	}, nil
+	var deps []domain.Dependency
+	for _, d := range schema.Dependencies {
+		predUUID, ok := refMap[d.PredecessorRef]
+		if !ok {
+			return nil, fmt.Errorf("predecessor_ref %q not found", d.PredecessorRef)
+		}
+		succUUID, ok := refMap[d.SuccessorRef]
+		if !ok {
+			return nil, fmt.Errorf("successor_ref %q not found", d.SuccessorRef)
+		}
+		deps = append(deps, domain.Dependency{
+			PredecessorWorkItemID: predUUID,
+			SuccessorWorkItemID:   succUUID,
+		})
+	}
+	return deps, nil
 }
 
 func parseOptionalDate(s *string) *time.Time {

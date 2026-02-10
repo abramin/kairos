@@ -44,6 +44,42 @@ func TestFormatExplanation_IncludesFactorsCounterfactualsAndConfidence(t *testin
 	assert.Contains(t, out, "Confidence: 82%")
 }
 
+func TestFormatAskResolution_IncludesCommandHint(t *testing.T) {
+	r := &intelligence.AskResolution{
+		ParsedIntent: &intelligence.ParsedIntent{
+			Intent:     intelligence.IntentProjectImport,
+			Risk:       intelligence.RiskWrite,
+			Confidence: 0.95,
+			Arguments:  map[string]interface{}{"file_path": "spanish_a2_b1.json"},
+		},
+		ExecutionState: intelligence.StateNeedsConfirmation,
+		CommandHint:    "kairos project import spanish_a2_b1.json",
+	}
+
+	out := FormatAskResolution(r)
+	assert.Contains(t, out, "project_import")
+	assert.Contains(t, out, "kairos project import spanish_a2_b1.json")
+	assert.Contains(t, out, "Write operation")
+	assert.NotContains(t, out, "Proceed? [Y/n]")
+}
+
+func TestFormatAskResolution_AutoExecuteReadOnly(t *testing.T) {
+	r := &intelligence.AskResolution{
+		ParsedIntent: &intelligence.ParsedIntent{
+			Intent:     intelligence.IntentWhatNow,
+			Risk:       intelligence.RiskReadOnly,
+			Confidence: 0.95,
+			Arguments:  map[string]interface{}{"available_min": float64(60)},
+		},
+		ExecutionState: intelligence.StateExecuted,
+		CommandHint:    "kairos what-now --minutes 60",
+	}
+
+	out := FormatAskResolution(r)
+	assert.Contains(t, out, "Auto-executing")
+	assert.Contains(t, out, "kairos what-now --minutes 60")
+}
+
 func TestFormatExplanation_OmitsDuplicateDetailedSummary(t *testing.T) {
 	e := &intelligence.LLMExplanation{
 		SummaryShort:    "Use kairos status for risk overview.",

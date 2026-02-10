@@ -27,16 +27,23 @@ func newSessionCmd(app *App) *cobra.Command {
 }
 
 func newSessionLogCmd(app *App) *cobra.Command {
-	var workItemID, note string
+	var workItemID, note, projectFlag string
 	var minutes, unitsDone int
 
 	cmd := &cobra.Command{
 		Use:   "log",
 		Short: "Log a work session",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx := context.Background()
+			projectID, _ := resolveProjectForFlag(ctx, app, projectFlag)
+			wiID, err := resolveWorkItemID(ctx, app, workItemID, projectID)
+			if err != nil {
+				return err
+			}
+
 			s := &domain.WorkSessionLog{
 				ID:             uuid.New().String(),
-				WorkItemID:     workItemID,
+				WorkItemID:     wiID,
 				StartedAt:      time.Now(),
 				Minutes:        minutes,
 				UnitsDoneDelta: unitsDone,
@@ -44,11 +51,11 @@ func newSessionLogCmd(app *App) *cobra.Command {
 				CreatedAt:      time.Now(),
 			}
 
-			if err := app.Sessions.LogSession(context.Background(), s); err != nil {
+			if err := app.Sessions.LogSession(ctx, s); err != nil {
 				return err
 			}
 
-			fmt.Printf("Logged %d min session for work item %s (%s)\n", minutes, workItemID, s.ID)
+			fmt.Printf("Logged %d min session for work item %s (%s)\n", minutes, wiID, s.ID)
 			return nil
 		},
 	}
@@ -57,6 +64,7 @@ func newSessionLogCmd(app *App) *cobra.Command {
 	cmd.Flags().IntVar(&minutes, "minutes", 0, "Session duration in minutes")
 	cmd.Flags().IntVar(&unitsDone, "units-done", 0, "Number of units completed in this session")
 	cmd.Flags().StringVar(&note, "note", "", "Session note")
+	cmd.Flags().StringVar(&projectFlag, "project", "", "Project context for numeric IDs")
 	_ = cmd.MarkFlagRequired("work-item")
 	_ = cmd.MarkFlagRequired("minutes")
 
@@ -64,7 +72,7 @@ func newSessionLogCmd(app *App) *cobra.Command {
 }
 
 func newSessionListCmd(app *App) *cobra.Command {
-	var workItemID string
+	var workItemID, projectFlag string
 	var days int
 
 	cmd := &cobra.Command{
@@ -77,7 +85,12 @@ func newSessionListCmd(app *App) *cobra.Command {
 			var err error
 
 			if workItemID != "" {
-				sessions, err = app.Sessions.ListByWorkItem(ctx, workItemID)
+				projectID, _ := resolveProjectForFlag(ctx, app, projectFlag)
+				wiID, resolveErr := resolveWorkItemID(ctx, app, workItemID, projectID)
+				if resolveErr != nil {
+					return resolveErr
+				}
+				sessions, err = app.Sessions.ListByWorkItem(ctx, wiID)
 			} else {
 				sessions, err = app.Sessions.ListRecent(ctx, days)
 			}
@@ -114,6 +127,7 @@ func newSessionListCmd(app *App) *cobra.Command {
 
 	cmd.Flags().StringVar(&workItemID, "work-item", "", "Filter by work item ID")
 	cmd.Flags().IntVar(&days, "days", 7, "Number of recent days to show")
+	cmd.Flags().StringVar(&projectFlag, "project", "", "Project context for numeric IDs")
 
 	return cmd
 }

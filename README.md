@@ -84,8 +84,110 @@ kairos what-now --minutes 45
 Log what you actually did:
 
 ```bash
-kairos session log --work-item <WORK_ITEM_ID> --minutes 45 --units-done 1 --note "Focused reading"
+kairos session log --work-item 5 --project PHI01 --minutes 45 --units-done 1 --note "Focused reading"
 ```
+
+## Updating existing projects
+
+Use this when plans change and you need to edit an existing project.
+
+### 1) Find the IDs you need
+
+```bash
+kairos project list
+kairos project inspect PHI01
+```
+
+`project inspect` shows the node tree with integer IDs (e.g. `#1`, `#2`, `#3`) you can use in commands.
+
+### 2) Update project details
+
+Change name/domain/short ID/status/due date:
+
+```bash
+kairos project update PHI01 \
+  --name "Philosophy 101 (Spring)" \
+  --domain education \
+  --id PHI01 \
+  --status active \
+  --due 2026-06-05
+```
+
+Examples:
+
+```bash
+# Pause a project temporarily
+kairos project update PHI01 --status paused
+
+# Move project deadline later
+kairos project update PHI01 --due 2026-06-20
+```
+
+### 3) Change a node
+
+Nodes support title/kind/order updates. Use the integer ID shown in `project inspect`:
+
+```bash
+kairos node update 3 --project PHI01 \
+  --title "Week 4 - Ethics" \
+  --kind week \
+  --order 4
+```
+
+### 4) Update work item details (with examples)
+
+Work item fields you can change include title/type/status, planned minutes, session sizing, and unit tracking. Use the integer ID from `project inspect`:
+
+```bash
+kairos work update 5 --project PHI01 \
+  --title "Read Chapter 5" \
+  --type reading \
+  --status in_progress \
+  --planned-min 90 \
+  --min-session 20 \
+  --max-session 60 \
+  --default-session 30 \
+  --splittable=true \
+  --units-kind pages \
+  --units-total 35 \
+  --units-done 12
+```
+
+Quick examples:
+
+```bash
+# Change expected effort from 45 to 75 minutes
+kairos work update 5 --project PHI01 --planned-min 75
+
+# Switch from pages to problem sets
+kairos work update 5 --project PHI01 --units-kind problems --units-total 20
+
+# Mark complete directly
+kairos work done 5 --project PHI01
+```
+
+### 5) Log time and pages completed
+
+Use session logs to record actual work and increment units:
+
+```bash
+# 50 minutes + 8 pages
+kairos session log --work-item 5 --project PHI01 --minutes 50 --units-done 8 --note "Deep reading pass"
+
+# Another 30 minutes + 5 pages
+kairos session log --work-item 5 --project PHI01 --minutes 30 --units-done 5
+```
+
+Review logs:
+
+```bash
+kairos session list --work-item 5 --project PHI01
+```
+
+### 6) Changing due dates
+
+- Project due date: use `project update --due YYYY-MM-DD`.
+- Node/work-item due dates: set these in JSON during `project import` (or in templates/draft flow). There is currently no direct `node update --due` or `work update --due` flag.
 
 ## Starter templates
 
@@ -265,17 +367,19 @@ Kairos includes an interactive shell with session state, autocomplete, and style
 kairos shell
 ```
 
-Once inside, you can set an active project and run commands without repeating IDs:
+Once inside, you can set an active project and use integer IDs without repeating `--project`:
 
 ```
 kairos ❯ projects
 kairos ❯ use PHI01
 kairos (PHI01) ❯ inspect
+kairos (PHI01) ❯ work done 5
+kairos (PHI01) ❯ node update 3 --title "Week 4 - Ethics"
 kairos (PHI01) ❯ what-now 45
 kairos (PHI01) ❯ status
 ```
 
-Shell-native commands like `inspect`, `what-now`, and `status` automatically scope to the active project. All other CLI commands work directly inside the shell too (e.g. `project add`, `session log`, `replan`).
+Shell-native commands like `inspect`, `what-now`, and `status` automatically scope to the active project. Node, work, and session commands automatically inject `--project` from the active project, so integer IDs just work. All other CLI commands work directly inside the shell too (e.g. `project add`, `replan`).
 
 Type `help` for the full command list, or press Tab for autocomplete.
 

@@ -62,13 +62,17 @@ func FormatAskResolution(r *intelligence.AskResolution) string {
 		b.WriteString(fmt.Sprintf("  Arguments:  %s\n", formatArgs(intent.Arguments)))
 	}
 
+	if r.CommandHint != "" {
+		b.WriteString(fmt.Sprintf("  Command:    %s\n", StyleGreen.Render(r.CommandHint)))
+	}
+
 	b.WriteString("\n")
 
 	switch r.ExecutionState {
 	case intelligence.StateExecuted:
 		b.WriteString(StyleGreen.Render("  Auto-executing (read-only, high confidence)"))
 	case intelligence.StateNeedsConfirmation:
-		b.WriteString(StyleYellow.Render("  Requires confirmation. Proceed? [Y/n]"))
+		b.WriteString(StyleYellow.Render("  Write operation — run the command above to execute."))
 	case intelligence.StateNeedsClarification:
 		b.WriteString(StyleYellow.Render("  Low confidence. Did you mean:"))
 		b.WriteString("\n")

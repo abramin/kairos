@@ -43,6 +43,8 @@ type ProjectRepo interface {
 type PlanNodeRepo interface {
 	Create(ctx context.Context, n *domain.PlanNode) error
 	GetByID(ctx context.Context, id string) (*domain.PlanNode, error)
+	GetBySeq(ctx context.Context, projectID string, seq int) (*domain.PlanNode, error)
+	NextProjectSeq(ctx context.Context, projectID string) (int, error)
 	ListByProject(ctx context.Context, projectID string) ([]*domain.PlanNode, error)
 	ListChildren(ctx context.Context, parentID string) ([]*domain.PlanNode, error)
 	ListRoots(ctx context.Context, projectID string) ([]*domain.PlanNode, error)
@@ -53,6 +55,7 @@ type PlanNodeRepo interface {
 type WorkItemRepo interface {
 	Create(ctx context.Context, w *domain.WorkItem) error
 	GetByID(ctx context.Context, id string) (*domain.WorkItem, error)
+	GetBySeq(ctx context.Context, projectID string, seq int) (*domain.WorkItem, error)
 	ListByNode(ctx context.Context, nodeID string) ([]*domain.WorkItem, error)
 	ListByProject(ctx context.Context, projectID string) ([]*domain.WorkItem, error)
 	ListSchedulable(ctx context.Context, includeArchived bool) ([]SchedulableCandidate, error)

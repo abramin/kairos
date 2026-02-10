@@ -9,6 +9,10 @@ import (
 	"github.com/alexanderramin/kairos/internal/domain"
 )
 
+// planNodeColumns is the canonical SELECT column list for plan_nodes.
+const planNodeColumns = `id, project_id, parent_id, title, kind, order_index,
+		due_date, not_before, not_after, planned_min_budget, seq, created_at, updated_at`
+
 // SQLitePlanNodeRepo implements PlanNodeRepo using a SQLite database.
 type SQLitePlanNodeRepo struct {
 	db *sql.DB
@@ -21,8 +25,8 @@ func NewSQLitePlanNodeRepo(db *sql.DB) *SQLitePlanNodeRepo {
 
 func (r *SQLitePlanNodeRepo) Create(ctx context.Context, n *domain.PlanNode) error {
 	query := `INSERT INTO plan_nodes (id, project_id, parent_id, title, kind, order_index,
-		due_date, not_before, not_after, planned_min_budget, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		due_date, not_before, not_after, planned_min_budget, seq, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := r.db.ExecContext(ctx, query,
 		n.ID,
 		n.ProjectID,
@@ -34,6 +38,7 @@ func (r *SQLitePlanNodeRepo) Create(ctx context.Context, n *domain.PlanNode) err
 		nullableTimeToString(n.NotBefore, dateLayout),
 		nullableTimeToString(n.NotAfter, dateLayout),
 		nullableIntToValue(n.PlannedMinBudget),
+		n.Seq,
 		n.CreatedAt.Format(time.RFC3339),
 		n.UpdatedAt.Format(time.RFC3339),
 	)
@@ -44,17 +49,37 @@ func (r *SQLitePlanNodeRepo) Create(ctx context.Context, n *domain.PlanNode) err
 }
 
 func (r *SQLitePlanNodeRepo) GetByID(ctx context.Context, id string) (*domain.PlanNode, error) {
-	query := `SELECT id, project_id, parent_id, title, kind, order_index,
-		due_date, not_before, not_after, planned_min_budget, created_at, updated_at
-		FROM plan_nodes WHERE id = ?`
+	query := `SELECT ` + planNodeColumns + ` FROM plan_nodes WHERE id = ?`
 	row := r.db.QueryRowContext(ctx, query, id)
 	return r.scanNode(row)
 }
 
+func (r *SQLitePlanNodeRepo) GetBySeq(ctx context.Context, projectID string, seq int) (*domain.PlanNode, error) {
+	query := `SELECT ` + planNodeColumns + ` FROM plan_nodes WHERE project_id = ? AND seq = ?`
+	row := r.db.QueryRowContext(ctx, query, projectID, seq)
+	return r.scanNode(row)
+}
+
+// NextProjectSeq returns the next available sequential ID for a project,
+// computed as MAX(seq) + 1 across both plan_nodes and work_items.
+func (r *SQLitePlanNodeRepo) NextProjectSeq(ctx context.Context, projectID string) (int, error) {
+	query := `SELECT COALESCE(MAX(seq_val), 0) + 1 FROM (
+		SELECT seq AS seq_val FROM plan_nodes WHERE project_id = ? AND seq > 0
+		UNION ALL
+		SELECT w.seq AS seq_val FROM work_items w
+		JOIN plan_nodes n ON w.node_id = n.id
+		WHERE n.project_id = ? AND w.seq > 0
+	)`
+	var next int
+	err := r.db.QueryRowContext(ctx, query, projectID, projectID).Scan(&next)
+	if err != nil {
+		return 0, fmt.Errorf("computing next seq for project %s: %w", projectID, err)
+	}
+	return next, nil
+}
+
 func (r *SQLitePlanNodeRepo) ListByProject(ctx context.Context, projectID string) ([]*domain.PlanNode, error) {
-	query := `SELECT id, project_id, parent_id, title, kind, order_index,
-		due_date, not_before, not_after, planned_min_budget, created_at, updated_at
-		FROM plan_nodes WHERE project_id = ? ORDER BY order_index`
+	query := `SELECT ` + planNodeColumns + ` FROM plan_nodes WHERE project_id = ? ORDER BY order_index`
 	rows, err := r.db.QueryContext(ctx, query, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("listing plan nodes by project: %w", err)
@@ -64,9 +89,7 @@ func (r *SQLitePlanNodeRepo) ListByProject(ctx context.Context, projectID string
 }
 
 func (r *SQLitePlanNodeRepo) ListChildren(ctx context.Context, parentID string) ([]*domain.PlanNode, error) {
-	query := `SELECT id, project_id, parent_id, title, kind, order_index,
-		due_date, not_before, not_after, planned_min_budget, created_at, updated_at
-		FROM plan_nodes WHERE parent_id = ? ORDER BY order_index`
+	query := `SELECT ` + planNodeColumns + ` FROM plan_nodes WHERE parent_id = ? ORDER BY order_index`
 	rows, err := r.db.QueryContext(ctx, query, parentID)
 	if err != nil {
 		return nil, fmt.Errorf("listing child plan nodes: %w", err)
@@ -76,9 +99,7 @@ func (r *SQLitePlanNodeRepo) ListChildren(ctx context.Context, parentID string) 
 }
 
 func (r *SQLitePlanNodeRepo) ListRoots(ctx context.Context, projectID string) ([]*domain.PlanNode, error) {
-	query := `SELECT id, project_id, parent_id, title, kind, order_index,
-		due_date, not_before, not_after, planned_min_budget, created_at, updated_at
-		FROM plan_nodes WHERE project_id = ? AND parent_id IS NULL ORDER BY order_index`
+	query := `SELECT ` + planNodeColumns + ` FROM plan_nodes WHERE project_id = ? AND parent_id IS NULL ORDER BY order_index`
 	rows, err := r.db.QueryContext(ctx, query, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("listing root plan nodes: %w", err)
@@ -90,7 +111,7 @@ func (r *SQLitePlanNodeRepo) ListRoots(ctx context.Context, projectID string) ([
 func (r *SQLitePlanNodeRepo) Update(ctx context.Context, n *domain.PlanNode) error {
 	query := `UPDATE plan_nodes SET project_id = ?, parent_id = ?, title = ?, kind = ?,
 		order_index = ?, due_date = ?, not_before = ?, not_after = ?, planned_min_budget = ?,
-		updated_at = ?
+		seq = ?, updated_at = ?
 		WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, query,
 		n.ProjectID,
@@ -102,6 +123,7 @@ func (r *SQLitePlanNodeRepo) Update(ctx context.Context, n *domain.PlanNode) err
 		nullableTimeToString(n.NotBefore, dateLayout),
 		nullableTimeToString(n.NotAfter, dateLayout),
 		nullableIntToValue(n.PlannedMinBudget),
+		n.Seq,
 		n.UpdatedAt.Format(time.RFC3339),
 		n.ID,
 	)
@@ -131,7 +153,7 @@ func (r *SQLitePlanNodeRepo) scanNode(row *sql.Row) (*domain.PlanNode, error) {
 	err := row.Scan(
 		&n.ID, &n.ProjectID, &parentID, &n.Title, &kindStr, &n.OrderIndex,
 		&dueDateStr, &notBeforeStr, &notAfterStr, &plannedMinBudget,
-		&createdAtStr, &updatedAtStr,
+		&n.Seq, &createdAtStr, &updatedAtStr,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -157,7 +179,7 @@ func (r *SQLitePlanNodeRepo) scanNodes(rows *sql.Rows) ([]*domain.PlanNode, erro
 		err := rows.Scan(
 			&n.ID, &n.ProjectID, &parentID, &n.Title, &kindStr, &n.OrderIndex,
 			&dueDateStr, &notBeforeStr, &notAfterStr, &plannedMinBudget,
-			&createdAtStr, &updatedAtStr,
+			&n.Seq, &createdAtStr, &updatedAtStr,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scanning plan node row: %w", err)

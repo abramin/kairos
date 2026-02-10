@@ -18,12 +18,8 @@ const (
 type ReplanTrigger string
 
 const (
-	TriggerManual          ReplanTrigger = "MANUAL"
-	TriggerDeadlineUpdated ReplanTrigger = "DEADLINE_UPDATED"
-	TriggerItemAdded       ReplanTrigger = "ITEM_ADDED"
-	TriggerItemRemoved     ReplanTrigger = "ITEM_REMOVED"
-	TriggerSessionLogged   ReplanTrigger = "SESSION_LOGGED"
-	TriggerTemplateInit    ReplanTrigger = "TEMPLATE_INIT"
+	TriggerManual        ReplanTrigger = "MANUAL"
+	TriggerSessionLogged ReplanTrigger = "SESSION_LOGGED"
 )
 
 type ProjectStatus string
@@ -50,12 +46,23 @@ type NodeKind string
 const (
 	NodeWeek       NodeKind = "week"
 	NodeModule     NodeKind = "module"
-	NodeBook       NodeKind = "book"
-	NodeStage      NodeKind = "stage"
-	NodeSection    NodeKind = "section"
 	NodeAssessment NodeKind = "assessment"
 	NodeGeneric    NodeKind = "generic"
 )
+
+// ValidNodeKinds is the canonical set of accepted node kind strings.
+var ValidNodeKinds = map[string]bool{
+	"week": true, "module": true, "book": true, "stage": true,
+	"section": true, "generic": true, "assessment": true,
+}
+
+// ValidWorkItemTypes is the canonical set of accepted work item type strings.
+var ValidWorkItemTypes = map[string]bool{
+	"reading": true, "practice": true, "review": true,
+	"assignment": true, "task": true, "quiz": true,
+	"study": true, "training": true, "activity": true,
+	"submission": true,
+}
 
 type DurationMode string
 
@@ -70,5 +77,4 @@ type DurationSource string
 const (
 	SourceManual   DurationSource = "manual"
 	SourceTemplate DurationSource = "template"
-	SourceRollup   DurationSource = "rollup"
 )

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/domain"
@@ -24,11 +25,24 @@ func (s *nodeService) Create(ctx context.Context, n *domain.PlanNode) error {
 	now := time.Now().UTC()
 	n.CreatedAt = now
 	n.UpdatedAt = now
+
+	if n.Seq == 0 {
+		seq, err := s.nodes.NextProjectSeq(ctx, n.ProjectID)
+		if err != nil {
+			return fmt.Errorf("assigning seq: %w", err)
+		}
+		n.Seq = seq
+	}
+
 	return s.nodes.Create(ctx, n)
 }
 
 func (s *nodeService) GetByID(ctx context.Context, id string) (*domain.PlanNode, error) {
 	return s.nodes.GetByID(ctx, id)
+}
+
+func (s *nodeService) GetBySeq(ctx context.Context, projectID string, seq int) (*domain.PlanNode, error) {
+	return s.nodes.GetBySeq(ctx, projectID, seq)
 }
 
 func (s *nodeService) ListByProject(ctx context.Context, projectID string) ([]*domain.PlanNode, error) {

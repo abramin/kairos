@@ -9,6 +9,19 @@ import (
 	"github.com/alexanderramin/kairos/internal/domain"
 )
 
+// workItemColumns is the canonical SELECT column list for work_items.
+const workItemColumns = `id, node_id, title, type, status, archived_at,
+		duration_mode, planned_min, logged_min, duration_source, estimate_confidence,
+		min_session_min, max_session_min, default_session_min, splittable,
+		units_kind, units_total, units_done, due_date, not_before, seq, created_at, updated_at`
+
+// workItemColumnsAliased is the same column list prefixed with "w." for join queries.
+const workItemColumnsAliased = `w.id, w.node_id, w.title, w.type, w.status, w.archived_at,
+		w.duration_mode, w.planned_min, w.logged_min, w.duration_source, w.estimate_confidence,
+		w.min_session_min, w.max_session_min, w.default_session_min, w.splittable,
+		w.units_kind, w.units_total, w.units_done, w.due_date, w.not_before, w.seq,
+		w.created_at, w.updated_at`
+
 // SQLiteWorkItemRepo implements WorkItemRepo using a SQLite database.
 type SQLiteWorkItemRepo struct {
 	db *sql.DB
@@ -23,8 +36,8 @@ func (r *SQLiteWorkItemRepo) Create(ctx context.Context, w *domain.WorkItem) err
 	query := `INSERT INTO work_items (id, node_id, title, type, status, archived_at,
 		duration_mode, planned_min, logged_min, duration_source, estimate_confidence,
 		min_session_min, max_session_min, default_session_min, splittable,
-		units_kind, units_total, units_done, due_date, not_before, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		units_kind, units_total, units_done, due_date, not_before, seq, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := r.db.ExecContext(ctx, query,
 		w.ID,
 		w.NodeID,
@@ -46,6 +59,7 @@ func (r *SQLiteWorkItemRepo) Create(ctx context.Context, w *domain.WorkItem) err
 		w.UnitsDone,
 		nullableTimeToString(w.DueDate, dateLayout),
 		nullableTimeToString(w.NotBefore, dateLayout),
+		w.Seq,
 		w.CreatedAt.Format(time.RFC3339),
 		w.UpdatedAt.Format(time.RFC3339),
 	)
@@ -56,21 +70,22 @@ func (r *SQLiteWorkItemRepo) Create(ctx context.Context, w *domain.WorkItem) err
 }
 
 func (r *SQLiteWorkItemRepo) GetByID(ctx context.Context, id string) (*domain.WorkItem, error) {
-	query := `SELECT id, node_id, title, type, status, archived_at,
-		duration_mode, planned_min, logged_min, duration_source, estimate_confidence,
-		min_session_min, max_session_min, default_session_min, splittable,
-		units_kind, units_total, units_done, due_date, not_before, created_at, updated_at
-		FROM work_items WHERE id = ?`
+	query := `SELECT ` + workItemColumns + ` FROM work_items WHERE id = ?`
 	row := r.db.QueryRowContext(ctx, query, id)
 	return r.scanWorkItem(row)
 }
 
+func (r *SQLiteWorkItemRepo) GetBySeq(ctx context.Context, projectID string, seq int) (*domain.WorkItem, error) {
+	query := `SELECT ` + workItemColumnsAliased + `
+		FROM work_items w
+		JOIN plan_nodes n ON w.node_id = n.id
+		WHERE n.project_id = ? AND w.seq = ?`
+	row := r.db.QueryRowContext(ctx, query, projectID, seq)
+	return r.scanWorkItem(row)
+}
+
 func (r *SQLiteWorkItemRepo) ListByNode(ctx context.Context, nodeID string) ([]*domain.WorkItem, error) {
-	query := `SELECT id, node_id, title, type, status, archived_at,
-		duration_mode, planned_min, logged_min, duration_source, estimate_confidence,
-		min_session_min, max_session_min, default_session_min, splittable,
-		units_kind, units_total, units_done, due_date, not_before, created_at, updated_at
-		FROM work_items WHERE node_id = ? ORDER BY created_at`
+	query := `SELECT ` + workItemColumns + ` FROM work_items WHERE node_id = ? ORDER BY created_at`
 	rows, err := r.db.QueryContext(ctx, query, nodeID)
 	if err != nil {
 		return nil, fmt.Errorf("listing work items by node: %w", err)
@@ -80,10 +95,7 @@ func (r *SQLiteWorkItemRepo) ListByNode(ctx context.Context, nodeID string) ([]*
 }
 
 func (r *SQLiteWorkItemRepo) ListByProject(ctx context.Context, projectID string) ([]*domain.WorkItem, error) {
-	query := `SELECT w.id, w.node_id, w.title, w.type, w.status, w.archived_at,
-		w.duration_mode, w.planned_min, w.logged_min, w.duration_source, w.estimate_confidence,
-		w.min_session_min, w.max_session_min, w.default_session_min, w.splittable,
-		w.units_kind, w.units_total, w.units_done, w.due_date, w.not_before, w.created_at, w.updated_at
+	query := `SELECT ` + workItemColumnsAliased + `
 		FROM work_items w
 		JOIN plan_nodes n ON w.node_id = n.id
 		WHERE n.project_id = ?
@@ -97,14 +109,13 @@ func (r *SQLiteWorkItemRepo) ListByProject(ctx context.Context, projectID string
 }
 
 func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchived bool) ([]SchedulableCandidate, error) {
+	schedulableJoinedColumns := workItemColumnsAliased + `,
+			n.project_id, p.name AS project_name, p.domain AS project_domain,
+			n.title AS node_title, n.due_date AS node_due_date, p.target_date, p.start_date`
+
 	var query string
 	if includeArchived {
-		query = `SELECT w.id, w.node_id, w.title, w.type, w.status, w.archived_at,
-			w.duration_mode, w.planned_min, w.logged_min, w.duration_source, w.estimate_confidence,
-			w.min_session_min, w.max_session_min, w.default_session_min, w.splittable,
-			w.units_kind, w.units_total, w.units_done, w.due_date, w.not_before, w.created_at, w.updated_at,
-			n.project_id, p.name AS project_name, p.domain AS project_domain,
-			n.title AS node_title, n.due_date AS node_due_date, p.target_date, p.start_date
+		query = `SELECT ` + schedulableJoinedColumns + `
 			FROM work_items w
 			JOIN plan_nodes n ON w.node_id = n.id
 			JOIN projects p ON n.project_id = p.id
@@ -112,12 +123,7 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 			  AND p.status = 'active'
 			ORDER BY w.id`
 	} else {
-		query = `SELECT w.id, w.node_id, w.title, w.type, w.status, w.archived_at,
-			w.duration_mode, w.planned_min, w.logged_min, w.duration_source, w.estimate_confidence,
-			w.min_session_min, w.max_session_min, w.default_session_min, w.splittable,
-			w.units_kind, w.units_total, w.units_done, w.due_date, w.not_before, w.created_at, w.updated_at,
-			n.project_id, p.name AS project_name, p.domain AS project_domain,
-			n.title AS node_title, n.due_date AS node_due_date, p.target_date, p.start_date
+		query = `SELECT ` + schedulableJoinedColumns + `
 			FROM work_items w
 			JOIN plan_nodes n ON w.node_id = n.id
 			JOIN projects p ON n.project_id = p.id
@@ -151,7 +157,7 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 			&durationModeStr, &w.PlannedMin, &w.LoggedMin, &durationSourceStr, &w.EstimateConfidence,
 			&w.MinSessionMin, &w.MaxSessionMin, &w.DefaultSessionMin, &splittableInt,
 			&w.UnitsKind, &w.UnitsTotal, &w.UnitsDone, &dueDateStr, &notBeforeStr,
-			&createdAtStr, &updatedAtStr,
+			&w.Seq, &createdAtStr, &updatedAtStr,
 			&projectID, &projectName, &projectDomain,
 			&nodeTitle, &nodeDueDateStr, &targetDateStr, &startDateStr,
 		)
@@ -234,7 +240,8 @@ func (r *SQLiteWorkItemRepo) Update(ctx context.Context, w *domain.WorkItem) err
 	query := `UPDATE work_items SET node_id = ?, title = ?, type = ?, status = ?, archived_at = ?,
 		duration_mode = ?, planned_min = ?, logged_min = ?, duration_source = ?, estimate_confidence = ?,
 		min_session_min = ?, max_session_min = ?, default_session_min = ?, splittable = ?,
-		units_kind = ?, units_total = ?, units_done = ?, due_date = ?, not_before = ?, updated_at = ?
+		units_kind = ?, units_total = ?, units_done = ?, due_date = ?, not_before = ?,
+		seq = ?, updated_at = ?
 		WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, query,
 		w.NodeID,
@@ -256,6 +263,7 @@ func (r *SQLiteWorkItemRepo) Update(ctx context.Context, w *domain.WorkItem) err
 		w.UnitsDone,
 		nullableTimeToString(w.DueDate, dateLayout),
 		nullableTimeToString(w.NotBefore, dateLayout),
+		w.Seq,
 		w.UpdatedAt.Format(time.RFC3339),
 		w.ID,
 	)
@@ -297,7 +305,7 @@ func (r *SQLiteWorkItemRepo) scanWorkItem(row *sql.Row) (*domain.WorkItem, error
 		&durationModeStr, &w.PlannedMin, &w.LoggedMin, &durationSourceStr, &w.EstimateConfidence,
 		&w.MinSessionMin, &w.MaxSessionMin, &w.DefaultSessionMin, &splittableInt,
 		&w.UnitsKind, &w.UnitsTotal, &w.UnitsDone, &dueDateStr, &notBeforeStr,
-		&createdAtStr, &updatedAtStr,
+		&w.Seq, &createdAtStr, &updatedAtStr,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -325,7 +333,7 @@ func (r *SQLiteWorkItemRepo) scanWorkItems(rows *sql.Rows) ([]*domain.WorkItem, 
 			&durationModeStr, &w.PlannedMin, &w.LoggedMin, &durationSourceStr, &w.EstimateConfidence,
 			&w.MinSessionMin, &w.MaxSessionMin, &w.DefaultSessionMin, &splittableInt,
 			&w.UnitsKind, &w.UnitsTotal, &w.UnitsDone, &dueDateStr, &notBeforeStr,
-			&createdAtStr, &updatedAtStr,
+			&w.Seq, &createdAtStr, &updatedAtStr,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scanning work item row: %w", err)

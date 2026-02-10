@@ -102,8 +102,27 @@ func buildTreePanel(rootNodes []*domain.PlanNode, childMap map[string][]*domain.
 	}
 
 	var b strings.Builder
-	b.WriteString(Header("Plan"))
-	b.WriteString("\n")
+
+	// Compute progress from work item statuses.
+	totalCount := 0
+	doneCount := 0
+	for _, items := range workItems {
+		for _, wi := range items {
+			totalCount++
+			if wi.Status == domain.WorkItemDone {
+				doneCount++
+			}
+		}
+	}
+
+	// Render header with optional progress bar on the same line.
+	headerText := StyleHeader.Render("PLAN")
+	if totalCount > 0 {
+		pct := float64(doneCount) / float64(totalCount)
+		headerText += "  " + RenderProgress(pct, 12)
+	}
+	underline := StyleDim.Render(strings.Repeat("─", 4))
+	b.WriteString(headerText + "\n" + underline + "\n")
 
 	items := buildProjectTree(rootNodes, childMap, workItems, 0)
 	if len(items) > 0 {
@@ -130,13 +149,34 @@ func buildProjectTree(
 	})
 
 	for i, node := range sorted {
-		// Determine if this is the last sibling at this level.
 		children := childMap[node.ID]
 		nodeWorkItems := workItems[node.ID]
-		hasChildren := len(children) > 0 || len(nodeWorkItems) > 0
-
-		// Check if this is the last node AND it has no siblings after it
 		isLastNode := i == len(sorted)-1
+
+		// Collapse: single work item + no child nodes → merge into one line.
+		if len(nodeWorkItems) == 1 && len(children) == 0 {
+			wi := nodeWorkItems[0]
+			detail := ""
+			if wi.PlannedMin > 0 {
+				detail = FormatMinutes(wi.PlannedMin)
+			} else if node.DueDate != nil {
+				detail = "DUE " + RelativeDate(*node.DueDate)
+			} else if node.PlannedMinBudget != nil {
+				detail = FormatMinutes(*node.PlannedMinBudget)
+			}
+
+			items = append(items, TreeItem{
+				Title:  node.Title,
+				Seq:    node.Seq,
+				Level:  level + 1,
+				IsLast: isLastNode,
+				Status: string(wi.Status),
+				Detail: detail,
+			})
+			continue
+		}
+
+		hasChildren := len(children) > 0 || len(nodeWorkItems) > 0
 
 		// Build detail badge
 		detail := ""
@@ -148,6 +188,7 @@ func buildProjectTree(
 
 		items = append(items, TreeItem{
 			Title:  node.Title,
+			Seq:    node.Seq,
 			Level:  level + 1,
 			IsLast: isLastNode && !hasChildren,
 			Detail: detail,
@@ -166,16 +207,14 @@ func buildProjectTree(
 				wiDetail = FormatMinutes(wi.PlannedMin)
 			}
 
-			isLastWI := j == len(nodeWorkItems)-1 && isLastNode && len(children) == 0
-
 			items = append(items, TreeItem{
 				Title:  wi.Title,
+				Seq:    wi.Seq,
 				Level:  level + 2,
 				IsLast: j == len(nodeWorkItems)-1,
 				Status: string(wi.Status),
 				Detail: wiDetail,
 			})
-			_ = isLastWI // used for potential future tree connector logic
 		}
 	}
 

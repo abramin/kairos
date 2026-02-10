@@ -10,6 +10,7 @@ import (
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/importer"
 	"github.com/alexanderramin/kairos/internal/intelligence"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // draftPhase tracks progress through the interactive draft flow.
@@ -61,478 +62,446 @@ type draftWizardState struct {
 }
 
 // execDraft enters draft mode within the shell.
-func (s *shellSession) execDraft(args []string) {
-	if len(args) > 0 && s.app.ProjectDraft == nil {
-		fmt.Println(formatter.StyleRed.Render(
+func (m *shellModel) execDraft(args []string) string {
+	if len(args) > 0 && m.app.ProjectDraft == nil {
+		return formatter.StyleRed.Render(
 			"LLM features are disabled. Run 'draft' without arguments for the guided wizard.\n" +
 				"Or use explicit commands:\n" +
 				"  project add --name ... --domain ... --start ...\n" +
 				"  project import file.json\n\n" +
-				"Enable with: KAIROS_LLM_ENABLED=true"))
-		return
+				"Enable with: KAIROS_LLM_ENABLED=true")
 	}
 
-	s.draftMode = true
-	s.draft = &draftWizardState{}
+	m.mode = modeDraft
+	m.draft = &draftWizardState{}
 
 	if len(args) > 0 {
 		// Description provided: use LLM conversational flow.
 		description := strings.Join(args, " ")
 		description += "\nStart date: " + time.Now().Format("2006-01-02")
-		s.startDraftConversation(description, nil)
-		return
+		return m.startDraftConversation(description, nil)
 	}
 
 	// Enter wizard gathering mode.
-	s.draft.phase = draftPhaseDescription
-	fmt.Print(formatter.FormatDraftWelcome())
-	fmt.Print("  Describe your project:\n  > ")
+	m.draft.phase = draftPhaseDescription
+	return formatter.FormatDraftWelcome() + "\n  Describe your project:"
 }
 
-// execDraftTurn handles a single line of input while in draft mode.
-func (s *shellSession) execDraftTurn(input string) {
+// handleDraftInput handles a single line of input while in draft mode.
+// Dispatches to phase-specific handlers.
+func (m *shellModel) handleDraftInput(input string) (string, tea.Cmd) {
 	lower := strings.ToLower(strings.TrimSpace(input))
 	if lower == "/quit" || lower == "/cancel" || lower == "/q" {
-		fmt.Println("Draft cancelled.")
-		s.exitDraftMode()
-		return
+		m.exitDraftMode()
+		return "Draft cancelled.", nil
 	}
 
-	switch s.draft.phase {
+	switch {
+	case m.draft.phase <= draftPhaseDeadline:
+		return m.handleDraftMetadata(input), nil
+	case m.draft.phase <= draftPhaseGroupDays:
+		return m.handleDraftGroup(input), nil
+	case m.draft.phase <= draftPhaseWorkItemMinutes:
+		return m.handleDraftWorkItem(input), nil
+	case m.draft.phase <= draftPhaseSpecialWIMinutes:
+		return m.handleDraftSpecialNode(input), nil
+	case m.draft.phase == draftPhaseWizardReview:
+		return m.handleWizardReviewInput(input), nil
+	case m.draft.phase == draftPhaseConversation:
+		return m.handleDraftConversationInput(input), nil
+	case m.draft.phase == draftPhaseReview:
+		return m.handleDraftReviewInput(input), nil
+	}
+	return "", nil
+}
+
+// handleDraftMetadata handles the description, start date, and deadline phases.
+func (m *shellModel) handleDraftMetadata(input string) string {
+	switch m.draft.phase {
 	case draftPhaseDescription:
 		if input == "" {
-			fmt.Println(formatter.StyleRed.Render("  Project description is required."))
-			fmt.Print("  > ")
-			return
+			return formatter.StyleRed.Render("  Project description is required.")
 		}
-		s.draft.description = input
-		s.draft.phase = draftPhaseStartDate
-		fmt.Print("\n  When do you want to start? (YYYY-MM-DD, or Enter for today)\n  > ")
+		m.draft.description = input
+		m.draft.phase = draftPhaseStartDate
+		return "\n  When do you want to start? (YYYY-MM-DD, or Enter for today)"
 
 	case draftPhaseStartDate:
-		s.draft.startDate = time.Now().Format("2006-01-02")
+		m.draft.startDate = time.Now().Format("2006-01-02")
 		if input != "" {
-			if _, err := time.Parse("2006-01-02", input); err != nil {
-				fmt.Println("  Invalid date format, using today.")
-			} else {
-				s.draft.startDate = input
+			if _, err := time.Parse("2006-01-02", input); err == nil {
+				m.draft.startDate = input
 			}
 		}
-		s.draft.phase = draftPhaseDeadline
-		fmt.Print("\n  When is the deadline? (YYYY-MM-DD, or Enter to skip)\n  > ")
+		m.draft.phase = draftPhaseDeadline
+		return "\n  When is the deadline? (YYYY-MM-DD, or Enter to skip)"
 
 	case draftPhaseDeadline:
 		if input != "" {
-			if _, err := time.Parse("2006-01-02", input); err != nil {
-				fmt.Println("  Invalid date format, skipping deadline.")
-			} else {
-				s.draft.deadline = input
+			if _, err := time.Parse("2006-01-02", input); err == nil {
+				m.draft.deadline = input
 			}
 		}
-		// Enter wizard: ask for group count.
-		s.draft.phase = draftPhaseGroupCount
-		s.draft.groups = nil
-		s.draft.workItems = nil
-		s.draft.specialNodes = nil
-		s.draft.groupTotal = 1
-		s.draft.currentGroupIdx = 0
-		fmt.Print("\n  How many groups of work? (e.g., phases, levels — Enter for 1)\n  > ")
+		m.draft.phase = draftPhaseGroupCount
+		m.draft.groups = nil
+		m.draft.workItems = nil
+		m.draft.specialNodes = nil
+		m.draft.groupTotal = 1
+		m.draft.currentGroupIdx = 0
+		return "\n  How many groups of work? (e.g., phases, levels — Enter for 1)"
+	}
+	return ""
+}
 
+// handleDraftGroup handles the group count, label, node count, kind, and days phases.
+func (m *shellModel) handleDraftGroup(input string) string {
+	switch m.draft.phase {
 	case draftPhaseGroupCount:
 		n := 1
 		if input != "" {
-			parsed, err := strconv.Atoi(input)
-			if err != nil || parsed < 1 {
-				fmt.Println("  Invalid number, using 1.")
-			} else {
+			if parsed, err := strconv.Atoi(input); err == nil && parsed >= 1 {
 				n = parsed
 			}
 		}
-		s.draft.groupTotal = n
-		s.draft.currentGroupIdx = 0
-		s.draft.groups = nil
-		s.draft.currentGroup = wizardGroup{Kind: "module"}
-		s.draft.phase = draftPhaseGroupLabel
+		m.draft.groupTotal = n
+		m.draft.currentGroupIdx = 0
+		m.draft.groups = nil
+		m.draft.currentGroup = wizardGroup{Kind: "module"}
+		m.draft.phase = draftPhaseGroupLabel
 		if n > 1 {
-			fmt.Printf("\n  --- Group 1 ---\n")
-			fmt.Print("  Label (e.g., \"Chapter\", \"Week\", \"A2 Module\"): ")
-		} else {
-			fmt.Print("\n  Node label (e.g., \"Chapter\", \"Week\", \"Module\"): ")
+			return fmt.Sprintf("\n  --- Group 1 ---\n  Label (e.g., \"Chapter\", \"Week\", \"A2 Module\"):")
 		}
+		return "\n  Node label (e.g., \"Chapter\", \"Week\", \"Module\"):"
 
 	case draftPhaseGroupLabel:
 		label := input
 		if label == "" {
 			label = "Module"
 		}
-		s.draft.currentGroup.Label = label
-		s.draft.phase = draftPhaseGroupNodeCount
-		fmt.Print("  How many? ")
+		m.draft.currentGroup.Label = label
+		m.draft.phase = draftPhaseGroupNodeCount
+		return "  How many?"
 
 	case draftPhaseGroupNodeCount:
 		count, err := strconv.Atoi(input)
 		if err != nil || count < 1 {
-			fmt.Println("  Invalid number, using 1.")
 			count = 1
 		}
-		s.draft.currentGroup.Count = count
-		s.draft.phase = draftPhaseGroupKind
-		fmt.Print("  Node kind [module/week/section/stage/assessment/generic] (Enter for module): ")
+		m.draft.currentGroup.Count = count
+		m.draft.phase = draftPhaseGroupKind
+		return "  Node kind [module/week/section/stage/assessment/generic] (Enter for module):"
 
 	case draftPhaseGroupKind:
 		if input != "" {
 			kind := strings.ToLower(input)
 			if validNodeKinds[kind] {
-				s.draft.currentGroup.Kind = kind
-			} else {
-				fmt.Println("  Invalid kind, using module.")
+				m.draft.currentGroup.Kind = kind
 			}
 		}
-		s.draft.phase = draftPhaseGroupDays
-		fmt.Print("  Days per node (Enter to spread evenly): ")
+		m.draft.phase = draftPhaseGroupDays
+		return "  Days per node (Enter to spread evenly):"
 
 	case draftPhaseGroupDays:
 		if input != "" {
-			days, err := strconv.Atoi(input)
-			if err != nil || days < 1 {
-				fmt.Println("  Invalid number, skipping.")
-			} else {
-				s.draft.currentGroup.DaysPer = days
+			if days, err := strconv.Atoi(input); err == nil && days >= 1 {
+				m.draft.currentGroup.DaysPer = days
 			}
 		}
-		// Save group and advance.
-		s.draft.groups = append(s.draft.groups, s.draft.currentGroup)
-		s.draft.currentGroupIdx++
+		m.draft.groups = append(m.draft.groups, m.draft.currentGroup)
+		m.draft.currentGroupIdx++
 
-		if s.draft.currentGroupIdx < s.draft.groupTotal {
-			s.draft.currentGroup = wizardGroup{Kind: "module"}
-			s.draft.phase = draftPhaseGroupLabel
-			fmt.Printf("\n  --- Group %d ---\n", s.draft.currentGroupIdx+1)
-			fmt.Print("  Label (e.g., \"Chapter\", \"Week\", \"A2 Module\"): ")
-		} else {
-			// Move to work items.
-			s.draft.phase = draftPhaseWorkItemTitle
-			fmt.Print("\n  --- Work Items (applied to every node) ---\n")
-			fmt.Print("  Title (Enter when done): ")
+		if m.draft.currentGroupIdx < m.draft.groupTotal {
+			m.draft.currentGroup = wizardGroup{Kind: "module"}
+			m.draft.phase = draftPhaseGroupLabel
+			return fmt.Sprintf("\n  --- Group %d ---\n  Label (e.g., \"Chapter\", \"Week\", \"A2 Module\"):", m.draft.currentGroupIdx+1)
 		}
+		m.draft.phase = draftPhaseWorkItemTitle
+		return "\n  --- Work Items (applied to every node) ---\n  Title (Enter when done):"
+	}
+	return ""
+}
 
+// handleDraftWorkItem handles the work item title, type, and minutes phases.
+func (m *shellModel) handleDraftWorkItem(input string) string {
+	switch m.draft.phase {
 	case draftPhaseWorkItemTitle:
 		if input == "" {
-			if len(s.draft.workItems) == 0 {
-				fmt.Println("  At least one work item is recommended.")
-			}
-			// Move to special nodes.
-			s.draft.phase = draftPhaseSpecialTitle
-			fmt.Print("\n  --- Special Nodes (exams, milestones — Enter to skip) ---\n")
-			fmt.Print("  Title (Enter to skip): ")
-			return
+			m.draft.phase = draftPhaseSpecialTitle
+			return "\n  --- Special Nodes (exams, milestones — Enter to skip) ---\n  Title (Enter to skip):"
 		}
-		s.draft.currentWI = wizardWorkItem{Title: input, Type: "task"}
-		s.draft.phase = draftPhaseWorkItemType
-		fmt.Print("    Type [reading/practice/review/assignment/task/quiz/study]: ")
+		m.draft.currentWI = wizardWorkItem{Title: input, Type: "task"}
+		m.draft.phase = draftPhaseWorkItemType
+		return "    Type [reading/practice/review/assignment/task/quiz/study]:"
 
 	case draftPhaseWorkItemType:
 		if input != "" {
 			t := strings.ToLower(input)
 			if validWorkItemTypes[t] {
-				s.draft.currentWI.Type = t
-			} else {
-				fmt.Println("    Invalid type, using task.")
+				m.draft.currentWI.Type = t
 			}
 		}
-		s.draft.phase = draftPhaseWorkItemMinutes
-		fmt.Print("    Estimated minutes: ")
+		m.draft.phase = draftPhaseWorkItemMinutes
+		return "    Estimated minutes:"
 
 	case draftPhaseWorkItemMinutes:
 		if input != "" {
 			mins, err := strconv.Atoi(input)
 			if err != nil || mins < 1 {
-				fmt.Println("    Invalid number, using 30.")
 				mins = 30
 			}
-			s.draft.currentWI.PlannedMin = mins
+			m.draft.currentWI.PlannedMin = mins
 		}
-		s.draft.workItems = append(s.draft.workItems, s.draft.currentWI)
-		s.draft.phase = draftPhaseWorkItemTitle
-		fmt.Print("  Title (Enter when done): ")
+		m.draft.workItems = append(m.draft.workItems, m.draft.currentWI)
+		m.draft.phase = draftPhaseWorkItemTitle
+		return "  Title (Enter when done):"
+	}
+	return ""
+}
 
+// handleDraftSpecialNode handles the special node title, kind, due date, and work item phases.
+func (m *shellModel) handleDraftSpecialNode(input string) string {
+	switch m.draft.phase {
 	case draftPhaseSpecialTitle:
 		if input == "" {
-			// Done with special nodes, build and review.
-			s.buildAndShowWizardDraft()
-			return
+			return m.buildAndShowWizardDraft()
 		}
-		s.draft.currentSpecial = wizardSpecialNode{Title: input, Kind: "assessment"}
-		s.draft.phase = draftPhaseSpecialKind
-		fmt.Print("    Kind [assessment/generic] (Enter for assessment): ")
+		m.draft.currentSpecial = wizardSpecialNode{Title: input, Kind: "assessment"}
+		m.draft.phase = draftPhaseSpecialKind
+		return "    Kind [assessment/generic] (Enter for assessment):"
 
 	case draftPhaseSpecialKind:
 		if input != "" {
 			kind := strings.ToLower(input)
 			if kind == "assessment" || kind == "generic" {
-				s.draft.currentSpecial.Kind = kind
-			} else {
-				fmt.Println("    Invalid kind, using assessment.")
+				m.draft.currentSpecial.Kind = kind
 			}
 		}
-		s.draft.phase = draftPhaseSpecialDueDate
-		fmt.Print("    Due date (YYYY-MM-DD, Enter for deadline): ")
+		m.draft.phase = draftPhaseSpecialDueDate
+		return "    Due date (YYYY-MM-DD, Enter for deadline):"
 
 	case draftPhaseSpecialDueDate:
 		if input != "" {
-			if _, err := time.Parse("2006-01-02", input); err != nil {
-				fmt.Println("    Invalid date, skipping.")
-			} else {
-				s.draft.currentSpecial.DueDate = input
+			if _, err := time.Parse("2006-01-02", input); err == nil {
+				m.draft.currentSpecial.DueDate = input
 			}
 		}
-		s.draft.phase = draftPhaseSpecialWITitle
-		fmt.Print("    Work item title (Enter when done): ")
+		m.draft.phase = draftPhaseSpecialWITitle
+		return "    Work item title (Enter when done):"
 
 	case draftPhaseSpecialWITitle:
 		if input == "" {
-			// Done with this special node's work items.
-			s.draft.specialNodes = append(s.draft.specialNodes, s.draft.currentSpecial)
-			s.draft.phase = draftPhaseSpecialTitle
-			fmt.Print("  Title (Enter to skip): ")
-			return
+			m.draft.specialNodes = append(m.draft.specialNodes, m.draft.currentSpecial)
+			m.draft.phase = draftPhaseSpecialTitle
+			return "  Title (Enter to skip):"
 		}
-		s.draft.currentSpecialWI = wizardWorkItem{Title: input, Type: "task"}
-		s.draft.phase = draftPhaseSpecialWIType
-		fmt.Print("      Type [reading/practice/review/assignment/task/quiz/study]: ")
+		m.draft.currentSpecialWI = wizardWorkItem{Title: input, Type: "task"}
+		m.draft.phase = draftPhaseSpecialWIType
+		return "      Type [reading/practice/review/assignment/task/quiz/study]:"
 
 	case draftPhaseSpecialWIType:
 		if input != "" {
 			t := strings.ToLower(input)
 			if validWorkItemTypes[t] {
-				s.draft.currentSpecialWI.Type = t
-			} else {
-				fmt.Println("      Invalid type, using task.")
+				m.draft.currentSpecialWI.Type = t
 			}
 		}
-		s.draft.phase = draftPhaseSpecialWIMinutes
-		fmt.Print("      Estimated minutes: ")
+		m.draft.phase = draftPhaseSpecialWIMinutes
+		return "      Estimated minutes:"
 
 	case draftPhaseSpecialWIMinutes:
 		if input != "" {
 			mins, err := strconv.Atoi(input)
 			if err != nil || mins < 1 {
-				fmt.Println("      Invalid number, using 30.")
 				mins = 30
 			}
-			s.draft.currentSpecialWI.PlannedMin = mins
+			m.draft.currentSpecialWI.PlannedMin = mins
 		}
-		s.draft.currentSpecial.WorkItems = append(s.draft.currentSpecial.WorkItems, s.draft.currentSpecialWI)
-		s.draft.phase = draftPhaseSpecialWITitle
-		fmt.Print("    Work item title (Enter when done): ")
-
-	case draftPhaseWizardReview:
-		s.handleWizardReviewInput(input)
-
-	case draftPhaseConversation:
-		s.handleDraftConversationInput(input)
-
-	case draftPhaseReview:
-		s.handleDraftReviewInput(input)
+		m.draft.currentSpecial.WorkItems = append(m.draft.currentSpecial.WorkItems, m.draft.currentSpecialWI)
+		m.draft.phase = draftPhaseSpecialWITitle
+		return "    Work item title (Enter when done):"
 	}
+	return ""
 }
 
-func (s *shellSession) buildAndShowWizardDraft() {
+func (m *shellModel) buildAndShowWizardDraft() string {
 	wizard := &wizardResult{
-		Description:  s.draft.description,
-		StartDate:    s.draft.startDate,
-		Deadline:     s.draft.deadline,
-		Groups:       s.draft.groups,
-		WorkItems:    s.draft.workItems,
-		SpecialNodes: s.draft.specialNodes,
+		Description:  m.draft.description,
+		StartDate:    m.draft.startDate,
+		Deadline:     m.draft.deadline,
+		Groups:       m.draft.groups,
+		WorkItems:    m.draft.workItems,
+		SpecialNodes: m.draft.specialNodes,
 	}
-	s.draft.wizard = wizard
-	s.draft.schema = buildSchemaFromWizard(wizard)
+	m.draft.wizard = wizard
+	m.draft.schema = buildSchemaFromWizard(wizard)
 
-	// Show preview.
 	conv := &intelligence.DraftConversation{
-		Draft:  s.draft.schema,
+		Draft:  m.draft.schema,
 		Status: intelligence.DraftStatusReady,
 	}
-	fmt.Print(formatter.FormatDraftPreview(conv))
-
-	s.draft.phase = draftPhaseWizardReview
-	s.printWizardReviewPrompt()
+	m.draft.phase = draftPhaseWizardReview
+	return formatter.FormatDraftPreview(conv) + m.wizardReviewPrompt()
 }
 
-func (s *shellSession) printWizardReviewPrompt() {
-	if s.app.ProjectDraft != nil {
-		fmt.Print("\n[a]ccept  [r]efine with AI  [c]ancel: ")
-	} else {
-		fmt.Print("\n[a]ccept  [c]ancel: ")
+func (m *shellModel) wizardReviewPrompt() string {
+	if m.app.ProjectDraft != nil {
+		return "\n[a]ccept  [r]efine with AI  [c]ancel:"
 	}
+	return "\n[a]ccept  [c]ancel:"
 }
 
-func (s *shellSession) handleWizardReviewInput(input string) {
+func (m *shellModel) handleWizardReviewInput(input string) string {
 	switch strings.ToLower(input) {
 	case "a", "accept":
-		s.acceptWizardSchema()
+		return m.acceptWizardSchema()
 	case "c", "cancel":
-		fmt.Println("Draft cancelled.")
-		s.exitDraftMode()
+		m.exitDraftMode()
+		return "Draft cancelled."
 	case "r", "refine":
-		if s.app.ProjectDraft == nil {
-			fmt.Println("LLM features are disabled. Accept the draft or cancel.")
-			s.printWizardReviewPrompt()
-			return
+		if m.app.ProjectDraft == nil {
+			return "LLM features are disabled. Accept the draft or cancel." + m.wizardReviewPrompt()
 		}
-		desc := buildLLMDescription(s.draft.wizard)
-		s.startDraftConversation(desc, s.draft.schema)
+		desc := buildLLMDescription(m.draft.wizard)
+		return m.startDraftConversation(desc, m.draft.schema)
 	default:
-		fmt.Println("Invalid option.")
-		s.printWizardReviewPrompt()
+		return "Invalid option." + m.wizardReviewPrompt()
 	}
 }
 
-func (s *shellSession) acceptWizardSchema() {
+func (m *shellModel) acceptWizardSchema() string {
 	ctx := context.Background()
-	errs := importer.ValidateImportSchema(s.draft.schema)
+	errs := importer.ValidateImportSchema(m.draft.schema)
 	if len(errs) > 0 {
-		fmt.Print(formatter.FormatDraftValidationErrors(errs))
-		fmt.Println("Draft has validation errors.")
-		s.exitDraftMode()
-		return
+		m.exitDraftMode()
+		return formatter.FormatDraftValidationErrors(errs) + "Draft has validation errors."
 	}
 
-	result, err := s.app.Import.ImportProjectFromSchema(ctx, s.draft.schema)
+	result, err := m.app.Import.ImportProjectFromSchema(ctx, m.draft.schema)
 	if err != nil {
-		fmt.Println(formatter.StyleRed.Render(fmt.Sprintf("Import failed: %v", err)))
-		return
+		return formatter.StyleRed.Render(fmt.Sprintf("Import failed: %v", err))
 	}
 
-	fmt.Print(formatter.FormatDraftAccepted(result))
-	s.exitDraftMode()
+	m.exitDraftMode()
+	return formatter.FormatDraftAccepted(result)
 }
 
-func (s *shellSession) startDraftConversation(description string, preDraft *importer.ImportSchema) {
+func (m *shellModel) startDraftConversation(description string, preDraft *importer.ImportSchema) string {
 	ctx := context.Background()
 
 	var conv *intelligence.DraftConversation
 	var err error
 
 	if preDraft != nil {
-		stopSpinner := formatter.StartSpinner("Preparing for refinement...")
-		conv, err = s.app.ProjectDraft.StartWithDraft(ctx, description, preDraft)
-		stopSpinner()
+		conv, err = m.app.ProjectDraft.StartWithDraft(ctx, description, preDraft)
 	} else {
-		stopSpinner := formatter.StartSpinner("Building your project draft...")
-		conv, err = s.app.ProjectDraft.Start(ctx, description)
-		stopSpinner()
+		conv, err = m.app.ProjectDraft.Start(ctx, description)
 	}
 	if err != nil {
-		fmt.Println(formatter.StyleRed.Render(fmt.Sprintf("Failed to start project draft: %v", err)))
-		s.exitDraftMode()
-		return
+		m.exitDraftMode()
+		return formatter.StyleRed.Render(fmt.Sprintf("Failed to start project draft: %v", err))
 	}
-	s.draft.conv = conv
-	fmt.Print(formatter.FormatDraftTurn(conv))
+	m.draft.conv = conv
+
+	var b strings.Builder
+	b.WriteString(formatter.FormatDraftTurn(conv))
 
 	if conv.Status == intelligence.DraftStatusReady {
-		s.draft.phase = draftPhaseReview
-		fmt.Print(formatter.FormatDraftReview(conv))
-		fmt.Print("\n[a]ccept  [e]dit  [c]ancel: ")
+		m.draft.phase = draftPhaseReview
+		b.WriteString(formatter.FormatDraftReview(conv))
+		b.WriteString("\n[a]ccept  [e]dit  [c]ancel:")
 	} else {
-		s.draft.phase = draftPhaseConversation
+		m.draft.phase = draftPhaseConversation
 	}
+
+	return b.String()
 }
 
-func (s *shellSession) handleDraftConversationInput(input string) {
+func (m *shellModel) handleDraftConversationInput(input string) string {
 	if input == "" {
-		return
+		return ""
 	}
 
 	lower := strings.ToLower(input)
 	switch lower {
 	case "/show", "/draft":
-		fmt.Print(formatter.FormatDraftPreview(s.draft.conv))
-		return
+		return formatter.FormatDraftPreview(m.draft.conv)
 	case "/accept":
-		if s.draft.conv.Draft != nil {
-			s.acceptShellDraft()
-		} else {
-			fmt.Println("No draft to accept yet.")
+		if m.draft.conv.Draft != nil {
+			return m.acceptShellDraft()
 		}
-		return
+		return "No draft to accept yet."
 	}
 
 	ctx := context.Background()
-	stopSpinner := formatter.StartSpinner("Thinking...")
-	conv, err := s.app.ProjectDraft.NextTurn(ctx, s.draft.conv, input)
-	stopSpinner()
+	conv, err := m.app.ProjectDraft.NextTurn(ctx, m.draft.conv, input)
 	if err != nil {
-		fmt.Println(formatter.StyleRed.Render(fmt.Sprintf("Error: %v", err)))
-		return
+		return shellError(err)
 	}
-	s.draft.conv = conv
-	fmt.Print(formatter.FormatDraftTurn(conv))
+	m.draft.conv = conv
+
+	var b strings.Builder
+	b.WriteString(formatter.FormatDraftTurn(conv))
 
 	if conv.Status == intelligence.DraftStatusReady {
-		s.draft.phase = draftPhaseReview
-		fmt.Print(formatter.FormatDraftReview(conv))
-		fmt.Print("\n[a]ccept  [e]dit  [c]ancel: ")
+		m.draft.phase = draftPhaseReview
+		b.WriteString(formatter.FormatDraftReview(conv))
+		b.WriteString("\n[a]ccept  [e]dit  [c]ancel:")
 	}
+
+	return b.String()
 }
 
-func (s *shellSession) handleDraftReviewInput(input string) {
+func (m *shellModel) handleDraftReviewInput(input string) string {
 	switch strings.ToLower(input) {
 	case "a", "accept":
-		s.acceptShellDraft()
+		return m.acceptShellDraft()
 	case "c", "cancel":
-		fmt.Println("Draft cancelled.")
-		s.exitDraftMode()
+		m.exitDraftMode()
+		return "Draft cancelled."
 	case "e", "edit":
-		s.draft.conv.Status = intelligence.DraftStatusGathering
-		s.draft.phase = draftPhaseConversation
-		fmt.Print("What would you like to change?\n")
+		m.draft.conv.Status = intelligence.DraftStatusGathering
+		m.draft.phase = draftPhaseConversation
+		return "What would you like to change?"
 	default:
-		// Treat as an edit instruction.
-		s.draft.conv.Status = intelligence.DraftStatusGathering
-		s.draft.phase = draftPhaseConversation
+		m.draft.conv.Status = intelligence.DraftStatusGathering
+		m.draft.phase = draftPhaseConversation
 		ctx := context.Background()
-		stopSpinner := formatter.StartSpinner("Thinking...")
-		conv, err := s.app.ProjectDraft.NextTurn(ctx, s.draft.conv, input)
-		stopSpinner()
+		conv, err := m.app.ProjectDraft.NextTurn(ctx, m.draft.conv, input)
 		if err != nil {
-			fmt.Println(formatter.StyleRed.Render(fmt.Sprintf("Error: %v", err)))
-			return
+			return shellError(err)
 		}
-		s.draft.conv = conv
-		fmt.Print(formatter.FormatDraftTurn(conv))
+		m.draft.conv = conv
+
+		var b strings.Builder
+		b.WriteString(formatter.FormatDraftTurn(conv))
 		if conv.Status == intelligence.DraftStatusReady {
-			s.draft.phase = draftPhaseReview
-			fmt.Print(formatter.FormatDraftReview(conv))
-			fmt.Print("\n[a]ccept  [e]dit  [c]ancel: ")
+			m.draft.phase = draftPhaseReview
+			b.WriteString(formatter.FormatDraftReview(conv))
+			b.WriteString("\n[a]ccept  [e]dit  [c]ancel:")
 		}
+		return b.String()
 	}
 }
 
-func (s *shellSession) acceptShellDraft() {
+func (m *shellModel) acceptShellDraft() string {
 	ctx := context.Background()
-	errs := importer.ValidateImportSchema(s.draft.conv.Draft)
+	errs := importer.ValidateImportSchema(m.draft.conv.Draft)
 	if len(errs) > 0 {
-		fmt.Print(formatter.FormatDraftValidationErrors(errs))
-		fmt.Println("Draft has validation errors. Continue editing to fix them.")
-		s.draft.conv.Status = intelligence.DraftStatusGathering
-		s.draft.phase = draftPhaseConversation
-		return
+		m.draft.conv.Status = intelligence.DraftStatusGathering
+		m.draft.phase = draftPhaseConversation
+		return formatter.FormatDraftValidationErrors(errs) + "Draft has validation errors. Continue editing to fix them."
 	}
 
-	result, err := s.app.Import.ImportProjectFromSchema(ctx, s.draft.conv.Draft)
+	result, err := m.app.Import.ImportProjectFromSchema(ctx, m.draft.conv.Draft)
 	if err != nil {
-		fmt.Println(formatter.StyleRed.Render(fmt.Sprintf("Import failed: %v", err)))
-		return
+		return formatter.StyleRed.Render(fmt.Sprintf("Import failed: %v", err))
 	}
 
-	fmt.Print(formatter.FormatDraftAccepted(result))
-	s.exitDraftMode()
+	m.exitDraftMode()
+	return formatter.FormatDraftAccepted(result)
 }
 
-func (s *shellSession) exitDraftMode() {
-	s.draftMode = false
-	s.draft = nil
+func (m *shellModel) exitDraftMode() {
+	m.mode = modePrompt
+	m.draft = nil
 }

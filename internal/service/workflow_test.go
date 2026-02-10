@@ -20,7 +20,7 @@ func TestFullWorkflow_ProjectLifecycle(t *testing.T) {
 	// 2. Create all services
 	projectService := NewProjectService(projRepo)
 	nodeService := NewNodeService(nodeRepo)
-	workItemService := NewWorkItemService(wiRepo)
+	workItemService := NewWorkItemService(wiRepo, nodeRepo)
 	sessionService := NewSessionService(sessRepo, wiRepo)
 	whatNowService := NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo)
 	statusService := NewStatusService(projRepo, wiRepo, sessRepo, profRepo)
@@ -145,7 +145,7 @@ func TestFullWorkflow_MultiProjectVariation(t *testing.T) {
 
 	projectService := NewProjectService(projRepo)
 	nodeService := NewNodeService(nodeRepo)
-	workItemService := NewWorkItemService(wiRepo)
+	workItemService := NewWorkItemService(wiRepo, nodeRepo)
 	sessionService := NewSessionService(sessRepo, wiRepo)
 	whatNowService := NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo)
 

@@ -130,3 +130,94 @@ func TestAskCmd_YesFlagExecutesNeedsConfirmationIntent(t *testing.T) {
 	require.NotNil(t, updated.TargetDate)
 	assert.Equal(t, "2026-02-09", updated.TargetDate.Format("2006-01-02"))
 }
+
+// =============================================================================
+// dispatchIntent Integration Tests — covers routing for non-update intents
+// =============================================================================
+
+func TestDispatchIntent_WhatNow(t *testing.T) {
+	app := testApp(t)
+	seedProjectWithWork(t, app)
+
+	intent := &intelligence.ParsedIntent{
+		Intent: intelligence.IntentWhatNow,
+		Arguments: map[string]interface{}{
+			"available_min": float64(60),
+		},
+	}
+
+	// Should succeed — dispatches to WhatNow.Recommend().
+	err := dispatchIntent(app, intent)
+	require.NoError(t, err)
+}
+
+func TestDispatchIntent_WhatNow_DefaultMinutes(t *testing.T) {
+	app := testApp(t)
+	seedProjectWithWork(t, app)
+
+	// When available_min is absent, should fall back to 60.
+	intent := &intelligence.ParsedIntent{
+		Intent:    intelligence.IntentWhatNow,
+		Arguments: map[string]interface{}{},
+	}
+
+	err := dispatchIntent(app, intent)
+	require.NoError(t, err)
+}
+
+func TestDispatchIntent_Status(t *testing.T) {
+	app := testApp(t)
+	seedProjectWithWork(t, app)
+
+	intent := &intelligence.ParsedIntent{
+		Intent:    intelligence.IntentStatus,
+		Arguments: map[string]interface{}{},
+	}
+
+	err := dispatchIntent(app, intent)
+	require.NoError(t, err)
+}
+
+func TestDispatchIntent_ExplainNow(t *testing.T) {
+	app := testApp(t)
+	seedProjectWithWork(t, app)
+
+	intent := &intelligence.ParsedIntent{
+		Intent: intelligence.IntentExplainNow,
+		Arguments: map[string]interface{}{
+			"minutes": float64(60),
+		},
+	}
+
+	// Uses deterministic fallback since app.Explain is nil.
+	err := dispatchIntent(app, intent)
+	require.NoError(t, err)
+}
+
+func TestDispatchIntent_ReviewWeekly(t *testing.T) {
+	app := testApp(t)
+	seedProjectWithWork(t, app)
+
+	intent := &intelligence.ParsedIntent{
+		Intent:    intelligence.IntentReviewWeekly,
+		Arguments: map[string]interface{}{},
+	}
+
+	// Uses deterministic fallback since app.Explain is nil.
+	err := dispatchIntent(app, intent)
+	require.NoError(t, err)
+}
+
+func TestDispatchIntent_UnknownIntentShowsHint(t *testing.T) {
+	app := testApp(t)
+
+	intent := &intelligence.ParsedIntent{
+		Intent:    intelligence.IntentTemplateList,
+		Arguments: map[string]interface{}{},
+	}
+
+	// Template-related intents don't have direct dispatch —
+	// should succeed (prints hint) without error.
+	err := dispatchIntent(app, intent)
+	require.NoError(t, err)
+}

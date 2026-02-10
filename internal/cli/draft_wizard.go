@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/importer"
 )
 
@@ -44,17 +45,11 @@ type wizardResult struct {
 	SpecialNodes []wizardSpecialNode
 }
 
-var validNodeKinds = map[string]bool{
-	"module": true, "week": true, "section": true,
-	"stage": true, "assessment": true, "generic": true,
-}
-
-var validWorkItemTypes = map[string]bool{
-	"reading": true, "practice": true, "review": true,
-	"assignment": true, "task": true, "quiz": true,
-	"study": true, "training": true, "activity": true,
-	"submission": true,
-}
+// validNodeKinds and validWorkItemTypes alias the canonical domain sets.
+var (
+	validNodeKinds     = domain.ValidNodeKinds
+	validWorkItemTypes = domain.ValidWorkItemTypes
+)
 
 // collectWorkItem prompts for a single work item (title, type, minutes).
 // Returns nil when the user enters an empty title (signals "done").

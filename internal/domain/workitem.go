@@ -3,9 +3,10 @@ package domain
 import "time"
 
 type WorkItem struct {
-	ID         string
-	NodeID     string
-	Title      string
+	ID     string
+	NodeID string
+	Seq    int // project-scoped sequential ID (shared with plan nodes)
+	Title  string
 	Type       string
 	Status     WorkItemStatus
 	ArchivedAt *time.Time

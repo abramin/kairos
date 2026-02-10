@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
-	"os"
 	"strings"
 	"time"
 
@@ -44,16 +42,18 @@ func newAskCmd(app *App) *cobra.Command {
 				return fmt.Errorf("parse failed: %w", err)
 			}
 
+			resolution.CommandHint = CommandHint(resolution.ParsedIntent)
+
 			fmt.Print(formatter.FormatAskResolution(resolution))
 
 			switch resolution.ExecutionState {
 			case intelligence.StateExecuted:
 				return dispatchIntent(app, resolution.ParsedIntent)
 			case intelligence.StateNeedsConfirmation:
-				if autoConfirm || confirmPromptIO(cmd.InOrStdin(), cmd.OutOrStdout()) {
+				if autoConfirm {
 					return dispatchIntent(app, resolution.ParsedIntent)
 				}
-				fmt.Fprintln(cmd.OutOrStdout(), "Cancelled.")
+				// Command is shown in the box above; user can copy-paste.
 			case intelligence.StateNeedsClarification:
 				// Display already handled by formatter.
 			case intelligence.StateRejected:
@@ -98,8 +98,26 @@ func dispatchIntent(app *App, intent *intelligence.ParsedIntent) error {
 	case intelligence.IntentReviewWeekly:
 		return runWeeklyReview(app)
 
+	case intelligence.IntentProjectImport:
+		filePath, ok := stringArg(intent.Arguments, "file_path")
+		if !ok {
+			return fmt.Errorf("project_import requires file_path")
+		}
+		result, err := app.Import.ImportProject(ctx, filePath)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Imported project %s [%s] — %d nodes, %d work items, %d dependencies\n",
+			result.Project.Name, result.Project.ShortID,
+			result.NodeCount, result.WorkItemCount, result.DependencyCount)
+
 	default:
-		fmt.Printf("Intent %q dispatched. Use the explicit CLI command to execute.\n", intent.Intent)
+		hint := CommandHint(intent)
+		if hint != "" {
+			fmt.Printf("Run: %s\n", hint)
+		} else {
+			fmt.Printf("Intent %q recognized but has no direct CLI dispatch.\n", intent.Intent)
+		}
 	}
 	return nil
 }
@@ -248,12 +266,3 @@ func dispatchProjectUpdateIntent(app *App, args map[string]interface{}) error {
 	return nil
 }
 
-func confirmPromptIO(in io.Reader, out io.Writer) bool {
-	if in == nil {
-		in = os.Stdin
-	}
-	if out == nil {
-		out = os.Stdout
-	}
-	return promptYesNoWithDefaultIO(in, out, "Confirm? [Y/n]: ", true)
-}

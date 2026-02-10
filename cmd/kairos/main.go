@@ -11,6 +11,7 @@ import (
 	"github.com/alexanderramin/kairos/internal/llm"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/alexanderramin/kairos/internal/service"
+	"github.com/mattn/go-isatty"
 )
 
 func main() {
@@ -66,13 +67,18 @@ func run() error {
 	app := &cli.App{
 		Projects:  service.NewProjectService(projectRepo),
 		Nodes:     service.NewNodeService(nodeRepo),
-		WorkItems: service.NewWorkItemService(workItemRepo),
+		WorkItems: service.NewWorkItemService(workItemRepo, nodeRepo),
 		Sessions:  service.NewSessionService(sessionRepo, workItemRepo),
 		WhatNow:   service.NewWhatNowService(workItemRepo, sessionRepo, projectRepo, depRepo, profileRepo),
 		Status:    service.NewStatusService(projectRepo, workItemRepo, sessionRepo, profileRepo),
 		Replan:    service.NewReplanService(projectRepo, workItemRepo, sessionRepo, profileRepo),
 		Templates: service.NewTemplateService(templateDir, projectRepo, nodeRepo, workItemRepo, depRepo),
 		Import:    service.NewImportService(projectRepo, nodeRepo, workItemRepo, depRepo),
+	}
+
+	// Detect interactive terminal for shell-first entrypoint.
+	app.IsInteractive = func() bool {
+		return isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())
 	}
 
 	// Wire v2 intelligence services (only when LLM is enabled)

@@ -21,6 +21,7 @@ type ProjectService interface {
 type NodeService interface {
 	Create(ctx context.Context, n *domain.PlanNode) error
 	GetByID(ctx context.Context, id string) (*domain.PlanNode, error)
+	GetBySeq(ctx context.Context, projectID string, seq int) (*domain.PlanNode, error)
 	ListByProject(ctx context.Context, projectID string) ([]*domain.PlanNode, error)
 	ListChildren(ctx context.Context, parentID string) ([]*domain.PlanNode, error)
 	ListRoots(ctx context.Context, projectID string) ([]*domain.PlanNode, error)
@@ -31,10 +32,12 @@ type NodeService interface {
 type WorkItemService interface {
 	Create(ctx context.Context, w *domain.WorkItem) error
 	GetByID(ctx context.Context, id string) (*domain.WorkItem, error)
+	GetBySeq(ctx context.Context, projectID string, seq int) (*domain.WorkItem, error)
 	ListByNode(ctx context.Context, nodeID string) ([]*domain.WorkItem, error)
 	ListByProject(ctx context.Context, projectID string) ([]*domain.WorkItem, error)
 	Update(ctx context.Context, w *domain.WorkItem) error
 	MarkDone(ctx context.Context, id string) error
+	MarkInProgress(ctx context.Context, id string) error
 	Archive(ctx context.Context, id string) error
 	Delete(ctx context.Context, id string) error
 }

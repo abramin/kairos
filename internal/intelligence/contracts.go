@@ -1,6 +1,5 @@
 package intelligence
 
-import "time"
 
 // IntentName enumerates all commands the NL parser can produce.
 type IntentName string
@@ -10,6 +9,7 @@ const (
 	IntentStatus                IntentName = "status"
 	IntentReplan                IntentName = "replan"
 	IntentProjectAdd            IntentName = "project_add"
+	IntentProjectImport         IntentName = "project_import"
 	IntentProjectUpdate         IntentName = "project_update"
 	IntentProjectArchive        IntentName = "project_archive"
 	IntentProjectRemove         IntentName = "project_remove"
@@ -36,7 +36,7 @@ const (
 // validIntents is the set of known intent names for validation.
 var validIntents = map[IntentName]bool{
 	IntentWhatNow: true, IntentStatus: true, IntentReplan: true,
-	IntentProjectAdd: true, IntentProjectUpdate: true, IntentProjectArchive: true,
+	IntentProjectAdd: true, IntentProjectImport: true, IntentProjectUpdate: true, IntentProjectArchive: true,
 	IntentProjectRemove: true, IntentNodeAdd: true, IntentNodeUpdate: true,
 	IntentNodeRemove: true, IntentWorkAdd: true, IntentWorkUpdate: true,
 	IntentWorkDone: true, IntentWorkRemove: true, IntentSessionLog: true,
@@ -62,7 +62,7 @@ const (
 // writeIntents is the set of intents that always require confirmation.
 var writeIntents = map[IntentName]bool{
 	IntentReplan: true, IntentProjectAdd: true, IntentProjectUpdate: true,
-	IntentProjectArchive: true, IntentProjectRemove: true,
+	IntentProjectImport: true, IntentProjectArchive: true, IntentProjectRemove: true,
 	IntentNodeAdd: true, IntentNodeUpdate: true, IntentNodeRemove: true,
 	IntentWorkAdd: true, IntentWorkUpdate: true, IntentWorkDone: true,
 	IntentWorkRemove: true, IntentSessionLog: true, IntentSessionRemove: true,
@@ -90,9 +90,6 @@ type ParsedIntent struct {
 type ParsedIntentErrorCode string
 
 const (
-	ErrCodeLowConfidence       ParsedIntentErrorCode = "LOW_CONFIDENCE"
-	ErrCodeAmbiguous           ParsedIntentErrorCode = "AMBIGUOUS"
-	ErrCodeUnsupportedIntent   ParsedIntentErrorCode = "UNSUPPORTED_INTENT"
 	ErrCodeArgSchemaMismatch   ParsedIntentErrorCode = "ARGUMENT_SCHEMA_MISMATCH"
 	ErrCodeInvalidOutputFormat ParsedIntentErrorCode = "INVALID_OUTPUT_FORMAT"
 )
@@ -123,6 +120,7 @@ type AskResolution struct {
 	ParsedIntent     *ParsedIntent  `json:"parsed_intent"`
 	ExecutionState   ExecutionState `json:"execution_state"`
 	ExecutionMessage string         `json:"execution_message"`
+	CommandHint      string         `json:"command_hint,omitempty"`
 }
 
 // EvidenceRefType classifies the kind of evidence an explanation factor references.
@@ -130,7 +128,6 @@ type EvidenceRefType string
 
 const (
 	EvidenceScoreFactor EvidenceRefType = "score_factor"
-	EvidenceRiskMetric  EvidenceRefType = "risk_metric"
 	EvidenceConstraint  EvidenceRefType = "constraint"
 	EvidenceHistory     EvidenceRefType = "history"
 )
@@ -156,10 +153,8 @@ type ExplanationContext string
 
 const (
 	ExplainContextWhatNow      ExplanationContext = "what_now"
-	ExplainContextStatus       ExplanationContext = "status"
 	ExplainContextWhyNot       ExplanationContext = "why_not"
 	ExplainContextWeeklyReview ExplanationContext = "weekly_review"
-	ExplainContextSimulation   ExplanationContext = "simulation"
 )
 
 // LLMExplanation is a narrative explanation grounded in engine trace data.
@@ -171,16 +166,6 @@ type LLMExplanation struct {
 	Counterfactuals  []Counterfactual    `json:"counterfactuals,omitempty"`
 	Confidence       float64             `json:"confidence"`
 }
-
-// LLMExplanationErrorCode enumerates explanation failure reasons.
-type LLMExplanationErrorCode string
-
-const (
-	ExplainErrMissingTrace     LLMExplanationErrorCode = "MISSING_TRACE"
-	ExplainErrInvalidEvidence  LLMExplanationErrorCode = "INVALID_EVIDENCE_REF"
-	ExplainErrUnfaithful       LLMExplanationErrorCode = "UNFAITHFUL_EXPLANATION"
-	ExplainErrInvalidFormat    LLMExplanationErrorCode = "INVALID_OUTPUT_FORMAT"
-)
 
 // TemplateDraft is the result of LLM-assisted template generation.
 type TemplateDraft struct {
@@ -195,14 +180,6 @@ type TemplateDraftValidation struct {
 	IsValid  bool     `json:"is_valid"`
 	Errors   []string `json:"errors"`
 	Warnings []string `json:"warnings"`
-}
-
-// LLMEnvelope wraps any LLM output with metadata.
-type LLMEnvelope struct {
-	ContractVersion string      `json:"contract_version"`
-	Model           string      `json:"model"`
-	GeneratedAt     time.Time   `json:"generated_at"`
-	Data            interface{} `json:"data"`
 }
 
 // ConfirmationPolicy defines when parsed intents may auto-execute.
