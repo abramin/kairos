@@ -26,9 +26,9 @@ func newAskCmd(app *App) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if app.Intent == nil {
 				return fmt.Errorf("LLM features are disabled. Use explicit commands:\n" +
-					"  kairos what-now --minutes 60\n" +
-					"  kairos status\n" +
-					"  kairos project list\n\n" +
+					"  what-now --minutes 60\n" +
+					"  status\n" +
+					"  project list\n\n" +
 					"Enable with: KAIROS_LLM_ENABLED=true")
 			}
 
@@ -116,7 +116,7 @@ func dispatchIntent(app *App, intent *intelligence.ParsedIntent) error {
 		if hint != "" {
 			fmt.Printf("Run: %s\n", hint)
 		} else {
-			fmt.Printf("Intent %q recognized but has no direct CLI dispatch.\n", intent.Intent)
+			fmt.Printf("Intent %q recognized but has no direct dispatch.\n", intent.Intent)
 		}
 	}
 	return nil

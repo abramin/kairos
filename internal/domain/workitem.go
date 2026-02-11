@@ -3,13 +3,15 @@ package domain
 import "time"
 
 type WorkItem struct {
-	ID     string
-	NodeID string
-	Seq    int // project-scoped sequential ID (shared with plan nodes)
-	Title  string
-	Type       string
-	Status     WorkItemStatus
-	ArchivedAt *time.Time
+	ID          string
+	NodeID      string
+	Seq         int // project-scoped sequential ID (shared with plan nodes)
+	Title       string
+	Description string
+	Type        string
+	Status      WorkItemStatus
+	ArchivedAt  *time.Time
+	CompletedAt *time.Time
 
 	// Duration
 	DurationMode       DurationMode

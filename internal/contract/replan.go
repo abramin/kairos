@@ -66,7 +66,6 @@ const (
 type ReplanError struct {
 	Code    ReplanErrorCode
 	Message string
-	Details map[string]any
 }
 
 func (e *ReplanError) Error() string {

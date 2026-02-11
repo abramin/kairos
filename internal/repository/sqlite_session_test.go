@@ -54,7 +54,7 @@ func TestSessionRepo_GetByID_NotFound(t *testing.T) {
 
 	_, err := repo.GetByID(ctx, "nonexistent")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+	assert.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestSessionRepo_ListByWorkItem(t *testing.T) {

@@ -53,12 +53,12 @@ func TestFormatAskResolution_IncludesCommandHint(t *testing.T) {
 			Arguments:  map[string]interface{}{"file_path": "spanish_a2_b1.json"},
 		},
 		ExecutionState: intelligence.StateNeedsConfirmation,
-		CommandHint:    "kairos project import spanish_a2_b1.json",
+		CommandHint:    "project import spanish_a2_b1.json",
 	}
 
 	out := FormatAskResolution(r)
 	assert.Contains(t, out, "project_import")
-	assert.Contains(t, out, "kairos project import spanish_a2_b1.json")
+	assert.Contains(t, out, "project import spanish_a2_b1.json")
 	assert.Contains(t, out, "Write operation")
 	assert.NotContains(t, out, "Proceed? [Y/n]")
 }
@@ -72,12 +72,12 @@ func TestFormatAskResolution_AutoExecuteReadOnly(t *testing.T) {
 			Arguments:  map[string]interface{}{"available_min": float64(60)},
 		},
 		ExecutionState: intelligence.StateExecuted,
-		CommandHint:    "kairos what-now --minutes 60",
+		CommandHint:    "what-now --minutes 60",
 	}
 
 	out := FormatAskResolution(r)
 	assert.Contains(t, out, "Auto-executing")
-	assert.Contains(t, out, "kairos what-now --minutes 60")
+	assert.Contains(t, out, "what-now --minutes 60")
 }
 
 func TestFormatExplanation_OmitsDuplicateDetailedSummary(t *testing.T) {

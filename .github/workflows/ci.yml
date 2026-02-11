@@ -37,3 +37,23 @@ jobs:
           name: coverage
           path: coverage.out
         if: always()
+
+  race-test:
+    name: Race Detector
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.x'
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Test with race detector
+        run: make test-race

@@ -15,6 +15,7 @@ const (
 	ReasonDependencyBlocked RecommendationReasonCode = "DEPENDENCY_BLOCKED"
 	ReasonOnTrackSafeMix    RecommendationReasonCode = "ON_TRACK_SAFE_MIX"
 	ReasonCriticalFocus     RecommendationReasonCode = "CRITICAL_FOCUS"
+	ReasonMomentum          RecommendationReasonCode = "MOMENTUM"
 )
 
 type RecommendationReason struct {
@@ -61,6 +62,7 @@ const (
 	BlockerNotBefore              ConstraintBlockerCode = "NOT_BEFORE"
 	BlockerDependency             ConstraintBlockerCode = "DEPENDENCY"
 	BlockerStatusDone             ConstraintBlockerCode = "STATUS_DONE"
+	BlockerNotInCriticalScope     ConstraintBlockerCode = "NOT_IN_CRITICAL_SCOPE"
 	BlockerSessionMinExceedsAvail ConstraintBlockerCode = "SESSION_MIN_EXCEEDS_AVAILABLE"
 )
 

@@ -1,8 +1,6 @@
 package scheduler
 
 import (
-	"math"
-
 	"github.com/alexanderramin/kairos/internal/contract"
 )
 
@@ -16,10 +14,11 @@ func AllocateSlices(
 ) ([]contract.WorkSlice, []contract.ConstraintBlocker) {
 	var slices []contract.WorkSlice
 	var blockers []contract.ConstraintBlocker
+	var pass1Candidates []ScoredCandidate // parallel to slices — tracks pass-1 origins for extension
 	remaining := availableMin
 	projectsUsed := make(map[string]bool)
 
-	// First pass: prefer variation
+	// First pass: prefer variation (one item per project)
 	var deferred []ScoredCandidate
 	for _, c := range candidates {
 		if len(slices) >= maxSlices || remaining <= 0 {
@@ -45,8 +44,28 @@ func AllocateSlices(
 		}
 		if slice != nil {
 			slices = append(slices, *slice)
+			pass1Candidates = append(pass1Candidates, c)
 			remaining -= slice.AllocatedMin
 			projectsUsed[c.Input.ProjectID] = true
+		}
+	}
+
+	// Extension pass: when variation deferred same-project items, extend
+	// pass-1 slices up to maxSessionMin before filling with deferred items.
+	for i, c := range pass1Candidates {
+		if !enforceVariation || len(deferred) == 0 {
+			break
+		}
+		if remaining <= 0 {
+			break
+		}
+		workLeft := c.Input.PlannedMin - c.Input.LoggedMin
+		ceiling := min(c.Input.MaxSessionMin, workLeft)
+		headroom := ceiling - slices[i].AllocatedMin
+		if headroom > 0 {
+			extend := min(headroom, remaining)
+			slices[i].AllocatedMin += extend
+			remaining -= extend
 		}
 	}
 
@@ -85,7 +104,7 @@ func tryAllocate(c ScoredCandidate, remaining int) (*contract.WorkSlice, *contra
 	}
 
 	// Clamp allocation to [min, min(max, remaining)]
-	upper := int(math.Min(float64(maxS), float64(remaining)))
+	upper := min(maxS, remaining)
 	allocated := clamp(defS, minS, upper)
 
 	// Don't over-allocate past remaining planned work

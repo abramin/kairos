@@ -403,3 +403,88 @@ func TestWhatNow_DeadlineUpdate_ChangesRiskAndRanking(t *testing.T) {
 	// Mode should be different (was balanced, now critical or at_risk indicators)
 	assert.NotEqual(t, mode1, resp2.Mode, "deadline change should affect mode")
 }
+
+// TestWhatNow_UserProfileWeightsAffectOrdering verifies that changing the
+// UserProfile scoring weights actually changes recommendation ordering.
+// This is the only personalization mechanism — zero coverage without this test.
+func TestWhatNow_UserProfileWeightsAffectOrdering(t *testing.T) {
+	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+
+	// Both projects share the SAME deadline (90 days) so the canonical sort
+	// falls through risk (both on-track) → due date (same) → score (varies by weights).
+	deadline := now.AddDate(0, 3, 0)
+
+	// Project A: more work remaining → higher deadline pressure score.
+	projA := testutil.NewTestProject("Alpha", testutil.WithTargetDate(deadline))
+	require.NoError(t, projects.Create(ctx, projA))
+	nodeA := testutil.NewTestNode(projA.ID, "Node A")
+	require.NoError(t, nodes.Create(ctx, nodeA))
+	wiA := testutil.NewTestWorkItem(nodeA.ID, "Alpha Task",
+		testutil.WithPlannedMin(500),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, workItems.Create(ctx, wiA))
+
+	// Project B: less work remaining → lower deadline pressure, but not worked recently → higher spacing.
+	projB := testutil.NewTestProject("Beta", testutil.WithTargetDate(deadline))
+	require.NoError(t, projects.Create(ctx, projB))
+	nodeB := testutil.NewTestNode(projB.ID, "Node B")
+	require.NoError(t, nodes.Create(ctx, nodeB))
+	wiB := testutil.NewTestWorkItem(nodeB.ID, "Beta Task",
+		testutil.WithPlannedMin(100),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, workItems.Create(ctx, wiB))
+
+	// Log recent sessions for both projects (avoid zero-activity critical path).
+	// Project A worked 2 hours ago → low spacing bonus.
+	// Project B worked 5 days ago → high spacing bonus.
+	sessA := testutil.NewTestSession(wiA.ID, 30,
+		testutil.WithStartedAt(now.Add(-2*time.Hour)),
+	)
+	require.NoError(t, sessions.Create(ctx, sessA))
+	sessB := testutil.NewTestSession(wiB.ID, 30,
+		testutil.WithStartedAt(now.Add(-5*24*time.Hour)),
+	)
+	require.NoError(t, sessions.Create(ctx, sessB))
+
+	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+
+	// --- Weight set 1: Heavy deadline pressure, zero spacing/variation ---
+	profile, err := profiles.Get(ctx)
+	require.NoError(t, err)
+	profile.WeightDeadlinePressure = 5.0
+	profile.WeightBehindPace = 5.0
+	profile.WeightSpacing = 0.0
+	profile.WeightVariation = 0.0
+	require.NoError(t, profiles.Upsert(ctx, profile))
+
+	req := contract.NewWhatNowRequest(90)
+	req.Now = &now
+
+	resp1, err := svc.Recommend(ctx, req)
+	require.NoError(t, err)
+	require.NotEmpty(t, resp1.Recommendations)
+
+	firstProjectID1 := resp1.Recommendations[0].ProjectID
+
+	// --- Weight set 2: Zero deadline pressure, heavy spacing/variation ---
+	profile.WeightDeadlinePressure = 0.0
+	profile.WeightBehindPace = 0.0
+	profile.WeightSpacing = 5.0
+	profile.WeightVariation = 5.0
+	require.NoError(t, profiles.Upsert(ctx, profile))
+
+	resp2, err := svc.Recommend(ctx, req)
+	require.NoError(t, err)
+	require.NotEmpty(t, resp2.Recommendations)
+
+	firstProjectID2 := resp2.Recommendations[0].ProjectID
+
+	// The key assertion: changing weights should change which project ranks first.
+	assert.NotEqual(t, firstProjectID1, firstProjectID2,
+		"changing scoring weights should change recommendation ordering")
+}

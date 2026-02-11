@@ -92,8 +92,9 @@ func TestShellProjectCache_FallsBackToUUIDPrefix(t *testing.T) {
 	projects[0].ShortID = ""
 	require.NoError(t, app.Projects.Update(context.Background(), projects[0]))
 
-	m := newShellModel(app)
-	suggestions := m.projectSuggestionsPlain("")
+	// Test via commandBar projectSuggestions.
+	cb := testCommandBar(t, app)
+	suggestions := cb.projectSuggestions("")
 	require.NotEmpty(t, suggestions)
 	assert.Equal(t, projects[0].ID[:8], suggestions[0])
 }

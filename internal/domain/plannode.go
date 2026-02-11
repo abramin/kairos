@@ -9,6 +9,7 @@ type PlanNode struct {
 	ParentID         *string
 	Title            string
 	Kind             NodeKind
+	IsDefault        bool // when true, UI hides this node (items appear directly under project)
 	OrderIndex       int
 	DueDate          *time.Time
 	NotBefore        *time.Time

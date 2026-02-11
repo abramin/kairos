@@ -103,22 +103,12 @@ func (r *SQLiteSessionRepo) scanSession(row *sql.Row) (*domain.WorkSessionLog, e
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("work session log not found")
+			return nil, fmt.Errorf("work session log: %w", ErrNotFound)
 		}
 		return nil, fmt.Errorf("scanning work session log: %w", err)
 	}
 
-	var parseErr error
-	s.StartedAt, parseErr = time.Parse(time.RFC3339, startedAtStr)
-	if parseErr != nil {
-		return nil, fmt.Errorf("parsing started_at: %w", parseErr)
-	}
-	s.CreatedAt, parseErr = time.Parse(time.RFC3339, createdAtStr)
-	if parseErr != nil {
-		return nil, fmt.Errorf("parsing created_at: %w", parseErr)
-	}
-
-	return &s, nil
+	return r.populateSession(&s, startedAtStr, createdAtStr)
 }
 
 // scanSessions scans multiple sessions from *sql.Rows.
@@ -135,20 +125,30 @@ func (r *SQLiteSessionRepo) scanSessions(rows *sql.Rows) ([]*domain.WorkSessionL
 			return nil, fmt.Errorf("scanning session row: %w", err)
 		}
 
-		var parseErr error
-		s.StartedAt, parseErr = time.Parse(time.RFC3339, startedAtStr)
+		session, parseErr := r.populateSession(&s, startedAtStr, createdAtStr)
 		if parseErr != nil {
-			return nil, fmt.Errorf("parsing started_at: %w", parseErr)
-		}
-		s.CreatedAt, parseErr = time.Parse(time.RFC3339, createdAtStr)
-		if parseErr != nil {
-			return nil, fmt.Errorf("parsing created_at: %w", parseErr)
+			return nil, parseErr
 		}
 
-		sessions = append(sessions, &s)
+		sessions = append(sessions, session)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating sessions: %w", err)
 	}
 	return sessions, nil
+}
+
+// populateSession fills in parsed fields on a WorkSessionLog after scanning raw strings.
+func (r *SQLiteSessionRepo) populateSession(s *domain.WorkSessionLog, startedAtStr, createdAtStr string) (*domain.WorkSessionLog, error) {
+	var parseErr error
+	s.StartedAt, parseErr = time.Parse(time.RFC3339, startedAtStr)
+	if parseErr != nil {
+		return nil, fmt.Errorf("parsing started_at: %w", parseErr)
+	}
+	s.CreatedAt, parseErr = time.Parse(time.RFC3339, createdAtStr)
+	if parseErr != nil {
+		return nil, fmt.Errorf("parsing created_at: %w", parseErr)
+	}
+
+	return s, nil
 }

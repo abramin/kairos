@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/contract"
-	"github.com/alexanderramin/kairos/internal/domain"
 )
 
 const statusProgressBarWidth = 10
@@ -78,18 +77,3 @@ func FormatStatus(resp *contract.StatusResponse) string {
 	return RenderBox("Status", b.String())
 }
 
-// countByRisk counts projects by risk level. This is a utility in case
-// the summary counts are not pre-computed.
-func countByRisk(projects []contract.ProjectStatusView) (critical, atRisk, onTrack int) {
-	for _, p := range projects {
-		switch p.RiskLevel {
-		case domain.RiskCritical:
-			critical++
-		case domain.RiskAtRisk:
-			atRisk++
-		case domain.RiskOnTrack:
-			onTrack++
-		}
-	}
-	return
-}

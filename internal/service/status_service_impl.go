@@ -124,8 +124,8 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 
 	// Sort views by canonical order
 	sort.Slice(views, func(i, j int) bool {
-		ri := riskSortOrder(views[i].RiskLevel)
-		rj := riskSortOrder(views[j].RiskLevel)
+		ri := scheduler.RiskPriority(views[i].RiskLevel)
+		rj := scheduler.RiskPriority(views[j].RiskLevel)
 		if ri != rj {
 			return ri < rj
 		}
@@ -165,13 +165,3 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 	}, nil
 }
 
-func riskSortOrder(r domain.RiskLevel) int {
-	switch r {
-	case domain.RiskCritical:
-		return 0
-	case domain.RiskAtRisk:
-		return 1
-	default:
-		return 2
-	}
-}

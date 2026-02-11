@@ -51,7 +51,6 @@ const (
 type WhatNowError struct {
 	Code    WhatNowErrorCode
 	Message string
-	Details map[string]any
 }
 
 func (e *WhatNowError) Error() string {

@@ -69,6 +69,7 @@ func FormatShellHelp() string {
 		{
 			title: "Quick Actions",
 			commands: [][]string{
+				{"add [#node] <title> [dur]", "Quick-add a work item (e.g. add #1 \"Review\" 2h)"},
 				{"log [min]", "Log a work session (wizard for missing args)"},
 				{"start [id]", "Start a work item (mark in-progress)"},
 				{"finish [id]", "Finish a work item (mark done)"},

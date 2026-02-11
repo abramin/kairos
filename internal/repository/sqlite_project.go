@@ -19,8 +19,6 @@ func NewSQLiteProjectRepo(db *sql.DB) *SQLiteProjectRepo {
 	return &SQLiteProjectRepo{db: db}
 }
 
-const dateLayout = "2006-01-02"
-
 func (r *SQLiteProjectRepo) Create(ctx context.Context, p *domain.Project) error {
 	query := `INSERT INTO projects (id, short_id, name, domain, start_date, target_date, status, archived_at, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -147,31 +145,12 @@ func (r *SQLiteProjectRepo) scanProject(row *sql.Row) (*domain.Project, error) {
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("project not found")
+			return nil, fmt.Errorf("project: %w", ErrNotFound)
 		}
 		return nil, fmt.Errorf("scanning project: %w", err)
 	}
 
-	p.Status = domain.ProjectStatus(statusStr)
-
-	var parseErr error
-	p.StartDate, parseErr = time.Parse(dateLayout, startDateStr)
-	if parseErr != nil {
-		return nil, fmt.Errorf("parsing start_date: %w", parseErr)
-	}
-	p.CreatedAt, parseErr = time.Parse(time.RFC3339, createdAtStr)
-	if parseErr != nil {
-		return nil, fmt.Errorf("parsing created_at: %w", parseErr)
-	}
-	p.UpdatedAt, parseErr = time.Parse(time.RFC3339, updatedAtStr)
-	if parseErr != nil {
-		return nil, fmt.Errorf("parsing updated_at: %w", parseErr)
-	}
-
-	p.TargetDate = parseNullableTime(targetDateStr, dateLayout)
-	p.ArchivedAt = parseNullableTime(archivedAtStr, time.RFC3339)
-
-	return &p, nil
+	return r.populateProject(&p, statusStr, startDateStr, createdAtStr, updatedAtStr, targetDateStr, archivedAtStr)
 }
 
 // scanProjectFromRows scans a single project row from *sql.Rows.
@@ -190,6 +169,15 @@ func (r *SQLiteProjectRepo) scanProjectFromRows(rows *sql.Rows) (*domain.Project
 		return nil, fmt.Errorf("scanning project row: %w", err)
 	}
 
+	return r.populateProject(&p, statusStr, startDateStr, createdAtStr, updatedAtStr, targetDateStr, archivedAtStr)
+}
+
+// populateProject fills in parsed fields on a Project after scanning raw strings.
+func (r *SQLiteProjectRepo) populateProject(
+	p *domain.Project,
+	statusStr, startDateStr, createdAtStr, updatedAtStr string,
+	targetDateStr, archivedAtStr sql.NullString,
+) (*domain.Project, error) {
 	p.Status = domain.ProjectStatus(statusStr)
 
 	var parseErr error
@@ -209,5 +197,5 @@ func (r *SQLiteProjectRepo) scanProjectFromRows(rows *sql.Rows) (*domain.Project
 	p.TargetDate = parseNullableTime(targetDateStr, dateLayout)
 	p.ArchivedAt = parseNullableTime(archivedAtStr, time.RFC3339)
 
-	return &p, nil
+	return p, nil
 }

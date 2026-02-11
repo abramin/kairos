@@ -36,15 +36,3 @@ func TestFormatStatus_IncludesPolicyWarningsAndFallbackDueDate(t *testing.T) {
 	assert.Contains(t, out, "Projected overload this week")
 }
 
-func TestCountByRisk(t *testing.T) {
-	critical, atRisk, onTrack := countByRisk([]contract.ProjectStatusView{
-		{RiskLevel: domain.RiskCritical},
-		{RiskLevel: domain.RiskCritical},
-		{RiskLevel: domain.RiskAtRisk},
-		{RiskLevel: domain.RiskOnTrack},
-	})
-
-	assert.Equal(t, 2, critical)
-	assert.Equal(t, 1, atRisk)
-	assert.Equal(t, 1, onTrack)
-}

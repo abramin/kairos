@@ -33,8 +33,8 @@ Interactive wizard collects:
 After the wizard, you can accept the draft or refine it with AI.
 
 Examples:
-  kairos project draft
-  kairos project draft "A 12-week physics study plan for my final exam in June"`,
+  project draft
+  project draft "A 12-week physics study plan for my final exam in June"`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Wrap stdin in a bufio.Reader so readPromptLine can consume
@@ -46,8 +46,8 @@ Examples:
 				if app.ProjectDraft == nil {
 					return fmt.Errorf("LLM features are disabled. Run without arguments for the guided wizard.\n" +
 						"Or use explicit commands:\n" +
-						"  kairos project add --name ... --domain ... --start ...\n" +
-						"  kairos project import file.json\n\n" +
+						"  project add --name ... --domain ... --start ...\n" +
+						"  project import file.json\n\n" +
 						"Enable LLM with: KAIROS_LLM_ENABLED=true")
 				}
 				return runProjectDraftLoop(app, reader, args[0], nil)

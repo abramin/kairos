@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
+	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/testutil"
 	"github.com/stretchr/testify/assert"
@@ -169,4 +171,86 @@ func TestSessionDelete_WorkItemStatusPreserved(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, domain.WorkItemInProgress, afterDelete.Status,
 		"status should remain in_progress after session delete (intentional: no status rollback)")
+}
+
+// TestSessionDelete_ReplanConvergesAfterDeletion chains session deletion with
+// replan and what-now to verify the pipeline remains consistent when logged_min
+// is stale relative to actual sessions.
+func TestSessionDelete_ReplanConvergesAfterDeletion(t *testing.T) {
+	projRepo, nodeRepo, wiRepo, depRepo, sessRepo, profRepo := setupRepos(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	target := now.AddDate(0, 2, 0)
+
+	proj := testutil.NewTestProject("Chain Test", testutil.WithTargetDate(target))
+	require.NoError(t, projRepo.Create(ctx, proj))
+	node := testutil.NewTestNode(proj.ID, "Module 1")
+	require.NoError(t, nodeRepo.Create(ctx, node))
+
+	// Units-tracked work item: 100 min planned for 10 chapters.
+	wi := testutil.NewTestWorkItem(node.ID, "Read Textbook",
+		testutil.WithPlannedMin(100),
+		testutil.WithUnits("chapters", 10, 0),
+		testutil.WithDurationMode(domain.DurationEstimate),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, wiRepo.Create(ctx, wi))
+
+	sessSvc := NewSessionService(sessRepo, wiRepo)
+	replanSvc := NewReplanService(projRepo, wiRepo, sessRepo, profRepo)
+	whatNowSvc := NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo)
+
+	// Log two sessions with units (triggers re-estimation each time).
+	sess1 := testutil.NewTestSession(wi.ID, 30, testutil.WithUnitsDelta(2))
+	sess2 := testutil.NewTestSession(wi.ID, 40, testutil.WithUnitsDelta(3))
+	require.NoError(t, sessSvc.LogSession(ctx, sess1))
+	require.NoError(t, sessSvc.LogSession(ctx, sess2))
+
+	afterLog, err := wiRepo.GetByID(ctx, wi.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 70, afterLog.LoggedMin, "logged_min should accumulate both sessions")
+	assert.NotEqual(t, 100, afterLog.PlannedMin, "planned_min should be re-estimated")
+
+	// Delete one session — logged_min stays stale (intentional, no compensation).
+	require.NoError(t, sessSvc.Delete(ctx, sess1.ID))
+
+	afterDelete, err := wiRepo.GetByID(ctx, wi.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 70, afterDelete.LoggedMin, "logged_min unchanged after delete")
+
+	// Replan should converge to a stable state.
+	replanReq := contract.NewReplanRequest(domain.TriggerManual)
+	replanReq.Now = &now
+	resp1, err := replanSvc.Replan(ctx, replanReq)
+	require.NoError(t, err)
+
+	resp2, err := replanSvc.Replan(ctx, replanReq)
+	require.NoError(t, err)
+	assert.Equal(t, resp1.RecomputedProjects, resp2.RecomputedProjects,
+		"replan should converge: second run should match first")
+
+	// What-now should still produce valid recommendations.
+	wnReq := contract.NewWhatNowRequest(60)
+	wnReq.Now = &now
+	wnResp, err := whatNowSvc.Recommend(ctx, wnReq)
+	require.NoError(t, err)
+	require.NotEmpty(t, wnResp.Recommendations,
+		"what-now should still recommend items after session delete + replan")
+
+	for _, rec := range wnResp.Recommendations {
+		assert.GreaterOrEqual(t, rec.AllocatedMin, rec.MinSessionMin,
+			"allocation invariant: min session bound")
+		assert.LessOrEqual(t, rec.AllocatedMin, rec.MaxSessionMin,
+			"allocation invariant: max session bound")
+	}
+
+	// Determinism: same input → same output.
+	wnResp2, err := whatNowSvc.Recommend(ctx, wnReq)
+	require.NoError(t, err)
+	require.Equal(t, len(wnResp.Recommendations), len(wnResp2.Recommendations))
+	for i := range wnResp.Recommendations {
+		assert.Equal(t, wnResp.Recommendations[i].WorkItemID, wnResp2.Recommendations[i].WorkItemID,
+			"recommendations must be deterministic after delete+replan")
+	}
 }

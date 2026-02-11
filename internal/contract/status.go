@@ -67,7 +67,6 @@ const (
 type StatusError struct {
 	Code    StatusErrorCode
 	Message string
-	Details map[string]any
 }
 
 func (e *StatusError) Error() string {

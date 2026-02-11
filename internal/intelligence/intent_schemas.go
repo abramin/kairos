@@ -1,7 +1,5 @@
 package intelligence
 
-import "fmt"
-
 // ValidateIntentArguments validates the arguments map against the schema
 // for the given intent. Returns a ParsedIntentError on failure.
 func ValidateIntentArguments(intent IntentName, args map[string]interface{}) *ParsedIntentError {
@@ -127,7 +125,7 @@ func validateExplainWhyNotArgs(args map[string]interface{}) *ParsedIntentError {
 
 func validateSimulateArgs(args map[string]interface{}) *ParsedIntentError {
 	if _, ok := getString(args, "scenario_text"); !ok {
-		return argError(fmt.Sprintf("scenario_text is required for simulate"))
+		return argError("scenario_text is required for simulate")
 	}
 	return nil
 }

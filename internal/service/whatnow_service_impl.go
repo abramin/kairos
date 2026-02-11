@@ -258,7 +258,6 @@ func (s *whatNowService) scoreCandidates(
 
 	var blockers []contract.ConstraintBlocker
 	var scored []scheduler.ScoredCandidate
-	projectSliceCount := make(map[string]int)
 
 	for _, c := range candidates {
 		blocked, err := s.deps.HasUnfinishedPredecessors(ctx, c.WorkItem.ID)
@@ -298,9 +297,10 @@ func (s *whatNowService) scoreCandidates(
 			ProjectRisk:         agg.risks[c.ProjectID].Level,
 			Now:                 now,
 			LastSessionDaysAgo:  lastSessionDaysAgo[c.WorkItem.ID],
-			ProjectSlicesInPlan: projectSliceCount[c.ProjectID],
+			ProjectSlicesInPlan: 0, // variation is enforced by the allocator's two-pass approach
 			Weights:             weights,
 			Mode:                mode,
+			Status:              c.WorkItem.Status,
 			MinSessionMin:       c.WorkItem.MinSessionMin,
 			MaxSessionMin:       c.WorkItem.MaxSessionMin,
 			DefaultSessionMin:   c.WorkItem.DefaultSessionMin,

@@ -24,10 +24,10 @@ func newHelpCmd(app *App, root *cobra.Command) *cobra.Command {
 LLM-powered help that understands natural language questions.
 
 Examples:
-  kairos help
-  kairos help project
-  kairos help chat
-  kairos help chat "How do I log a 30 minute session?"`,
+  help
+  help project
+  help chat
+  help chat "How do I log a 30 minute session?"`,
 		// DisableFlagsInUseLine prevents --help showing in this command's usage.
 		DisableFlagsInUseLine: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -37,7 +37,7 @@ Examples:
 			// Find and show help for the specified subcommand.
 			target, _, err := root.Find(args)
 			if err != nil || target == nil {
-				return fmt.Errorf("unknown command %q — run 'kairos help' for available commands", strings.Join(args, " "))
+				return fmt.Errorf("unknown command %q — run 'help' for available commands", strings.Join(args, " "))
 			}
 			return target.Help()
 		},
@@ -60,9 +60,9 @@ Commands during chat:
   /commands  List all available commands
 
 Examples:
-  kairos help chat
-  kairos help chat "How do I log a 30 minute session?"
-  kairos help chat "What is a plan node?"`,
+  help chat
+  help chat "How do I log a 30 minute session?"
+  help chat "What is a plan node?"`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			spec := app.getCommandSpec(root)

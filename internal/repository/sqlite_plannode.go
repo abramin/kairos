@@ -11,7 +11,8 @@ import (
 
 // planNodeColumns is the canonical SELECT column list for plan_nodes.
 const planNodeColumns = `id, project_id, parent_id, title, kind, order_index,
-		due_date, not_before, not_after, planned_min_budget, seq, created_at, updated_at`
+		due_date, not_before, not_after, planned_min_budget, seq, created_at, updated_at,
+		is_default`
 
 // SQLitePlanNodeRepo implements PlanNodeRepo using a SQLite database.
 type SQLitePlanNodeRepo struct {
@@ -25,8 +26,9 @@ func NewSQLitePlanNodeRepo(db *sql.DB) *SQLitePlanNodeRepo {
 
 func (r *SQLitePlanNodeRepo) Create(ctx context.Context, n *domain.PlanNode) error {
 	query := `INSERT INTO plan_nodes (id, project_id, parent_id, title, kind, order_index,
-		due_date, not_before, not_after, planned_min_budget, seq, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		due_date, not_before, not_after, planned_min_budget, seq, created_at, updated_at,
+		is_default)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := r.db.ExecContext(ctx, query,
 		n.ID,
 		n.ProjectID,
@@ -41,6 +43,7 @@ func (r *SQLitePlanNodeRepo) Create(ctx context.Context, n *domain.PlanNode) err
 		n.Seq,
 		n.CreatedAt.Format(time.RFC3339),
 		n.UpdatedAt.Format(time.RFC3339),
+		boolToInt(n.IsDefault),
 	)
 	if err != nil {
 		return fmt.Errorf("inserting plan node: %w", err)
@@ -111,7 +114,7 @@ func (r *SQLitePlanNodeRepo) ListRoots(ctx context.Context, projectID string) ([
 func (r *SQLitePlanNodeRepo) Update(ctx context.Context, n *domain.PlanNode) error {
 	query := `UPDATE plan_nodes SET project_id = ?, parent_id = ?, title = ?, kind = ?,
 		order_index = ?, due_date = ?, not_before = ?, not_after = ?, planned_min_budget = ?,
-		seq = ?, updated_at = ?
+		seq = ?, updated_at = ?, is_default = ?
 		WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, query,
 		n.ProjectID,
@@ -125,6 +128,7 @@ func (r *SQLitePlanNodeRepo) Update(ctx context.Context, n *domain.PlanNode) err
 		nullableIntToValue(n.PlannedMinBudget),
 		n.Seq,
 		n.UpdatedAt.Format(time.RFC3339),
+		boolToInt(n.IsDefault),
 		n.ID,
 	)
 	if err != nil {
@@ -149,19 +153,22 @@ func (r *SQLitePlanNodeRepo) scanNode(row *sql.Row) (*domain.PlanNode, error) {
 	var parentID sql.NullString
 	var dueDateStr, notBeforeStr, notAfterStr sql.NullString
 	var plannedMinBudget sql.NullInt64
+	var isDefaultInt int
 
 	err := row.Scan(
 		&n.ID, &n.ProjectID, &parentID, &n.Title, &kindStr, &n.OrderIndex,
 		&dueDateStr, &notBeforeStr, &notAfterStr, &plannedMinBudget,
 		&n.Seq, &createdAtStr, &updatedAtStr,
+		&isDefaultInt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("plan node not found")
+			return nil, fmt.Errorf("plan node: %w", ErrNotFound)
 		}
 		return nil, fmt.Errorf("scanning plan node: %w", err)
 	}
 
+	n.IsDefault = intToBool(isDefaultInt)
 	return r.populateNode(&n, kindStr, createdAtStr, updatedAtStr, parentID,
 		dueDateStr, notBeforeStr, notAfterStr, plannedMinBudget)
 }
@@ -175,16 +182,19 @@ func (r *SQLitePlanNodeRepo) scanNodes(rows *sql.Rows) ([]*domain.PlanNode, erro
 		var parentID sql.NullString
 		var dueDateStr, notBeforeStr, notAfterStr sql.NullString
 		var plannedMinBudget sql.NullInt64
+		var isDefaultInt int
 
 		err := rows.Scan(
 			&n.ID, &n.ProjectID, &parentID, &n.Title, &kindStr, &n.OrderIndex,
 			&dueDateStr, &notBeforeStr, &notAfterStr, &plannedMinBudget,
 			&n.Seq, &createdAtStr, &updatedAtStr,
+			&isDefaultInt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scanning plan node row: %w", err)
 		}
 
+		n.IsDefault = intToBool(isDefaultInt)
 		node, err := r.populateNode(&n, kindStr, createdAtStr, updatedAtStr, parentID,
 			dueDateStr, notBeforeStr, notAfterStr, plannedMinBudget)
 		if err != nil {

@@ -43,6 +43,7 @@ func TestFormatShellHelp(t *testing.T) {
 	assert.Contains(t, out, "work add")
 	assert.Contains(t, out, "node add")
 	// New shortcut commands
+	assert.Contains(t, out, "add [#node]")
 	assert.Contains(t, out, "log [min]")
 	assert.Contains(t, out, "start [id]")
 	assert.Contains(t, out, "finish [id]")

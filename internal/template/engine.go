@@ -208,10 +208,10 @@ func Execute(schema *TemplateSchema, projectName, startDate string, dueDate *str
 
 			// Apply defaults, then override with work item config
 			durationMode := domain.CoalesceStr(wc.DurationMode, defaultDurationMode(schema.Defaults), "estimate")
-			minSession := domain.IntFromPtrWithDefault(15, sessionPolicyField(wc.SessionPolicy, "min"), sessionPolicyField(defaultSessionPolicy(schema.Defaults), "min"))
-			maxSession := domain.IntFromPtrWithDefault(60, sessionPolicyField(wc.SessionPolicy, "max"), sessionPolicyField(defaultSessionPolicy(schema.Defaults), "max"))
-			defSession := domain.IntFromPtrWithDefault(30, sessionPolicyField(wc.SessionPolicy, "default"), sessionPolicyField(defaultSessionPolicy(schema.Defaults), "default"))
-			splittable := domain.BoolFromPtrWithDefault(true, sessionPolicyBool(wc.SessionPolicy), sessionPolicyBool(defaultSessionPolicy(schema.Defaults)))
+			minSession := domain.IntFromPtrWithDefault(15, SessionPolicyField(wc.SessionPolicy, "min"), SessionPolicyField(defaultSessionPolicy(schema.Defaults), "min"))
+			maxSession := domain.IntFromPtrWithDefault(60, SessionPolicyField(wc.SessionPolicy, "max"), SessionPolicyField(defaultSessionPolicy(schema.Defaults), "max"))
+			defSession := domain.IntFromPtrWithDefault(30, SessionPolicyField(wc.SessionPolicy, "default"), SessionPolicyField(defaultSessionPolicy(schema.Defaults), "default"))
+			splittable := domain.BoolFromPtrWithDefault(true, SessionPolicySplittable(wc.SessionPolicy), SessionPolicySplittable(defaultSessionPolicy(schema.Defaults)))
 			plannedMin := domain.IntFromPtrWithDefault(0, wc.PlannedMin)
 			estimateConf := domain.Float64FromPtrWithDefault(0.5, wc.EstimateConf)
 
@@ -278,7 +278,7 @@ func Execute(schema *TemplateSchema, projectName, startDate string, dueDate *str
 			deps = append(deps, generateDependencyLinks(dc.Predecessor, dc.Successor, idMap, vars)...)
 		}
 	} else {
-		deps = inferTemplateDefaultDependencies(nodes, workItems)
+		deps = inferTemplateDeps(nodes, workItems)
 	}
 
 	return &GeneratedProject{
@@ -583,33 +583,9 @@ func defaultSessionPolicy(d *DefaultsConfig) *SessionPolicyConfig {
 	return nil
 }
 
-func sessionPolicyField(sp *SessionPolicyConfig, field string) *int {
-	if sp == nil {
-		return nil
-	}
-	switch field {
-	case "min":
-		return sp.MinSessionMin
-	case "max":
-		return sp.MaxSessionMin
-	case "default":
-		return sp.DefaultSessionMin
-	}
-	return nil
-}
-
-func sessionPolicyBool(sp *SessionPolicyConfig) *bool {
-	if sp == nil {
-		return nil
-	}
-	return sp.Splittable
-}
-
-func inferTemplateDefaultDependencies(nodes []*domain.PlanNode, workItems []*domain.WorkItem) []domain.Dependency {
-	if len(workItems) < 2 {
-		return nil
-	}
-
+// inferTemplateDeps builds DependencyCandidate entries from domain objects
+// and delegates to the shared InferLinearDependencies algorithm.
+func inferTemplateDeps(nodes []*domain.PlanNode, workItems []*domain.WorkItem) []domain.Dependency {
 	nodePos := make(map[string]int, len(nodes))
 	nodeOrder := make(map[string]int, len(nodes))
 	for i, n := range nodes {
@@ -617,43 +593,15 @@ func inferTemplateDefaultDependencies(nodes []*domain.PlanNode, workItems []*dom
 		nodeOrder[n.ID] = n.OrderIndex
 	}
 
-	type indexedWI struct {
-		id        string
-		nodeOrder int
-		nodePos   int
-		wiPos     int
-	}
-
-	ordered := make([]indexedWI, 0, len(workItems))
+	candidates := make([]DependencyCandidate, 0, len(workItems))
 	for i, wi := range workItems {
-		ordered = append(ordered, indexedWI{
-			id:        wi.ID,
-			nodeOrder: nodeOrder[wi.NodeID],
-			nodePos:   nodePos[wi.NodeID],
-			wiPos:     i,
+		candidates = append(candidates, DependencyCandidate{
+			ID:        wi.ID,
+			NodeOrder: nodeOrder[wi.NodeID],
+			NodePos:   nodePos[wi.NodeID],
+			ItemPos:   i,
 		})
 	}
 
-	sort.SliceStable(ordered, func(i, j int) bool {
-		if ordered[i].nodeOrder != ordered[j].nodeOrder {
-			return ordered[i].nodeOrder < ordered[j].nodeOrder
-		}
-		if ordered[i].nodePos != ordered[j].nodePos {
-			return ordered[i].nodePos < ordered[j].nodePos
-		}
-		return ordered[i].wiPos < ordered[j].wiPos
-	})
-
-	deps := make([]domain.Dependency, 0, len(ordered)-1)
-	for i := 0; i < len(ordered)-1; i++ {
-		if ordered[i].id == ordered[i+1].id {
-			continue
-		}
-		deps = append(deps, domain.Dependency{
-			PredecessorWorkItemID: ordered[i].id,
-			SuccessorWorkItemID:   ordered[i+1].id,
-		})
-	}
-
-	return deps
+	return InferLinearDependencies(candidates)
 }

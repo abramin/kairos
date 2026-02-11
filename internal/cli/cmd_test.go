@@ -75,38 +75,14 @@ func executeCmd(t *testing.T, app *App, args ...string) (string, error) {
 	return buf.String(), err
 }
 
-// --- Root command shortcut ---
+// --- Root command ---
 
-func TestRootCmd_MinutesShortcut(t *testing.T) {
-	app := testApp(t)
-	seedProjectWithWork(t, app)
-
-	_, err := executeCmd(t, app, "45")
-	require.NoError(t, err)
-}
-
-func TestRootCmd_InvalidMinutes(t *testing.T) {
+func TestRootCmd_NoArgs_NonInteractive(t *testing.T) {
 	app := testApp(t)
 
-	_, err := executeCmd(t, app, "abc")
+	_, err := executeCmd(t, app)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid minutes")
-}
-
-func TestRootCmd_NegativeMinutes(t *testing.T) {
-	app := testApp(t)
-
-	_, err := executeCmd(t, app, "-5")
-	// Cobra treats -5 as a flag; should error.
-	assert.Error(t, err)
-}
-
-func TestRootCmd_NoArgs_ShowsHelp(t *testing.T) {
-	app := testApp(t)
-
-	output, err := executeCmd(t, app)
-	require.NoError(t, err)
-	assert.Contains(t, output, "kairos")
+	assert.Contains(t, err.Error(), "interactive terminal")
 }
 
 // --- what-now command ---
@@ -1194,4 +1170,43 @@ func TestExplainNowCLI_RoundTrip(t *testing.T) {
 	// We verify the command completes without error (deterministic fallback path).
 	_, err := executeCmd(t, app, "explain", "now", "--minutes", "60")
 	require.NoError(t, err)
+}
+
+// =============================================================================
+// parseDurationArg
+// =============================================================================
+
+func TestParseDurationArg(t *testing.T) {
+	tests := []struct {
+		input   string
+		wantMin int
+		wantOK  bool
+	}{
+		{"120", 120, true},
+		{"60", 60, true},
+		{"1", 1, true},
+		{"2h", 120, true},
+		{"30m", 30, true},
+		{"1h30m", 90, true},
+		{"1h0m", 60, true},
+		{"0h30m", 30, true},
+		{"0", 0, false},
+		{"-1", 0, false},
+		{"", 0, false},
+		{"abc", 0, false},
+		{"h", 0, false},
+		{"m", 0, false},
+		{"2x", 0, false},
+		{"Review", 0, false},
+		{"#3", 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got, ok := parseDurationArg(tt.input)
+			assert.Equal(t, tt.wantOK, ok, "ok mismatch for %q", tt.input)
+			if ok {
+				assert.Equal(t, tt.wantMin, got, "minutes mismatch for %q", tt.input)
+			}
+		})
+	}
 }

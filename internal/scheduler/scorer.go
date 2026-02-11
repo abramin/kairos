@@ -38,6 +38,9 @@ type ScoringInput struct {
 	Weights             ScoringWeights
 	Mode                domain.PlanMode
 
+	// Work item status for momentum scoring
+	Status domain.WorkItemStatus
+
 	// Work item fields for allocation
 	MinSessionMin     int
 	MaxSessionMin     int
@@ -67,7 +70,7 @@ func ScoreWorkItem(input ScoringInput) ScoredCandidate {
 		result.Blocker = &contract.ConstraintBlocker{
 			EntityType: "work_item",
 			EntityID:   input.WorkItemID,
-			Code:       contract.BlockerStatusDone,
+			Code:       contract.BlockerNotInCriticalScope,
 			Message:    "Item skipped: not in critical scope during critical mode",
 		}
 		return result
@@ -79,6 +82,7 @@ func ScoreWorkItem(input ScoringInput) ScoredCandidate {
 		scoreBehindPace,
 		scoreSpacing,
 		scoreVariation,
+		scoreMomentum,
 		scoreCriticalBonus,
 		scoreSafeMix,
 	}
@@ -188,6 +192,18 @@ func scoreVariation(input ScoringInput) (float64, *contract.RecommendationReason
 		}
 	}
 	return 0, nil // ProjectSlicesInPlan == 1 is neutral
+}
+
+func scoreMomentum(input ScoringInput) (float64, *contract.RecommendationReason) {
+	if input.Status == domain.WorkItemInProgress {
+		delta := 15.0
+		return delta, &contract.RecommendationReason{
+			Code:        contract.ReasonMomentum,
+			Message:     "Item already in progress — continue momentum",
+			WeightDelta: &delta,
+		}
+	}
+	return 0, nil
 }
 
 func scoreCriticalBonus(input ScoringInput) (float64, *contract.RecommendationReason) {

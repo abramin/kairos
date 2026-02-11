@@ -227,7 +227,6 @@ func TestBuildCommandSpec_RealRootContainsExpectedCommands(t *testing.T) {
 		"kairos status",
 		"kairos replan",
 		"kairos template",
-		"kairos shell",
 		"kairos ask",
 		"kairos explain",
 		"kairos review",

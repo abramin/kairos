@@ -6,8 +6,8 @@ import (
 	"github.com/alexanderramin/kairos/internal/domain"
 )
 
-// riskPriority returns a sort priority (lower = more urgent).
-func riskPriority(r domain.RiskLevel) int {
+// RiskPriority returns a sort priority (lower = more urgent).
+func RiskPriority(r domain.RiskLevel) int {
 	switch r {
 	case domain.RiskCritical:
 		return 0
@@ -29,7 +29,7 @@ func CanonicalSort(candidates []ScoredCandidate) {
 		a, b := candidates[i], candidates[j]
 
 		// 1. Risk priority
-		riskA, riskB := riskPriority(a.Input.ProjectRisk), riskPriority(b.Input.ProjectRisk)
+		riskA, riskB := RiskPriority(a.Input.ProjectRisk), RiskPriority(b.Input.ProjectRisk)
 		if riskA != riskB {
 			return riskA < riskB
 		}

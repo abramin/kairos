@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Kairos is a single-user CLI project planner and session recommender. It answers: "I have X minutes now, what should I do?" by recommending work sessions across multiple projects, respecting hard deadlines, on-track status, anti-cram spacing, and cross-project variation.
 
-**Status**: Core v1 packages (domain, contracts, repository, scheduler, services) and v2 intelligence layer (LLM-backed NL parsing, explanations, template drafting, interactive help, guided draft wizard) are implemented. CLI is fully wired with Cobra.
+**Status**: Core v1 packages (domain, contracts, repository, scheduler, services) and v2 intelligence layer (LLM-backed NL parsing, explanations, template drafting, interactive help, guided draft wizard) are implemented. Shell-only: `kairos` always launches the interactive shell; all commands run within the REPL.
 
 **Requires**: Go 1.25+
 
@@ -85,7 +85,7 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 - `ProjectDraftService` — Multi-turn NL→project structure drafting. Interactive conversation produces `ImportSchema`, validated via `importer.ValidateImportSchema`, then imported via `ImportService`
 - `HelpService` — LLM-powered Q&A about using Kairos. Supports one-shot questions and multi-turn chat (`StartChat`/`NextTurn`). Uses grounding validation to filter hallucinated commands/flags and a domain glossary embedded in the system prompt. Falls back to `DeterministicHelp()` (fuzzy-matching against the command spec) when LLM is unavailable
 
-**`internal/cli`** — Cobra command tree + bubbletea shell REPL. `App` struct holds all service interfaces; v2 intelligence fields (`Intent`, `Explain`, `TemplateDraft`, `ProjectDraft`, `Help`) are nil when LLM is disabled. **Shell-first**: running `kairos` with no args on a TTY launches the interactive shell directly. `kairos 45` is a shortcut for `kairos what-now --minutes 45`. Cobra subcommands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `shell`, `ask`, `explain` (subcommands: `now`, `why-not`), `review` (subcommand: `weekly`), `help` (subcommand: `chat`).
+**`internal/cli`** — Bubbletea shell REPL + Cobra command tree (internal). `App` struct holds all service interfaces; v2 intelligence fields (`Intent`, `Explain`, `TemplateDraft`, `ProjectDraft`, `Help`) are nil when LLM is disabled. **Shell-only**: `kairos` always launches the interactive shell. All commands run inside the REPL. Cobra remains as an internal execution engine — the shell dispatches unrecognized input through the Cobra tree via `execCobraCapture()`. Internal Cobra subcommands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `ask`, `explain` (subcommands: `now`, `why-not`), `review` (subcommand: `weekly`), `help` (subcommand: `chat`).
 
 **`internal/cli/draft_wizard.go`** — Interactive structure wizard for guided project creation without LLM. Collects node groups (label, count, kind, day spacing), work item templates stamped on every node, and special one-off nodes (exams, milestones). Produces an `ImportSchema` that goes through the same validation and import pipeline as LLM-drafted projects. `generateShortID()` creates human-friendly IDs (e.g., `"PHYS01"`) from project descriptions.
 

@@ -13,14 +13,16 @@ import (
 const workItemColumns = `id, node_id, title, type, status, archived_at,
 		duration_mode, planned_min, logged_min, duration_source, estimate_confidence,
 		min_session_min, max_session_min, default_session_min, splittable,
-		units_kind, units_total, units_done, due_date, not_before, seq, created_at, updated_at`
+		units_kind, units_total, units_done, due_date, not_before, seq, created_at, updated_at,
+		description, completed_at`
 
 // workItemColumnsAliased is the same column list prefixed with "w." for join queries.
 const workItemColumnsAliased = `w.id, w.node_id, w.title, w.type, w.status, w.archived_at,
 		w.duration_mode, w.planned_min, w.logged_min, w.duration_source, w.estimate_confidence,
 		w.min_session_min, w.max_session_min, w.default_session_min, w.splittable,
 		w.units_kind, w.units_total, w.units_done, w.due_date, w.not_before, w.seq,
-		w.created_at, w.updated_at`
+		w.created_at, w.updated_at,
+		w.description, w.completed_at`
 
 // SQLiteWorkItemRepo implements WorkItemRepo using a SQLite database.
 type SQLiteWorkItemRepo struct {
@@ -36,8 +38,9 @@ func (r *SQLiteWorkItemRepo) Create(ctx context.Context, w *domain.WorkItem) err
 	query := `INSERT INTO work_items (id, node_id, title, type, status, archived_at,
 		duration_mode, planned_min, logged_min, duration_source, estimate_confidence,
 		min_session_min, max_session_min, default_session_min, splittable,
-		units_kind, units_total, units_done, due_date, not_before, seq, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		units_kind, units_total, units_done, due_date, not_before, seq, created_at, updated_at,
+		description, completed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 	_, err := r.db.ExecContext(ctx, query,
 		w.ID,
 		w.NodeID,
@@ -62,6 +65,8 @@ func (r *SQLiteWorkItemRepo) Create(ctx context.Context, w *domain.WorkItem) err
 		w.Seq,
 		w.CreatedAt.Format(time.RFC3339),
 		w.UpdatedAt.Format(time.RFC3339),
+		w.Description,
+		nullableTimeToString(w.CompletedAt, time.RFC3339),
 	)
 	if err != nil {
 		return fmt.Errorf("inserting work item: %w", err)
@@ -147,6 +152,7 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 		var archivedAtStr, dueDateStr, notBeforeStr sql.NullString
 		var splittableInt int
 		var createdAtStr, updatedAtStr string
+		var completedAtStr sql.NullString
 
 		// Extra joined fields
 		var projectID, projectName, projectDomain, nodeTitle string
@@ -158,6 +164,7 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 			&w.MinSessionMin, &w.MaxSessionMin, &w.DefaultSessionMin, &splittableInt,
 			&w.UnitsKind, &w.UnitsTotal, &w.UnitsDone, &dueDateStr, &notBeforeStr,
 			&w.Seq, &createdAtStr, &updatedAtStr,
+			&w.Description, &completedAtStr,
 			&projectID, &projectName, &projectDomain,
 			&nodeTitle, &nodeDueDateStr, &targetDateStr, &startDateStr,
 		)
@@ -172,6 +179,7 @@ func (r *SQLiteWorkItemRepo) ListSchedulable(ctx context.Context, includeArchive
 		w.ArchivedAt = parseNullableTime(archivedAtStr, time.RFC3339)
 		w.DueDate = parseNullableTime(dueDateStr, dateLayout)
 		w.NotBefore = parseNullableTime(notBeforeStr, dateLayout)
+		w.CompletedAt = parseNullableTime(completedAtStr, time.RFC3339)
 
 		var parseErr error
 		w.CreatedAt, parseErr = time.Parse(time.RFC3339, createdAtStr)
@@ -241,7 +249,7 @@ func (r *SQLiteWorkItemRepo) Update(ctx context.Context, w *domain.WorkItem) err
 		duration_mode = ?, planned_min = ?, logged_min = ?, duration_source = ?, estimate_confidence = ?,
 		min_session_min = ?, max_session_min = ?, default_session_min = ?, splittable = ?,
 		units_kind = ?, units_total = ?, units_done = ?, due_date = ?, not_before = ?,
-		seq = ?, updated_at = ?
+		seq = ?, updated_at = ?, description = ?, completed_at = ?
 		WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, query,
 		w.NodeID,
@@ -265,6 +273,8 @@ func (r *SQLiteWorkItemRepo) Update(ctx context.Context, w *domain.WorkItem) err
 		nullableTimeToString(w.NotBefore, dateLayout),
 		w.Seq,
 		w.UpdatedAt.Format(time.RFC3339),
+		w.Description,
+		nullableTimeToString(w.CompletedAt, time.RFC3339),
 		w.ID,
 	)
 	if err != nil {
@@ -299,6 +309,7 @@ func (r *SQLiteWorkItemRepo) scanWorkItem(row *sql.Row) (*domain.WorkItem, error
 	var archivedAtStr, dueDateStr, notBeforeStr sql.NullString
 	var splittableInt int
 	var createdAtStr, updatedAtStr string
+	var completedAtStr sql.NullString
 
 	err := row.Scan(
 		&w.ID, &w.NodeID, &w.Title, &w.Type, &statusStr, &archivedAtStr,
@@ -306,16 +317,17 @@ func (r *SQLiteWorkItemRepo) scanWorkItem(row *sql.Row) (*domain.WorkItem, error
 		&w.MinSessionMin, &w.MaxSessionMin, &w.DefaultSessionMin, &splittableInt,
 		&w.UnitsKind, &w.UnitsTotal, &w.UnitsDone, &dueDateStr, &notBeforeStr,
 		&w.Seq, &createdAtStr, &updatedAtStr,
+		&w.Description, &completedAtStr,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("work item not found")
+			return nil, fmt.Errorf("work item: %w", ErrNotFound)
 		}
 		return nil, fmt.Errorf("scanning work item: %w", err)
 	}
 
 	return r.populateWorkItem(&w, statusStr, durationModeStr, durationSourceStr,
-		archivedAtStr, dueDateStr, notBeforeStr, splittableInt, createdAtStr, updatedAtStr)
+		archivedAtStr, dueDateStr, notBeforeStr, completedAtStr, splittableInt, createdAtStr, updatedAtStr)
 }
 
 // scanWorkItems scans multiple work items from *sql.Rows.
@@ -327,6 +339,7 @@ func (r *SQLiteWorkItemRepo) scanWorkItems(rows *sql.Rows) ([]*domain.WorkItem, 
 		var archivedAtStr, dueDateStr, notBeforeStr sql.NullString
 		var splittableInt int
 		var createdAtStr, updatedAtStr string
+		var completedAtStr sql.NullString
 
 		err := rows.Scan(
 			&w.ID, &w.NodeID, &w.Title, &w.Type, &statusStr, &archivedAtStr,
@@ -334,13 +347,14 @@ func (r *SQLiteWorkItemRepo) scanWorkItems(rows *sql.Rows) ([]*domain.WorkItem, 
 			&w.MinSessionMin, &w.MaxSessionMin, &w.DefaultSessionMin, &splittableInt,
 			&w.UnitsKind, &w.UnitsTotal, &w.UnitsDone, &dueDateStr, &notBeforeStr,
 			&w.Seq, &createdAtStr, &updatedAtStr,
+			&w.Description, &completedAtStr,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scanning work item row: %w", err)
 		}
 
 		item, err := r.populateWorkItem(&w, statusStr, durationModeStr, durationSourceStr,
-			archivedAtStr, dueDateStr, notBeforeStr, splittableInt, createdAtStr, updatedAtStr)
+			archivedAtStr, dueDateStr, notBeforeStr, completedAtStr, splittableInt, createdAtStr, updatedAtStr)
 		if err != nil {
 			return nil, err
 		}
@@ -356,7 +370,7 @@ func (r *SQLiteWorkItemRepo) scanWorkItems(rows *sql.Rows) ([]*domain.WorkItem, 
 func (r *SQLiteWorkItemRepo) populateWorkItem(
 	w *domain.WorkItem,
 	statusStr, durationModeStr, durationSourceStr string,
-	archivedAtStr, dueDateStr, notBeforeStr sql.NullString,
+	archivedAtStr, dueDateStr, notBeforeStr, completedAtStr sql.NullString,
 	splittableInt int,
 	createdAtStr, updatedAtStr string,
 ) (*domain.WorkItem, error) {
@@ -368,6 +382,7 @@ func (r *SQLiteWorkItemRepo) populateWorkItem(
 	w.ArchivedAt = parseNullableTime(archivedAtStr, time.RFC3339)
 	w.DueDate = parseNullableTime(dueDateStr, dateLayout)
 	w.NotBefore = parseNullableTime(notBeforeStr, dateLayout)
+	w.CompletedAt = parseNullableTime(completedAtStr, time.RFC3339)
 
 	var parseErr error
 	w.CreatedAt, parseErr = time.Parse(time.RFC3339, createdAtStr)

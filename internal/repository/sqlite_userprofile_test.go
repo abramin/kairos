@@ -67,5 +67,5 @@ func TestUserProfileRepo_Get_NotFoundWhenDefaultDeleted(t *testing.T) {
 
 	_, err = repo.Get(ctx)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+	assert.ErrorIs(t, err, ErrNotFound)
 }

@@ -37,7 +37,7 @@ func (r *SQLiteUserProfileRepo) Get(ctx context.Context) (*domain.UserProfile, e
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return nil, fmt.Errorf("user profile not found")
+			return nil, fmt.Errorf("user profile: %w", ErrNotFound)
 		}
 		return nil, fmt.Errorf("scanning user profile: %w", err)
 	}

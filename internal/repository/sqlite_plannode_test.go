@@ -66,7 +66,7 @@ func TestPlanNodeRepo_GetByID_NotFound(t *testing.T) {
 	repo, _ := setupPlanNodeRepo(t)
 	_, err := repo.GetByID(context.Background(), "missing")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "not found")
+	assert.ErrorIs(t, err, ErrNotFound)
 }
 
 func TestPlanNodeRepo_ListMethods_OrderAndHierarchy(t *testing.T) {

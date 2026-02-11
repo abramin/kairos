@@ -76,7 +76,7 @@ func run() error {
 		Import:    service.NewImportService(projectRepo, nodeRepo, workItemRepo, depRepo),
 	}
 
-	// Detect interactive terminal for shell-first entrypoint.
+	// Detect interactive terminal for shell-only entrypoint.
 	app.IsInteractive = func() bool {
 		return isatty.IsTerminal(os.Stdin.Fd()) || isatty.IsCygwinTerminal(os.Stdin.Fd())
 	}

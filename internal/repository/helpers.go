@@ -2,8 +2,15 @@ package repository
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 )
+
+// ErrNotFound is returned when a queried entity does not exist.
+var ErrNotFound = errors.New("not found")
+
+// dateLayout is the standard date format for project/node/work-item dates in SQLite.
+const dateLayout = "2006-01-02"
 
 // parseNullableTime parses a sql.NullString into a *time.Time using the given layout.
 // Returns nil if the value is NULL, empty, or fails to parse.

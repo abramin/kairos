@@ -223,6 +223,11 @@ var migrations = []string{
 	// Add seq column to plan_nodes and work_items (project-scoped sequential IDs)
 	`ALTER TABLE plan_nodes ADD COLUMN seq INTEGER NOT NULL DEFAULT 0`,
 	`ALTER TABLE work_items ADD COLUMN seq INTEGER NOT NULL DEFAULT 0`,
+
+	// v2 TUI: add is_default to plan_nodes, description and completed_at to work_items
+	`ALTER TABLE plan_nodes ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`,
+	`ALTER TABLE work_items ADD COLUMN description TEXT NOT NULL DEFAULT ''`,
+	`ALTER TABLE work_items ADD COLUMN completed_at TEXT`,
 }
 
 // migrateBackfillSeq assigns sequential IDs to existing nodes and work items

@@ -20,7 +20,7 @@ func FormatHelpAnswer(answer *intelligence.HelpAnswer) string {
 		b.WriteString(Header("Examples"))
 		b.WriteString("\n")
 		for _, ex := range answer.Examples {
-			b.WriteString(fmt.Sprintf("  %s\n", StyleGreen.Render("$ "+ex.Command)))
+			b.WriteString(fmt.Sprintf("  %s\n", StyleGreen.Render("$ "+strings.TrimPrefix(ex.Command, "kairos "))))
 			if ex.Description != "" {
 				for _, line := range strings.Split(wrapText(ex.Description, helpTextWrapWidth-4), "\n") {
 					if strings.TrimSpace(line) == "" {
@@ -37,7 +37,7 @@ func FormatHelpAnswer(answer *intelligence.HelpAnswer) string {
 		b.WriteString(Header("Try Next"))
 		b.WriteString("\n")
 		for _, cmd := range answer.NextCommands {
-			b.WriteString(fmt.Sprintf("  %s\n", StyleBlue.Render(cmd)))
+			b.WriteString(fmt.Sprintf("  %s\n", StyleBlue.Render(strings.TrimPrefix(cmd, "kairos "))))
 		}
 	}
 
@@ -120,7 +120,7 @@ func FormatHelpChatWelcome() string {
 func FormatCommandList(commands []intelligence.HelpCommandInfo) string {
 	var b strings.Builder
 	for _, cmd := range commands {
-		b.WriteString(fmt.Sprintf("  %s  %s\n", StyleGreen.Render(cmd.FullPath), Dim(cmd.Short)))
+		b.WriteString(fmt.Sprintf("  %s  %s\n", StyleGreen.Render(strings.TrimPrefix(cmd.FullPath, "kairos ")), Dim(cmd.Short)))
 	}
 	return RenderBox("Commands", b.String())
 }

@@ -14,3 +14,15 @@ type Project struct {
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
 }
+
+// DisplayID returns the best short identifier for display.
+// It prefers shortID; if empty it truncates fullID to 8 characters.
+func DisplayID(shortID, fullID string) string {
+	if shortID != "" {
+		return shortID
+	}
+	if len(fullID) >= 8 {
+		return fullID[:8]
+	}
+	return fullID
+}

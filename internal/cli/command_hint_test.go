@@ -12,7 +12,7 @@ func TestCommandHint_WhatNow(t *testing.T) {
 		Intent:    intelligence.IntentWhatNow,
 		Arguments: map[string]interface{}{"available_min": float64(45)},
 	}
-	assert.Equal(t, "kairos what-now --minutes 45", CommandHint(intent))
+	assert.Equal(t, "what-now --minutes 45", CommandHint(intent))
 }
 
 func TestCommandHint_Status(t *testing.T) {
@@ -20,7 +20,7 @@ func TestCommandHint_Status(t *testing.T) {
 		Intent:    intelligence.IntentStatus,
 		Arguments: map[string]interface{}{},
 	}
-	assert.Equal(t, "kairos status", CommandHint(intent))
+	assert.Equal(t, "status", CommandHint(intent))
 }
 
 func TestCommandHint_Replan(t *testing.T) {
@@ -28,7 +28,7 @@ func TestCommandHint_Replan(t *testing.T) {
 		Intent:    intelligence.IntentReplan,
 		Arguments: map[string]interface{}{"strategy": "deadline_first"},
 	}
-	assert.Equal(t, "kairos replan --strategy deadline_first", CommandHint(intent))
+	assert.Equal(t, "replan --strategy deadline_first", CommandHint(intent))
 }
 
 func TestCommandHint_ProjectAdd(t *testing.T) {
@@ -42,7 +42,7 @@ func TestCommandHint_ProjectAdd(t *testing.T) {
 		},
 	}
 	got := CommandHint(intent)
-	assert.Contains(t, got, "kairos project add")
+	assert.Contains(t, got, "project add")
 	assert.Contains(t, got, `--name "Spanish A2 B1"`)
 	assert.Contains(t, got, `--domain "Language Learning"`)
 	assert.Contains(t, got, "--start 2026-02-09")
@@ -55,7 +55,7 @@ func TestCommandHint_ProjectImport(t *testing.T) {
 		Intent:    intelligence.IntentProjectImport,
 		Arguments: map[string]interface{}{"file_path": "spanish_a2_b1_modules.json"},
 	}
-	assert.Equal(t, "kairos project import spanish_a2_b1_modules.json", CommandHint(intent))
+	assert.Equal(t, "project import spanish_a2_b1_modules.json", CommandHint(intent))
 }
 
 func TestCommandHint_ProjectImportMissingArg(t *testing.T) {
@@ -63,7 +63,7 @@ func TestCommandHint_ProjectImportMissingArg(t *testing.T) {
 		Intent:    intelligence.IntentProjectImport,
 		Arguments: map[string]interface{}{},
 	}
-	assert.Equal(t, "kairos project import <FILE>", CommandHint(intent))
+	assert.Equal(t, "project import <FILE>", CommandHint(intent))
 }
 
 func TestCommandHint_ProjectUpdate(t *testing.T) {
@@ -77,7 +77,7 @@ func TestCommandHint_ProjectUpdate(t *testing.T) {
 		},
 	}
 	got := CommandHint(intent)
-	assert.Contains(t, got, "kairos project update PHI01")
+	assert.Contains(t, got, "project update PHI01")
 	assert.Contains(t, got, `--name "New Name"`)
 	assert.Contains(t, got, "--due 2026-06-01")
 	assert.Contains(t, got, "--status done")
@@ -88,7 +88,7 @@ func TestCommandHint_ProjectArchive(t *testing.T) {
 		Intent:    intelligence.IntentProjectArchive,
 		Arguments: map[string]interface{}{"project_id": "PHI01"},
 	}
-	assert.Equal(t, "kairos project archive PHI01", CommandHint(intent))
+	assert.Equal(t, "project archive PHI01", CommandHint(intent))
 }
 
 func TestCommandHint_ProjectRemove(t *testing.T) {
@@ -96,7 +96,7 @@ func TestCommandHint_ProjectRemove(t *testing.T) {
 		Intent:    intelligence.IntentProjectRemove,
 		Arguments: map[string]interface{}{"project_id": "PHI01"},
 	}
-	assert.Equal(t, "kairos project remove PHI01", CommandHint(intent))
+	assert.Equal(t, "project remove PHI01", CommandHint(intent))
 }
 
 func TestCommandHint_NodeAdd(t *testing.T) {
@@ -109,7 +109,7 @@ func TestCommandHint_NodeAdd(t *testing.T) {
 		},
 	}
 	got := CommandHint(intent)
-	assert.Contains(t, got, "kairos node add")
+	assert.Contains(t, got, "node add")
 	assert.Contains(t, got, "--project PHI01")
 	assert.Contains(t, got, `--title "Week 1"`)
 	assert.Contains(t, got, "--kind week")
@@ -120,7 +120,7 @@ func TestCommandHint_WorkDone(t *testing.T) {
 		Intent:    intelligence.IntentWorkDone,
 		Arguments: map[string]interface{}{"work_item_id": "abc-123"},
 	}
-	assert.Equal(t, "kairos work done abc-123", CommandHint(intent))
+	assert.Equal(t, "work done abc-123", CommandHint(intent))
 }
 
 func TestCommandHint_SessionLog(t *testing.T) {
@@ -133,7 +133,7 @@ func TestCommandHint_SessionLog(t *testing.T) {
 		},
 	}
 	got := CommandHint(intent)
-	assert.Contains(t, got, "kairos session log")
+	assert.Contains(t, got, "session log")
 	assert.Contains(t, got, "--work-item abc-123")
 	assert.Contains(t, got, "--minutes 30")
 	assert.Contains(t, got, `--note "Finished chapter 3"`)
@@ -144,7 +144,7 @@ func TestCommandHint_TemplateList(t *testing.T) {
 		Intent:    intelligence.IntentTemplateList,
 		Arguments: map[string]interface{}{},
 	}
-	assert.Equal(t, "kairos template list", CommandHint(intent))
+	assert.Equal(t, "template list", CommandHint(intent))
 }
 
 func TestCommandHint_ExplainNow(t *testing.T) {
@@ -152,7 +152,7 @@ func TestCommandHint_ExplainNow(t *testing.T) {
 		Intent:    intelligence.IntentExplainNow,
 		Arguments: map[string]interface{}{"minutes": float64(90)},
 	}
-	assert.Equal(t, "kairos explain now --minutes 90", CommandHint(intent))
+	assert.Equal(t, "explain now --minutes 90", CommandHint(intent))
 }
 
 func TestCommandHint_ReviewWeekly(t *testing.T) {
@@ -160,7 +160,7 @@ func TestCommandHint_ReviewWeekly(t *testing.T) {
 		Intent:    intelligence.IntentReviewWeekly,
 		Arguments: map[string]interface{}{},
 	}
-	assert.Equal(t, "kairos review weekly", CommandHint(intent))
+	assert.Equal(t, "review weekly", CommandHint(intent))
 }
 
 func TestCommandHint_ProjectInitFromTemplate(t *testing.T) {
@@ -174,7 +174,7 @@ func TestCommandHint_ProjectInitFromTemplate(t *testing.T) {
 		},
 	}
 	got := CommandHint(intent)
-	assert.Contains(t, got, "kairos project init")
+	assert.Contains(t, got, "project init")
 	assert.Contains(t, got, "--template physics_101")
 	assert.Contains(t, got, `--name "Physics Fall 2026"`)
 	assert.Contains(t, got, "--start 2026-09-01")

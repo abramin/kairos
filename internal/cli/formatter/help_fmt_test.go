@@ -21,9 +21,9 @@ func TestFormatHelpAnswer_LLM(t *testing.T) {
 
 	out := FormatHelpAnswer(answer)
 	assert.Contains(t, out, "Use kairos status.")
-	assert.Contains(t, out, "$ kairos status")
+	assert.Contains(t, out, "$ status")
 	assert.Contains(t, out, "Show project risks")
-	assert.Contains(t, out, "kairos what-now --minutes 45")
+	assert.Contains(t, out, "what-now --minutes 45")
 	assert.Contains(t, out, "[LLM | Confidence: 91%]")
 }
 
@@ -49,9 +49,9 @@ func TestFormatHelpChatWelcomeAndCommandList(t *testing.T) {
 		{FullPath: "kairos status", Short: "Show status overview"},
 		{FullPath: "kairos what-now", Short: "Get recommendations"},
 	})
-	assert.Contains(t, list, "kairos status")
+	assert.Contains(t, list, "status")
 	assert.Contains(t, list, "Show status overview")
-	assert.Contains(t, list, "kairos what-now")
+	assert.Contains(t, list, "what-now")
 }
 
 func TestWrapText(t *testing.T) {

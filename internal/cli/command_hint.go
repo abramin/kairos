@@ -7,7 +7,7 @@ import (
 	"github.com/alexanderramin/kairos/internal/intelligence"
 )
 
-// CommandHint produces the CLI command string corresponding to a parsed intent.
+// CommandHint produces the shell command string corresponding to a parsed intent.
 // Returns an empty string if the intent cannot be meaningfully mapped.
 func CommandHint(intent *intelligence.ParsedIntent) string {
 	if intent == nil {
@@ -18,13 +18,13 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 	switch intent.Intent {
 	case intelligence.IntentWhatNow:
 		min := intArg(args, "available_min", 60)
-		return fmt.Sprintf("kairos what-now --minutes %d", min)
+		return fmt.Sprintf("what-now --minutes %d", min)
 
 	case intelligence.IntentStatus:
-		return "kairos status"
+		return "status"
 
 	case intelligence.IntentReplan:
-		cmd := "kairos replan"
+		cmd := "replan"
 		if s, ok := stringArg(args, "strategy"); ok {
 			cmd += fmt.Sprintf(" --strategy %s", s)
 		}
@@ -32,7 +32,7 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 
 	case intelligence.IntentProjectAdd:
 		var parts []string
-		parts = append(parts, "kairos project add")
+		parts = append(parts, "project add")
 		parts = append(parts, "--id <SHORT_ID>")
 		if name, ok := stringArg(args, "name"); ok {
 			parts = append(parts, fmt.Sprintf("--name %q", name))
@@ -57,16 +57,16 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 	case intelligence.IntentProjectImport:
 		filePath, ok := stringArg(args, "file_path")
 		if !ok {
-			return "kairos project import <FILE>"
+			return "project import <FILE>"
 		}
-		return fmt.Sprintf("kairos project import %s", filePath)
+		return fmt.Sprintf("project import %s", filePath)
 
 	case intelligence.IntentProjectUpdate:
 		id, _ := stringArg(args, "project_id")
 		if id == "" {
 			id = "<PROJECT_ID>"
 		}
-		cmd := fmt.Sprintf("kairos project update %s", id)
+		cmd := fmt.Sprintf("project update %s", id)
 		if name, ok := stringArg(args, "name"); ok {
 			cmd += fmt.Sprintf(" --name %q", name)
 		}
@@ -83,18 +83,18 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 		if id == "" {
 			id = "<PROJECT_ID>"
 		}
-		return fmt.Sprintf("kairos project archive %s", id)
+		return fmt.Sprintf("project archive %s", id)
 
 	case intelligence.IntentProjectRemove:
 		id, _ := stringArg(args, "project_id")
 		if id == "" {
 			id = "<PROJECT_ID>"
 		}
-		return fmt.Sprintf("kairos project remove %s", id)
+		return fmt.Sprintf("project remove %s", id)
 
 	case intelligence.IntentNodeAdd:
 		var parts []string
-		parts = append(parts, "kairos node add")
+		parts = append(parts, "node add")
 		if pid, ok := stringArg(args, "project_id"); ok {
 			parts = append(parts, fmt.Sprintf("--project %s", pid))
 		} else {
@@ -117,7 +117,7 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 		if id == "" {
 			id = "<NODE_ID>"
 		}
-		cmd := fmt.Sprintf("kairos node update %s", id)
+		cmd := fmt.Sprintf("node update %s", id)
 		if title, ok := stringArg(args, "title"); ok {
 			cmd += fmt.Sprintf(" --title %q", title)
 		}
@@ -131,11 +131,11 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 		if id == "" {
 			id = "<NODE_ID>"
 		}
-		return fmt.Sprintf("kairos node remove %s", id)
+		return fmt.Sprintf("node remove %s", id)
 
 	case intelligence.IntentWorkAdd:
 		var parts []string
-		parts = append(parts, "kairos work add")
+		parts = append(parts, "work add")
 		if nid, ok := stringArg(args, "node_id"); ok {
 			parts = append(parts, fmt.Sprintf("--node %s", nid))
 		} else {
@@ -161,7 +161,7 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 		if id == "" {
 			id = "<WORK_ITEM_ID>"
 		}
-		cmd := fmt.Sprintf("kairos work update %s", id)
+		cmd := fmt.Sprintf("work update %s", id)
 		if title, ok := stringArg(args, "title"); ok {
 			cmd += fmt.Sprintf(" --title %q", title)
 		}
@@ -178,18 +178,18 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 		if id == "" {
 			id = "<WORK_ITEM_ID>"
 		}
-		return fmt.Sprintf("kairos work done %s", id)
+		return fmt.Sprintf("work done %s", id)
 
 	case intelligence.IntentWorkRemove:
 		id, _ := stringArg(args, "work_item_id")
 		if id == "" {
 			id = "<WORK_ITEM_ID>"
 		}
-		return fmt.Sprintf("kairos work remove %s", id)
+		return fmt.Sprintf("work remove %s", id)
 
 	case intelligence.IntentSessionLog:
 		var parts []string
-		parts = append(parts, "kairos session log")
+		parts = append(parts, "session log")
 		if wid, ok := stringArg(args, "work_item_id"); ok {
 			parts = append(parts, fmt.Sprintf("--work-item %s", wid))
 		} else {
@@ -210,28 +210,28 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 		if id == "" {
 			id = "<SESSION_ID>"
 		}
-		return fmt.Sprintf("kairos session remove %s", id)
+		return fmt.Sprintf("session remove %s", id)
 
 	case intelligence.IntentTemplateList:
-		return "kairos template list"
+		return "template list"
 
 	case intelligence.IntentTemplateShow:
 		ref, _ := stringArg(args, "template_id")
 		if ref == "" {
 			ref = "<TEMPLATE_REF>"
 		}
-		return fmt.Sprintf("kairos template show %s", ref)
+		return fmt.Sprintf("template show %s", ref)
 
 	case intelligence.IntentTemplateDraft:
 		prompt, ok := stringArg(args, "prompt")
 		if !ok {
-			return "kairos template draft <DESCRIPTION>"
+			return "template draft <DESCRIPTION>"
 		}
-		return fmt.Sprintf("kairos template draft %q", prompt)
+		return fmt.Sprintf("template draft %q", prompt)
 
 	case intelligence.IntentProjectInitFromTmpl:
 		var parts []string
-		parts = append(parts, "kairos project init")
+		parts = append(parts, "project init")
 		parts = append(parts, "--id <SHORT_ID>")
 		if tmpl, ok := stringArg(args, "template_id"); ok {
 			parts = append(parts, fmt.Sprintf("--template %s", tmpl))
@@ -254,14 +254,14 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 		return strings.Join(parts, " ")
 
 	case intelligence.IntentExplainNow:
-		cmd := "kairos explain now"
+		cmd := "explain now"
 		if min := intArg(args, "minutes", 0); min > 0 {
 			cmd += fmt.Sprintf(" --minutes %d", min)
 		}
 		return cmd
 
 	case intelligence.IntentExplainWhyNot:
-		cmd := "kairos explain why-not"
+		cmd := "explain why-not"
 		if pid, ok := stringArg(args, "project_id"); ok {
 			cmd += fmt.Sprintf(" --project %s", pid)
 		}
@@ -271,7 +271,7 @@ func CommandHint(intent *intelligence.ParsedIntent) string {
 		return cmd
 
 	case intelligence.IntentReviewWeekly:
-		return "kairos review weekly"
+		return "review weekly"
 
 	default:
 		return ""

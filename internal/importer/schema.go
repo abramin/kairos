@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+
+	tmpl "github.com/alexanderramin/kairos/internal/template"
 )
 
 // ImportSchema is the top-level JSON structure for project import.
@@ -30,13 +32,10 @@ type DefaultsImport struct {
 	SessionPolicy *SessionPolicyImport `json:"session_policy,omitempty"`
 }
 
-// SessionPolicyImport defines session bounds for work items.
-type SessionPolicyImport struct {
-	MinSessionMin     *int  `json:"min_session_min,omitempty"`
-	MaxSessionMin     *int  `json:"max_session_min,omitempty"`
-	DefaultSessionMin *int  `json:"default_session_min,omitempty"`
-	Splittable        *bool `json:"splittable,omitempty"`
-}
+// SessionPolicyImport is an alias for the canonical SessionPolicyConfig type
+// defined in the template package. Both packages share the same session policy
+// structure and JSON serialization.
+type SessionPolicyImport = tmpl.SessionPolicyConfig
 
 // NodeImport defines a plan node in the import file.
 type NodeImport struct {

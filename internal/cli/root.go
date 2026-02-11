@@ -1,12 +1,9 @@
 package cli
 
 import (
-	"context"
 	"fmt"
-	"strconv"
 	"sync"
 
-	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/intelligence"
 	"github.com/alexanderramin/kairos/internal/service"
 	"github.com/spf13/cobra"
@@ -45,34 +42,15 @@ type App struct {
 // subcommands against the provided App.
 func NewRootCmd(app *App) *cobra.Command {
 	root := &cobra.Command{
-		Use:   "kairos [minutes]",
+		Use:   "kairos",
 		Short: "Project planner and session recommender",
-		Long: `Project planner and session recommender.
-
-Quick usage: kairos <minutes> is shorthand for kairos what-now --minutes <minutes>`,
-		Args: cobra.ArbitraryArgs,
+		Long:  `Project planner and session recommender. Launches an interactive shell.`,
+		Args:  cobra.ArbitraryArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(args) == 0 {
-				// TTY → launch interactive shell; non-TTY → show help.
-				if app.IsInteractive != nil && app.IsInteractive() {
-					return runShell(app)
-				}
-				return cmd.Help()
+			if app.IsInteractive != nil && app.IsInteractive() {
+				return runShell(app)
 			}
-			if len(args) != 1 {
-				return cmd.Help()
-			}
-			minutes, err := strconv.Atoi(args[0])
-			if err != nil || minutes <= 0 {
-				return fmt.Errorf("invalid minutes %q — expected a positive integer", args[0])
-			}
-			req := contract.NewWhatNowRequest(minutes)
-			resp, err := app.WhatNow.Recommend(context.Background(), req)
-			if err != nil {
-				return err
-			}
-			fmt.Print(formatWhatNowResponse(context.Background(), app, resp))
-			return nil
+			return fmt.Errorf("kairos requires an interactive terminal")
 		},
 	}
 
@@ -85,7 +63,6 @@ Quick usage: kairos <minutes> is shorthand for kairos what-now --minutes <minute
 		newStatusCmd(app),
 		newReplanCmd(app),
 		newTemplateCmd(app),
-		newShellCmd(app),
 		// v2 intelligence commands
 		newAskCmd(app),
 		newExplainCmd(app),
