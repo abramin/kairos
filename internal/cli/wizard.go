@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/domain"
@@ -137,6 +138,41 @@ func wizardSelectNode(ctx context.Context, app *App, projectID string, result *s
 	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
 }
 
+// parsePositiveInt parses s as a positive integer, returning fallback if s is
+// empty, non-numeric, or non-positive. Used after huh form validation has
+// already ensured the string is valid, so this is a safe conversion.
+func parsePositiveInt(s string, fallback int) int {
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return fallback
+	}
+	return v
+}
+
+// validatePositiveInt accepts empty or a positive integer.
+func validatePositiveInt(s string) error {
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return fmt.Errorf("enter a positive number")
+	}
+	return nil
+}
+
+// validateNonNegativeInt accepts empty or a non-negative integer.
+func validateNonNegativeInt(s string) error {
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.Atoi(s)
+	if err != nil || v < 0 {
+		return fmt.Errorf("enter a non-negative number")
+	}
+	return nil
+}
+
 // wizardInputDuration creates a huh form to enter session duration in minutes.
 func wizardInputDuration(defaultMin int, result *string) *huh.Form {
 	defStr := strconv.Itoa(defaultMin)
@@ -148,16 +184,7 @@ func wizardInputDuration(defaultMin int, result *string) *huh.Form {
 				Title("Duration (minutes)").
 				Placeholder(defStr).
 				Value(result).
-				Validate(func(s string) error {
-					if s == "" {
-						return nil // will use default
-					}
-					v, err := strconv.Atoi(s)
-					if err != nil || v <= 0 {
-						return fmt.Errorf("enter a positive number")
-					}
-					return nil
-				}),
+				Validate(validatePositiveInt),
 		),
 	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
 }
@@ -220,6 +247,17 @@ func wizardSelectWorkItemType(result *string) *huh.Form {
 				Value(result),
 		),
 	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
+}
+
+// validateOptionalDate accepts empty or a YYYY-MM-DD date string.
+func validateOptionalDate(s string) error {
+	if s == "" {
+		return nil
+	}
+	if _, err := time.Parse("2006-01-02", s); err != nil {
+		return fmt.Errorf("use YYYY-MM-DD format")
+	}
+	return nil
 }
 
 // wizardConfirm creates a huh form for a yes/no confirmation.

@@ -107,8 +107,18 @@ func tryAllocate(c ScoredCandidate, remaining int) (*contract.WorkSlice, *contra
 	upper := min(maxS, remaining)
 	allocated := clamp(defS, minS, upper)
 
-	// Don't over-allocate past remaining planned work
+	// No remaining work — item is fully logged
 	workRemaining := c.Input.PlannedMin - c.Input.LoggedMin
+	if c.Input.PlannedMin > 0 && workRemaining <= 0 {
+		return nil, &contract.ConstraintBlocker{
+			EntityType: "work_item",
+			EntityID:   c.Input.WorkItemID,
+			Code:       contract.BlockerWorkComplete,
+			Message:    "No remaining work to allocate",
+		}
+	}
+
+	// Don't over-allocate past remaining planned work
 	if workRemaining > 0 && workRemaining < allocated {
 		allocated = clamp(workRemaining, minS, upper)
 	}

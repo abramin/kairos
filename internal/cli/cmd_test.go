@@ -42,25 +42,51 @@ func testApp(t *testing.T) *App {
 	}
 }
 
-// seedProjectWithWork creates a project with a node and work item for CLI tests.
-func seedProjectWithWork(t *testing.T, app *App) (string, string) {
+// seedOpts configures seedProjectCore.
+type seedOpts struct {
+	shortID    string
+	name       string
+	plannedMin int
+}
+
+// seedProjectCore creates a project→node→work-item triple and returns all three IDs.
+// It is the single source of truth for test fixture creation.
+func seedProjectCore(t *testing.T, app *App, opts seedOpts) (projID, nodeID, wiID string) {
 	t.Helper()
 	ctx := context.Background()
 
+	if opts.name == "" {
+		opts.name = "CLI Test Project"
+	}
+	if opts.plannedMin == 0 {
+		opts.plannedMin = 60
+	}
+
 	target := time.Now().UTC().AddDate(0, 3, 0)
-	proj := testutil.NewTestProject("CLI Test Project", testutil.WithTargetDate(target))
+	projOpts := []testutil.ProjectOption{testutil.WithTargetDate(target)}
+	if opts.shortID != "" {
+		projOpts = append(projOpts, testutil.WithShortID(opts.shortID))
+	}
+	proj := testutil.NewTestProject(opts.name, projOpts...)
 	require.NoError(t, app.Projects.Create(ctx, proj))
 
 	node := testutil.NewTestNode(proj.ID, "Week 1", testutil.WithNodeKind(domain.NodeWeek))
 	require.NoError(t, app.Nodes.Create(ctx, node))
 
 	wi := testutil.NewTestWorkItem(node.ID, "Reading",
-		testutil.WithPlannedMin(60),
+		testutil.WithPlannedMin(opts.plannedMin),
 		testutil.WithSessionBounds(15, 60, 30),
 	)
 	require.NoError(t, app.WorkItems.Create(ctx, wi))
 
-	return proj.ID, wi.ID
+	return proj.ID, node.ID, wi.ID
+}
+
+// seedProjectWithWork creates a project with a node and work item for CLI tests.
+func seedProjectWithWork(t *testing.T, app *App) (string, string) {
+	t.Helper()
+	projID, _, wiID := seedProjectCore(t, app, seedOpts{})
+	return projID, wiID
 }
 
 // executeCmd runs a cobra command and captures stdout/stderr.

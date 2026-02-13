@@ -27,25 +27,31 @@ func (c *commandBar) cmdAsk(args []string) tea.Cmd {
 	}
 
 	question := strings.Join(args, " ")
-	ctx := context.Background()
 
-	resolution, err := c.state.App.Intent.Parse(ctx, question)
-	if err != nil {
-		return outputCmd(shellError(fmt.Errorf("parse failed: %w", err)))
-	}
+	return tea.Batch(
+		loadingCmd("Thinking..."),
+		asyncOutputCmd(func() string {
+			ctx := context.Background()
 
-	resolution.CommandHint = CommandHint(resolution.ParsedIntent)
-	output := formatter.FormatAskResolution(resolution)
+			resolution, err := c.state.App.Intent.Parse(ctx, question)
+			if err != nil {
+				return shellError(fmt.Errorf("parse failed: %w", err))
+			}
 
-	// Auto-execute read-only intents.
-	if resolution.ExecutionState == intelligence.StateExecuted {
-		result := c.dispatchIntentTUI(resolution.ParsedIntent)
-		if result != "" {
-			output += "\n" + result
-		}
-	}
+			resolution.CommandHint = CommandHint(resolution.ParsedIntent)
+			output := formatter.FormatAskResolution(resolution)
 
-	return outputCmd(output)
+			// Auto-execute read-only intents.
+			if resolution.ExecutionState == intelligence.StateExecuted {
+				result := c.dispatchIntentTUI(resolution.ParsedIntent)
+				if result != "" {
+					output += "\n" + result
+				}
+			}
+
+			return output
+		}),
+	)
 }
 
 // dispatchIntentTUI maps a parsed intent to a service call, returning
@@ -103,14 +109,20 @@ func (c *commandBar) cmdExplain(args []string) tea.Cmd {
 				minutes = m
 			}
 		}
-		return outputCmd(c.runExplainNowTUI(minutes))
+		return tea.Batch(
+			loadingCmd("Generating explanation..."),
+			asyncOutputCmd(func() string { return c.runExplainNowTUI(minutes) }),
+		)
 
 	case "why-not":
 		if len(args) < 2 {
 			return outputCmd(formatter.StyleYellow.Render("Usage: explain why-not <project-id or work-item-id>"))
 		}
 		candidateID := args[1]
-		return outputCmd(c.runExplainWhyNotTUI(candidateID))
+		return tea.Batch(
+			loadingCmd("Generating explanation..."),
+			asyncOutputCmd(func() string { return c.runExplainWhyNotTUI(candidateID) }),
+		)
 
 	default:
 		// Fall through to cobra for flag-based usage.
@@ -176,7 +188,10 @@ func (c *commandBar) cmdReview(args []string) tea.Cmd {
 	sub := strings.ToLower(args[0])
 	switch sub {
 	case "weekly":
-		return outputCmd(c.runReviewWeeklyTUI())
+		return tea.Batch(
+			loadingCmd("Generating weekly review..."),
+			asyncOutputCmd(c.runReviewWeeklyTUI),
+		)
 	default:
 		return outputCmd(c.cobraCapture(append([]string{"review"}, args...)))
 	}

@@ -46,6 +46,14 @@ func (m *appModel) activeView() View {
 	return m.viewStack[len(m.viewStack)-1]
 }
 
+// setActiveView replaces the top of the view stack.
+// If the stack is empty, this is a no-op.
+func (m *appModel) setActiveView(v View) {
+	if len(m.viewStack) > 0 {
+		m.viewStack[len(m.viewStack)-1] = v
+	}
+}
+
 // ── bubbletea interface ──────────────────────────────────────────────────────
 
 func (m appModel) Init() tea.Cmd {
@@ -66,7 +74,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Forward to active view
 		if v := m.activeView(); v != nil {
 			updated, cmd := v.Update(msg)
-			m.viewStack[len(m.viewStack)-1] = updated.(View)
+			m.setActiveView(updated.(View))
 			return m, cmd
 		}
 		return m, nil
@@ -101,6 +109,10 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.lastOutput = msg.output
 		return m, nil
 
+	case cmdLoadingMsg:
+		m.lastOutput = "\n  " + formatter.Dim(msg.message)
+		return m, nil
+
 	case wizardCompleteMsg:
 		// Atomically pop the wizard view and execute the follow-up command.
 		if len(m.viewStack) > 1 {
@@ -108,7 +120,8 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.lastOutput = ""
 		m.cmdBar.Focus()
-		return m, msg.nextCmd
+		// Batch the follow-up command with a refresh so the underlying view reloads.
+		return m, tea.Batch(msg.nextCmd, func() tea.Msg { return refreshViewMsg{} })
 
 	case quitMsg:
 		m.quitting = true
@@ -124,7 +137,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Forward to active view
 	if v := m.activeView(); v != nil {
 		updated, cmd := v.Update(msg)
-		m.viewStack[len(m.viewStack)-1] = updated.(View)
+		m.setActiveView(updated.(View))
 		return m, cmd
 	}
 
@@ -140,16 +153,24 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// If command bar is focused, route keys there
 	if m.cmdBar.Focused() {
+		if msg.Type == tea.KeyEnter {
+			m.lastOutput = "" // Clear stale output before new command runs
+		}
 		cmd := m.cmdBar.Update(msg)
 		return m, cmd
 	}
+
+	// Dismiss any lingering command output on first view-mode key press.
+	// This prevents stale output (e.g., LLM errors) from blocking the
+	// underlying view once the user has moved on (Esc to blur, then interact).
+	m.lastOutput = ""
 
 	// If active view captures input (has its own text input), forward directly.
 	// This bypasses global keybindings so views like draft and help chat can
 	// receive all characters including 'q', ':', etc.
 	if v := m.activeView(); v != nil && viewCapturesInput(v) {
 		updated, cmd := v.Update(msg)
-		m.viewStack[len(m.viewStack)-1] = updated.(View)
+		m.setActiveView(updated.(View))
 		return m, cmd
 	}
 
@@ -164,6 +185,17 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.quitting = true
 		return m, tea.Quit
 
+	case msg.String() == "?":
+		// Global what-now: push recommendation view from any view.
+		if v := m.activeView(); v != nil && v.ID() == ViewRecommendation {
+			break // already on recommendation view, let it handle
+		}
+		m.cmdBar.Blur()
+		m.lastOutput = ""
+		v := newRecommendationView(m.state, 60)
+		m.viewStack = append(m.viewStack, v)
+		return m, v.Init()
+
 	case msg.Type == tea.KeyEsc:
 		// Pop view stack (go back)
 		if len(m.viewStack) > 1 {
@@ -177,7 +209,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Forward to active view
 	if v := m.activeView(); v != nil {
 		updated, cmd := v.Update(msg)
-		m.viewStack[len(m.viewStack)-1] = updated.(View)
+		m.setActiveView(updated.(View))
 		return m, cmd
 	}
 
@@ -196,7 +228,14 @@ func (m appModel) View() string {
 
 	// Content area: active view or command output
 	if m.lastOutput != "" {
-		sections = append(sections, m.lastOutput)
+		content := m.lastOutput
+		if m.state.Height > 0 {
+			content = truncateToHeight(content, m.state.ContentHeight())
+		}
+		if m.state.Width > 0 {
+			content = lipgloss.NewStyle().MaxWidth(m.state.Width).Render(content)
+		}
+		sections = append(sections, content)
 	} else if v := m.activeView(); v != nil {
 		sections = append(sections, v.View())
 	}
@@ -207,7 +246,18 @@ func (m appModel) View() string {
 	// Command bar
 	sections = append(sections, m.cmdBar.View())
 
-	return strings.Join(sections, "\n")
+	result := strings.Join(sections, "\n")
+
+	// Pad to terminal height to prevent stale line artifacts from
+	// bubbletea's line-diff renderer in alt-screen mode.
+	if m.state.Height > 0 {
+		lines := strings.Count(result, "\n") + 1
+		if lines < m.state.Height {
+			result += strings.Repeat("\n", m.state.Height-lines)
+		}
+	}
+
+	return result
 }
 
 // ── rendering helpers ────────────────────────────────────────────────────────
@@ -258,6 +308,19 @@ func (m *appModel) renderStatusBar() string {
 	sepStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(formatter.ColorDim))
 	sep := sepStyle.Render(strings.Repeat("─", max(m.state.Width, 20)))
 	return sep + "\n" + bar
+}
+
+// truncateToHeight keeps only the last maxLines lines from s,
+// showing the bottom of the output which is typically most relevant.
+func truncateToHeight(s string, maxLines int) string {
+	if maxLines <= 0 {
+		return ""
+	}
+	lines := strings.Split(s, "\n")
+	if len(lines) <= maxLines {
+		return s
+	}
+	return strings.Join(lines[len(lines)-maxLines:], "\n")
 }
 
 // viewCapturesInput returns true if the active view has its own text input

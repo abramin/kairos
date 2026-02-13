@@ -130,6 +130,14 @@ func StatusPill(status domain.ProjectStatus) string {
 	}
 }
 
+// ModeBadge returns a styled mode indicator with description.
+func ModeBadge(mode domain.PlanMode) string {
+	if mode == domain.ModeCritical {
+		return StyleRed.Render("▲ CRITICAL MODE") + Dim(" — focus on critical work only")
+	}
+	return StyleGreen.Render("● BALANCED") + Dim(" — all projects available")
+}
+
 // WorkItemStatusPill returns a colored status indicator for work item status.
 func WorkItemStatusPill(status domain.WorkItemStatus) string {
 	switch status {

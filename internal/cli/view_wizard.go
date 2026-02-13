@@ -33,9 +33,7 @@ func (v *wizardView) Init() tea.Cmd {
 func (v *wizardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Escape cancels the wizard.
 	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.Type == tea.KeyEsc {
-		return v, func() tea.Msg {
-			return wizardCompleteMsg{nextCmd: outputCmd(formatter.Dim("Cancelled."))}
-		}
+		return v, func() tea.Msg { return wizardCompleteOutput(formatter.Dim("Cancelled.")) }
 	}
 
 	form, cmd := v.form.Update(msg)

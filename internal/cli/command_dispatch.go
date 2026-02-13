@@ -97,6 +97,20 @@ func outputCmd(s string) tea.Cmd {
 	return func() tea.Msg { return cmdOutputMsg{output: s} }
 }
 
+// asyncOutputCmd wraps a blocking function in a tea.Cmd that runs
+// asynchronously. The function's string result is delivered as a cmdOutputMsg.
+// Use with tea.Batch(loadingCmd(...), asyncOutputCmd(fn)) to show a loading
+// indicator while the work runs in a goroutine.
+func asyncOutputCmd(fn func() string) tea.Cmd {
+	return func() tea.Msg {
+		result := fn()
+		if result == "" {
+			return nil
+		}
+		return cmdOutputMsg{output: result}
+	}
+}
+
 // ── argument parsing helpers ─────────────────────────────────────────────────
 
 // stripItemPrefix removes a leading "#" from an item reference (e.g. "#5" → "5").

@@ -64,6 +64,7 @@ const (
 	BlockerStatusDone             ConstraintBlockerCode = "STATUS_DONE"
 	BlockerNotInCriticalScope     ConstraintBlockerCode = "NOT_IN_CRITICAL_SCOPE"
 	BlockerSessionMinExceedsAvail ConstraintBlockerCode = "SESSION_MIN_EXCEEDS_AVAILABLE"
+	BlockerWorkComplete           ConstraintBlockerCode = "WORK_COMPLETE"
 )
 
 type ConstraintBlocker struct {

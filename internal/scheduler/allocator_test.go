@@ -216,6 +216,58 @@ func TestAllocateSlices_ExtensionCappedByWorkRemaining(t *testing.T) {
 	assert.Equal(t, 30, slices[1].AllocatedMin, "wi-2 gets its default session")
 }
 
+func TestAllocateSlices_FullyLoggedItemBlocked(t *testing.T) {
+	candidates := []ScoredCandidate{
+		{
+			Input: ScoringInput{
+				WorkItemID:        "wi-1",
+				ProjectID:         "p-1",
+				ProjectName:       "A",
+				Title:             "Done Task",
+				MinSessionMin:     15,
+				MaxSessionMin:     60,
+				DefaultSessionMin: 30,
+				PlannedMin:        60,
+				LoggedMin:         60, // 100% complete
+				NodeID:            "n-1",
+			},
+			Score: 80.0,
+		},
+	}
+
+	slices, blockers := AllocateSlices(candidates, 60, 3, false)
+
+	assert.Empty(t, slices, "fully logged item should not be allocated")
+	require.Len(t, blockers, 1)
+	assert.Equal(t, contract.BlockerWorkComplete, blockers[0].Code)
+}
+
+func TestAllocateSlices_OverLoggedItemBlocked(t *testing.T) {
+	candidates := []ScoredCandidate{
+		{
+			Input: ScoringInput{
+				WorkItemID:        "wi-1",
+				ProjectID:         "p-1",
+				ProjectName:       "A",
+				Title:             "Over-logged Task",
+				MinSessionMin:     15,
+				MaxSessionMin:     60,
+				DefaultSessionMin: 30,
+				PlannedMin:        60,
+				LoggedMin:         90, // 150% complete
+				NodeID:            "n-1",
+			},
+			Score: 80.0,
+		},
+	}
+
+	slices, blockers := AllocateSlices(candidates, 60, 3, false)
+
+	assert.Empty(t, slices, "over-logged item should not be allocated")
+	require.Len(t, blockers, 1)
+	assert.Equal(t, contract.BlockerWorkComplete, blockers[0].Code)
+}
+
 func TestAllocateSlices_ExtensionMultipleProjects(t *testing.T) {
 	// Two projects, 90 min available. Pass 1 gives each 30 min (60 total).
 	// Extension distributes remaining 30 min across both pass-1 slices.

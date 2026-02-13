@@ -148,12 +148,47 @@ func TestAppModel_WizardCompleteAndOutput(t *testing.T) {
 	require.NotNil(t, cmd)
 	assert.True(t, m.cmdBar.Focused())
 	require.Len(t, m.viewStack, 1)
-	assert.IsType(t, cmdOutputMsg{}, cmd())
+	// wizardCompleteMsg now returns a tea.Batch (nextCmd + refreshViewMsg).
+	batchMsg := cmd()
+	batch, ok := batchMsg.(tea.BatchMsg)
+	require.True(t, ok, "expected tea.BatchMsg, got %T", batchMsg)
+	// Collect all messages from the batch.
+	var gotOutput, gotRefresh bool
+	for _, c := range batch {
+		if c == nil {
+			continue
+		}
+		switch c().(type) {
+		case cmdOutputMsg:
+			gotOutput = true
+		case refreshViewMsg:
+			gotRefresh = true
+		}
+	}
+	assert.True(t, gotOutput, "batch should contain cmdOutputMsg")
+	assert.True(t, gotRefresh, "batch should contain refreshViewMsg")
 
 	model, cmd = m.Update(cmdOutputMsg{output: "hello"})
 	m = model.(appModel)
 	require.Nil(t, cmd)
 	assert.Contains(t, m.View(), "hello")
+}
+
+func TestAppModel_LoadingMessage(t *testing.T) {
+	m := newAppModel(testApp(t))
+
+	// cmdLoadingMsg sets lastOutput to a dimmed loading indicator.
+	model, cmd := m.Update(cmdLoadingMsg{message: "Thinking..."})
+	m = model.(appModel)
+	require.Nil(t, cmd)
+	assert.Contains(t, m.lastOutput, "Thinking...")
+
+	// Subsequent cmdOutputMsg replaces the loading message.
+	model, cmd = m.Update(cmdOutputMsg{output: "result text"})
+	m = model.(appModel)
+	require.Nil(t, cmd)
+	assert.Equal(t, "result text", m.lastOutput)
+	assert.NotContains(t, m.lastOutput, "Thinking...")
 }
 
 func TestViewCapturesInput(t *testing.T) {
@@ -163,4 +198,5 @@ func TestViewCapturesInput(t *testing.T) {
 	assert.True(t, viewCapturesInput(newStubView(ViewForm, "Form", "")))
 	assert.False(t, viewCapturesInput(newStubView(ViewDashboard, "Dash", "")))
 }
+
 

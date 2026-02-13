@@ -7,7 +7,6 @@ import (
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/contract"
-	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -75,6 +74,11 @@ func (v *recommendationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.resp = msg.resp
 		return v, nil
 
+	case refreshViewMsg:
+		v.loading = true
+		v.err = nil
+		return v, v.loadRecommendations()
+
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "up", "k":
@@ -84,6 +88,11 @@ func (v *recommendationView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "down", "j":
 			if v.cursor < v.recCount()-1 {
 				v.cursor++
+			}
+		case "enter":
+			if v.resp != nil && v.cursor < len(v.resp.Recommendations) {
+				rec := v.resp.Recommendations[v.cursor]
+				return v, pushView(newActionMenuView(v.state, rec.WorkItemID, rec.Title, rec.WorkItemSeq))
 			}
 		case "r":
 			v.loading = true
@@ -116,11 +125,7 @@ func (v *recommendationView) View() string {
 	b.WriteString("\n")
 
 	// Mode badge
-	if v.resp.Mode == domain.ModeCritical {
-		b.WriteString("  " + formatter.StyleRed.Render("▲ CRITICAL MODE") + "\n")
-	} else {
-		b.WriteString("  " + formatter.StyleGreen.Render("● BALANCED") + "\n")
-	}
+	b.WriteString("  " + formatter.ModeBadge(v.resp.Mode) + "\n")
 
 	// Allocation summary
 	b.WriteString(fmt.Sprintf("  %s requested  %s allocated  %s free\n\n",

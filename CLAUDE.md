@@ -49,6 +49,7 @@ internal/cli/                    (Cobra command definitions + App struct + shell
 
 templates/                       (JSON template files loaded by TemplateService)
 internal/testutil/               (in-memory DB helpers + builder-pattern fixtures)
+internal/teatest/                (synchronous bubbletea test driver — deterministic, goroutine-free)
 ```
 
 ### Key Packages
@@ -74,6 +75,8 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 
 **`internal/testutil`** — `NewTestDB()` for in-memory databases. Builder fixtures: `NewTestProject(name, opts...)`, `NewTestNode(projectID, title, opts...)`, `NewTestWorkItem(nodeID, title, opts...)` with option functions like `WithTargetDate`, `WithPlannedMin`.
 
+**`internal/teatest`** — Synchronous test driver for bubbletea models. `Driver` replaces `tea.Program` in tests — calls `Update()` directly and synchronously drains returned `Cmd`s. Cursor blink `Cmd`s (which block on timer channels) are skipped via a 10ms timeout. `MaxDrainDepth` (100) prevents infinite loops. Provides helpers: `PressKey()`, `PressEnter()`, `PressEsc()`, `Type()`, `Send()`, `View()`.
+
 **`internal/importer`** — JSON import schema (`ImportSchema`, `NodeImport`, `WorkItemImport`) with validation (`ValidateImportSchema`) and conversion to domain objects (`Convert`). Used by both `ImportService` (file-based import) and `ProjectDraftService` (LLM-generated drafts).
 
 **`internal/llm`** — Ollama HTTP client (`NewOllamaClient`), structured JSON extraction (`ExtractJSON[T]` — generic, strips markdown fences, validates via `SchemaValidator[T]`), config from env vars, and observability hooks (`Observer` interface). All LLM calls go through this package.
@@ -85,23 +88,43 @@ internal/testutil/               (in-memory DB helpers + builder-pattern fixture
 - `ProjectDraftService` — Multi-turn NL→project structure drafting. Interactive conversation produces `ImportSchema`, validated via `importer.ValidateImportSchema`, then imported via `ImportService`
 - `HelpService` — LLM-powered Q&A about using Kairos. Supports one-shot questions and multi-turn chat (`StartChat`/`NextTurn`). Uses grounding validation to filter hallucinated commands/flags and a domain glossary embedded in the system prompt. Falls back to `DeterministicHelp()` (fuzzy-matching against the command spec) when LLM is unavailable
 
-**`internal/cli`** — Bubbletea shell REPL + Cobra command tree (internal). `App` struct holds all service interfaces; v2 intelligence fields (`Intent`, `Explain`, `TemplateDraft`, `ProjectDraft`, `Help`) are nil when LLM is disabled. **Shell-only**: `kairos` always launches the interactive shell. All commands run inside the REPL. Cobra remains as an internal execution engine — the shell dispatches unrecognized input through the Cobra tree via `execCobraCapture()`. Internal Cobra subcommands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `ask`, `explain` (subcommands: `now`, `why-not`), `review` (subcommand: `weekly`), `help` (subcommand: `chat`).
+**`internal/cli`** — Bubbletea TUI with view-stack navigation + Cobra command tree (internal). `App` struct (`root.go`) holds all service interfaces; v2 intelligence fields (`Intent`, `Explain`, `TemplateDraft`, `ProjectDraft`, `Help`) are nil when LLM is disabled. **Shell-only**: `kairos` always launches the interactive shell. Cobra remains as an internal execution engine — unrecognized commands fall through to the Cobra tree via `captureCobraOutput()` (`cobra_capture.go`). Internal Cobra subcommands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `ask`, `explain` (subcommands: `now`, `why-not`), `review` (subcommand: `weekly`), `help` (subcommand: `chat`).
 
-**`internal/cli/draft_wizard.go`** — Interactive structure wizard for guided project creation without LLM. Collects node groups (label, count, kind, day spacing), work item templates stamped on every node, and special one-off nodes (exams, milestones). Produces an `ImportSchema` that goes through the same validation and import pipeline as LLM-drafted projects. `generateShortID()` creates human-friendly IDs (e.g., `"PHYS01"`) from project descriptions.
+**TUI Architecture** (view-stack pattern):
+- **`app_model.go`** — Root bubbletea `appModel`: owns a `viewStack []View`, a persistent `commandBar`, and `SharedState`. Handles `pushViewMsg`/`popViewMsg`/`replaceViewMsg` navigation messages and `wizardCompleteMsg` for multi-step flows. Wizard completion batches the follow-up command with `refreshViewMsg` so views reload after mutations.
+- **`view.go`** — `View` interface (extends `tea.Model` with `ID()`, `ShortHelp()`, `Title()`). Nine `ViewID` constants: `ViewDashboard`, `ViewProjectList`, `ViewTaskList`, `ViewActionMenu`, `ViewRecommendation`, `ViewForm`, `ViewLogForm`, `ViewDraft`, `ViewHelpChat`.
+- **`shared_state.go`** — `SharedState` holds active project/item context, terminal dimensions, project cache, and transient recommendation state. Shared across all views via pointer.
+- **`command_bar.go`** — Persistent text input at the bottom of the TUI with autocomplete suggestions and history navigation.
+- **`navigate.go`** — Navigation message types (`pushViewMsg`, `popViewMsg`, `replaceViewMsg`, `cmdOutputMsg`, `wizardCompleteMsg`, `refreshViewMsg`) and helper constructors (`pushView()`, `popView()`, `replaceView()`). `refreshViewMsg` notifies views to reload data after state mutations.
+- **`command_dispatch.go`** — `commandBar.executeCommand()` dispatches text input to command handlers. Routes built-in commands (`projects`, `use`, `inspect`, `status`, `what-now`, `log`, `start`, `finish`, `add`, `ask`, `explain`, `review`, `context`, `draft`, `help`, `clear`, `exit`) and falls through to entity group commands and Cobra.
 
-**`internal/cli/shell_model.go`** — Bubbletea `shellModel` powering the interactive shell. Five modes: `modePrompt` (normal input), `modeWizard` (huh form active), `modeConfirm` (y/n for destructive ops), `modeDraft` (project drafting), `modeHelpChat` (interactive help). Manages context state (active project, active item, last duration) and command history.
+**View files**:
+- `view_dashboard.go` — Split-pane home screen: left pane has selectable project list with cursor, right pane shows project detail (stats: total/done/in-progress/todo). Async detail loading via `dashboardDetailLoadedMsg`.
+- `view_project_list.go` — Navigable project list with cursor + `/` filtering
+- `view_task_list.go` — Flattened plan tree (`taskRow`) for a project with cursor navigation. Supports node collapse/expand (`collapsedNodes` map) and digit-jump-to-sequence (`jumpBuf`). Handles `refreshViewMsg` to reload data after mutations.
+- `view_recommendation.go` — Interactive what-now results with action selection
+- `view_action_menu.go` — Action menu for selected work item with single-key shortcuts: start (s), log (l), adjust logged (a), mark done (d), edit (e), delete (x). Uses `replaceView()` for form-based actions.
+- `view_log_form.go` — Form-based views: `newLogFormView()` (duration/units/notes), `newAdjustLoggedView()` (correct logged minutes), `newEditWorkItemView()` (title/planned/type), `newAddWorkItemView()` (add new item).
+- `view_wizard.go` — Wraps `huh.Form` as a `View` on the stack; sends `wizardCompleteMsg` with chained callback on completion
+- `view_draft.go` — Draft mode: wizard flow (no-LLM) or LLM conversational flow; produces `ImportSchema`
+- `view_help_chat.go` — Interactive help chat view
 
-**`internal/cli/shell_cmd.go`** — Shell command implementations. Built-in commands: `projects`, `use <id>`, `inspect [id]`, `status`, `what-now [min]`, `log [#item] [minutes]`, `start [#item]`, `finish [#item]`, `context [clear|project|item]`, `draft [description]`, `clear`, `help [chat]`, `exit`. Bare creation commands (`work add`, `node add`, `session log`) auto-launch wizard forms. Destructive commands (`remove`, `archive`) require y/n confirmation. Unrecognized input falls through to the full Cobra command tree. Prompt shows active project context: `kairos (proj_id) ❯`.
+**Command implementation files**:
+- `cmd_navigation.go` — `projects`, `use`, `inspect`, `status`, `what-now`, `replan` handlers
+- `cmd_work.go` — `log`, `start`, `finish` with wizard chaining for missing args
+- `cmd_entity.go` — Entity group commands (`node/work/session/project` subcommands), wizard launch for bare creation, confirmation for destructive ops
+- `cmd_intelligence.go` — `ask`, `explain`, `review` LLM command handlers
+- `work_actions.go` — Extracted action handlers reused across command bar and action menu: `execLogSession()`, `execStartItem()`, `execMarkDone()`. Each takes `context`, `App`, `SharedState` and returns formatted output or error.
 
-**`internal/cli/wizard.go`** — Reusable huh form builders for shell wizards: `wizardSelectProject`, `wizardSelectWorkItem`, `wizardSelectNode`, `wizardInputDuration`, `wizardInputText`, `wizardSelectNodeKind`, `wizardSelectWorkItemType`, `wizardConfirm`. All use the Gruvbox-themed `kairosHuhTheme()`.
-
-**`internal/cli/resolve.go`** — ID resolution helpers (`resolveNodeID`, `resolveWorkItemID`, `resolveProjectForFlag`) that accept numeric seq IDs or UUIDs and resolve to full UUIDs using project context.
-
-**`internal/cli/shell_history.go`** — Persistent command history stored at `~/.kairos/shell_history` (max 500 lines). Arrow keys navigate history in the shell.
-
-**`internal/cli/command_hint.go`** — Maps `ParsedIntent` (from LLM intent parsing) to concrete CLI command strings for display in `ask` output.
-
-**`internal/cli/shell_draft.go`** — Draft mode within the shell REPL. Two flows: (1) **Wizard flow** (no args / LLM disabled): phase-by-phase interactive collection via `draftPhase` state machine → preview → accept/refine/cancel. (2) **LLM conversational flow** (`draft <description>`): multi-turn AI drafting reusing `ProjectDraftService`. Both flows produce an `ImportSchema` and go through the same validation/import pipeline.
+**Supporting files**:
+- `wizard.go` — Reusable huh form builders (`wizardSelectProject`, `wizardSelectWorkItem`, `wizardInputDuration`, etc.). Gruvbox-themed via `kairosHuhTheme()`.
+- `resolve.go` — ID resolution helpers (`resolveNodeID`, `resolveWorkItemID`, `resolveProjectID`) that accept numeric seq IDs or UUIDs and resolve to full UUIDs using project context.
+- `shell_history.go` — Persistent command history at `~/.kairos/shell_history` (max 500 lines). Arrow keys navigate history.
+- `shell_completer.go` — Tab autocomplete for the command bar.
+- `shell_cmd.go` — `runShell()` entrypoint, `destructiveCommands` map, utility functions.
+- `command_hint.go` — Maps `ParsedIntent` (from LLM intent parsing) to concrete CLI command strings.
+- `draft_wizard.go` — Interactive structure wizard for guided project creation without LLM. `generateShortID()` creates human-friendly IDs (e.g., `"PHYS01"`).
+- `cmdspec.go` — `CommandSpec` built from the Cobra tree for grounding validation.
 
 **`internal/cli/formatter`** — Terminal output formatting with lipgloss: tables, tree views, progress bars, color helpers, animated spinner (`spinner.go`). Separate formatters for what-now, status, explain, ask, draft, and help output.
 
@@ -193,6 +216,18 @@ item := testutil.NewTestWorkItem(node.ID, "Reading", testutil.WithPlannedMin(60)
 
 Scheduler tests use pure functions with no DB setup needed — just construct `ScoringInput`/`RiskInput` structs directly.
 
+TUI tests use `internal/teatest.Driver` for synchronous, deterministic testing. The CLI package wraps this in `TestDriver` (`tui_driver_test.go`) with Kairos-specific helpers:
+
+```go
+drv := NewTestDriver(t, app)
+drv.Command("use PHI01")           // type + execute in command bar
+assert.Equal(t, ViewTaskList, drv.ActiveViewID())
+drv.PressKey("enter")              // interact with current view
+assert.Equal(t, ViewActionMenu, drv.ActiveViewID())
+```
+
+Intelligence package tests use `httptest` servers to validate the full HTTP serialization path against real Ollama response shapes, preventing mock-drift.
+
 ## Reference Documents
 
 - `docs/prd.md` — Domain model, features, duration/progress rules, CLI UX requirements
@@ -203,4 +238,5 @@ Scheduler tests use pure functions with no DB setup needed — just construct `S
 - `docs/orchestrator-v2.md` — v2 intelligence build strategy
 - `docs/design.md` — System design notes
 - `docs/repl.md` — Interactive shell design and command reference
+- `docs/shell-first-prd.md` — Shell-first product direction and UX strategy
 - `docs/template-sample.json` — Example template schema for project scaffolding

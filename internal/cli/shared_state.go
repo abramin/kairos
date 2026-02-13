@@ -77,9 +77,10 @@ func (s *SharedState) SetActiveItem(id, title string, seq int) {
 }
 
 // ContentHeight returns the available height for view content,
-// accounting for header (1 line), status bar (1 line), and command bar (1 line).
+// accounting for header (2 lines: title + separator),
+// status bar (2 lines: separator + hints), and command bar (1 line).
 func (s *SharedState) ContentHeight() int {
-	h := s.Height - 3 // header + status bar + command bar
+	h := s.Height - 5
 	if h < 1 {
 		return 1
 	}

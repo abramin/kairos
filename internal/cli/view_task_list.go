@@ -3,7 +3,9 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/domain"
@@ -26,6 +28,9 @@ type taskRow struct {
 	logged    int
 	dueDate   *string
 	depth     int
+	// Collapse state (set at render time for node rows).
+	collapsed  bool
+	childCount int
 }
 
 // taskListLoadedMsg signals that task tree data has been loaded.
@@ -34,19 +39,26 @@ type taskListLoadedMsg struct {
 	err  error
 }
 
+// jumpTimeoutMsg clears the digit-jump buffer after a pause.
+type jumpTimeoutMsg struct{ seq int }
+
 // taskListView shows a project's plan tree with navigable nodes and items.
 type taskListView struct {
-	state   *SharedState
-	rows    []taskRow
-	cursor  int
-	loading bool
-	err     error
+	state          *SharedState
+	rows           []taskRow
+	cursor         int
+	loading        bool
+	err            error
+	collapsedNodes map[string]bool // nodeID -> collapsed
+	jumpBuf        string          // accumulated digit keys for jump-to-seq
+	jumpSeq        int             // incremented per digit press; stale timeouts are ignored
 }
 
 func newTaskListView(state *SharedState) *taskListView {
 	return &taskListView{
-		state:   state,
-		loading: true,
+		state:          state,
+		loading:        true,
+		collapsedNodes: make(map[string]bool),
 	}
 }
 
@@ -60,9 +72,12 @@ func (v *taskListView) Title() string {
 
 func (v *taskListView) ShortHelp() []key.Binding {
 	return []key.Binding{
+		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open/collapse")),
 		key.NewBinding(key.WithKeys("space"), key.WithHelp("space", "toggle done")),
-		key.NewBinding(key.WithKeys("s"), key.WithHelp("s", "start")),
-		key.NewBinding(key.WithKeys("l"), key.WithHelp("l", "log")),
+		key.NewBinding(key.WithKeys("1"), key.WithHelp("#", "jump to item")),
+		key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add item")),
+		key.NewBinding(key.WithKeys("x"), key.WithHelp("x", "delete")),
+		key.NewBinding(key.WithKeys("r"), key.WithHelp("r", "refresh")),
 		key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "back")),
 	}
 }
@@ -92,8 +107,40 @@ func (v *taskListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.rows = msg.rows
 		return v, nil
 
+	case refreshViewMsg:
+		v.loading = true
+		return v, v.loadTasks()
+
+	case jumpTimeoutMsg:
+		if msg.seq == v.jumpSeq {
+			v.jumpBuf = ""
+		}
+		return v, nil
+
 	case tea.KeyMsg:
 		visible := v.visibleRows()
+
+		// Digit keys: accumulate and jump to matching seq number.
+		if k := msg.String(); len(k) == 1 && k[0] >= '0' && k[0] <= '9' {
+			v.jumpBuf += k
+			v.jumpSeq++
+			if target, err := strconv.Atoi(v.jumpBuf); err == nil {
+				for i, row := range visible {
+					if !row.isNode && row.seq == target {
+						v.cursor = i
+						break
+					}
+				}
+			}
+			seq := v.jumpSeq
+			return v, tea.Tick(time.Second, func(time.Time) tea.Msg {
+				return jumpTimeoutMsg{seq: seq}
+			})
+		}
+
+		// Any non-digit key clears the jump buffer.
+		v.jumpBuf = ""
+
 		switch msg.String() {
 		case "up", "k":
 			if v.cursor > 0 {
@@ -103,12 +150,41 @@ func (v *taskListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if v.cursor < len(visible)-1 {
 				v.cursor++
 			}
+		case "enter":
+			if v.cursor < len(visible) {
+				row := visible[v.cursor]
+				if row.isNode {
+					v.collapsedNodes[row.nodeID] = !v.collapsedNodes[row.nodeID]
+				} else if row.itemID != "" {
+					v.state.SetActiveItem(row.itemID, row.title, row.seq)
+					return v, pushView(newActionMenuView(v.state, row.itemID, row.title, row.seq))
+				}
+			}
 		case "space":
 			// Toggle done/todo for work items
 			if v.cursor < len(visible) {
 				row := visible[v.cursor]
 				if !row.isNode && row.itemID != "" {
 					return v, v.toggleDone(row)
+				}
+			}
+		case "a":
+			// Add work item: infer nodeID from cursor position.
+			if v.cursor < len(visible) {
+				nodeID := visible[v.cursor].nodeID
+				if nodeID != "" {
+					return v, pushView(newAddWorkItemView(v.state, nodeID))
+				}
+			}
+		case "x":
+			// Delete: on item row → open action menu (which has delete);
+			// on node row → confirm and delete node.
+			if v.cursor < len(visible) {
+				row := visible[v.cursor]
+				if row.isNode {
+					return v, v.deleteNode(row)
+				} else if row.itemID != "" {
+					return v, v.deleteItem(row)
 				}
 			}
 		case "r":
@@ -141,12 +217,48 @@ func (v *taskListView) toggleDone(row taskRow) tea.Cmd {
 	}
 }
 
+func (v *taskListView) deleteItem(row taskRow) tea.Cmd {
+	return execDeleteItem(v.state, row.itemID, row.title)
+}
+
+func (v *taskListView) deleteNode(row taskRow) tea.Cmd {
+	title, nodeID := row.title, row.nodeID
+	prompt := fmt.Sprintf("Delete %q", title)
+	if row.childCount > 0 {
+		prompt += fmt.Sprintf(" and %d item(s)", row.childCount)
+	}
+	prompt += "?"
+	return execConfirmDelete(v.state, prompt, title, func(ctx context.Context) error {
+		return v.state.App.Nodes.Delete(ctx, nodeID)
+	})
+}
+
 func (v *taskListView) visibleRows() []taskRow {
-	// Filter out default nodes — show their items at depth 0
 	var visible []taskRow
+	// Track collapsed ancestor depth for recursive hiding.
+	collapsedDepth := -1
 	for _, r := range v.rows {
+		// Skip default nodes (their items appear at parent depth).
 		if r.isNode && r.isDefault {
 			continue
+		}
+		// If we are inside a collapsed subtree, skip until depth goes back up.
+		if collapsedDepth >= 0 {
+			if r.depth > collapsedDepth {
+				continue
+			}
+			collapsedDepth = -1
+		}
+		// Skip work items belonging to a collapsed node.
+		if !r.isNode && v.collapsedNodes[r.nodeID] {
+			continue
+		}
+		// Copy collapse state onto node rows for rendering.
+		if r.isNode {
+			r.collapsed = v.collapsedNodes[r.nodeID]
+			if r.collapsed {
+				collapsedDepth = r.depth
+			}
 		}
 		visible = append(visible, r)
 	}
@@ -171,12 +283,17 @@ func (v *taskListView) View() string {
 		return "\n  " + formatter.Dim("No tasks in this project.")
 	}
 
+	var jumpHint string
+	if v.jumpBuf != "" {
+		jumpHint = "  " + formatter.Dim("jump: #"+v.jumpBuf) + "\n"
+	}
+
 	groups := groupNodeRows(visible)
 	threshold := twoColMinWidth*2 + twoColGap
 	useTwoCol := v.state.Width >= threshold && len(groups) >= 2 && len(visible) > v.state.ContentHeight()
 
 	if !useTwoCol {
-		return v.renderSingleColumn(visible)
+		return jumpHint + v.renderSingleColumn(visible)
 	}
 
 	colWidth := (v.state.Width - twoColGap) / 2
@@ -203,7 +320,7 @@ func (v *taskListView) View() string {
 	rightCol := lipgloss.NewStyle().Width(colWidth).Render(strings.Join(rightLines, "\n"))
 	gap := strings.Repeat(" ", twoColGap)
 
-	return "\n" + lipgloss.JoinHorizontal(lipgloss.Top, leftCol, gap, rightCol)
+	return jumpHint + "\n" + lipgloss.JoinHorizontal(lipgloss.Top, leftCol, gap, rightCol)
 }
 
 // renderSingleColumn is the original single-column layout.
@@ -228,8 +345,13 @@ func (v *taskListView) renderRow(row taskRow, isCursor bool, colWidth int) strin
 	var line string
 
 	if row.isNode {
-		line = fmt.Sprintf("%s%s%s",
+		indicator := "▾ "
+		if row.collapsed {
+			indicator = fmt.Sprintf("▸ (%d) ", row.childCount)
+		}
+		line = fmt.Sprintf("%s%s%s%s",
 			cursor, indent,
+			formatter.Dim(indicator),
 			formatter.StyleBold.Render(row.title)+" "+formatter.Dim(string(row.kind)),
 		)
 	} else {
@@ -360,6 +482,7 @@ func buildTaskRows(ctx context.Context, app *App, projectID string) ([]taskRow, 
 	var walk func(nodes []*domain.PlanNode, depth int) error
 	walk = func(nodes []*domain.PlanNode, depth int) error {
 		for _, n := range nodes {
+			nodeRowIdx := len(rows)
 			rows = append(rows, taskRow{
 				isNode:    true,
 				nodeID:    n.ID,
@@ -397,6 +520,8 @@ func buildTaskRows(ctx context.Context, app *App, projectID string) ([]taskRow, 
 					depth:   itemDepth,
 				})
 			}
+			// Set the child count on the node row.
+			rows[nodeRowIdx].childCount = len(items)
 
 			// Recurse into child nodes
 			children, err := app.Nodes.ListChildren(ctx, n.ID)

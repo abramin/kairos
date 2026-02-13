@@ -31,6 +31,17 @@ type wizardCompleteMsg struct {
 	nextCmd tea.Cmd
 }
 
+// cmdLoadingMsg carries a transient loading indicator message
+// to display while an async command is running.
+type cmdLoadingMsg struct {
+	message string
+}
+
+// refreshViewMsg tells the active view to reload its data.
+// Sent automatically after a wizardCompleteMsg so underlying views
+// pick up changes made by actions (log, start, mark done, etc.).
+type refreshViewMsg struct{}
+
 // pushView returns a tea.Cmd that pushes a view onto the stack.
 func pushView(v View) tea.Cmd {
 	return func() tea.Msg { return pushViewMsg{view: v} }
@@ -44,4 +55,9 @@ func popView() tea.Cmd {
 // replaceView returns a tea.Cmd that replaces the top view.
 func replaceView(v View) tea.Cmd {
 	return func() tea.Msg { return replaceViewMsg{view: v} }
+}
+
+// loadingCmd returns a tea.Cmd that immediately sends a loading indicator.
+func loadingCmd(message string) tea.Cmd {
+	return func() tea.Msg { return cmdLoadingMsg{message: message} }
 }

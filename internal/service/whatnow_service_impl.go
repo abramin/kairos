@@ -284,6 +284,17 @@ func (s *whatNowService) scoreCandidates(
 			continue
 		}
 
+		// Skip items with no remaining work (logged >= planned)
+		if c.WorkItem.PlannedMin > 0 && c.WorkItem.LoggedMin >= c.WorkItem.PlannedMin {
+			blockers = append(blockers, contract.ConstraintBlocker{
+				EntityType: "work_item",
+				EntityID:   c.WorkItem.ID,
+				Code:       contract.BlockerWorkComplete,
+				Message:    fmt.Sprintf("Work item '%s' is fully logged (%dm/%dm)", c.WorkItem.Title, c.WorkItem.LoggedMin, c.WorkItem.PlannedMin),
+			})
+			continue
+		}
+
 		effectiveDue := earliestDueDate(c.WorkItem.DueDate, c.NodeDueDate, c.ProjectTargetDate)
 
 		input := scheduler.ScoringInput{

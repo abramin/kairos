@@ -65,7 +65,7 @@ func TestCommandBar_AskAutoExecuteReadOnlyIntent(t *testing.T) {
 		},
 	}
 
-	output := execCmd(cb, "ask what should i work on")
+	output := execCmdAsync(cb, "ask what should i work on")
 	assert.Contains(t, output, "Intent:")
 	assert.Contains(t, output, "MODE:")
 }
@@ -75,13 +75,13 @@ func TestCommandBar_ExplainTUIFallbacks(t *testing.T) {
 	_, wiID := seedProjectWithWork(t, app)
 	cb := testCommandBar(t, app)
 
-	output := execCmd(cb, "explain now 60")
+	output := execCmdAsync(cb, "explain now 60")
 	assert.Contains(t, output, "EXPLANATION")
 
-	output = execCmd(cb, "explain why-not "+wiID)
+	output = execCmdAsync(cb, "explain why-not "+wiID)
 	assert.Contains(t, output, "EXPLANATION")
 
-	output = execCmd(cb, "review weekly")
+	output = execCmdAsync(cb, "review weekly")
 	assert.Contains(t, output, "EXPLANATION")
 }
 
@@ -111,13 +111,13 @@ func TestCommandBar_ExplainAndReviewUseLLMServiceWhenAvailable(t *testing.T) {
 		},
 	}
 
-	output := execCmd(cb, "explain now 60")
+	output := execCmdAsync(cb, "explain now 60")
 	assert.Contains(t, output, "LLM explain now summary")
 
-	output = execCmd(cb, "explain why-not "+wiID)
+	output = execCmdAsync(cb, "explain why-not "+wiID)
 	assert.Contains(t, output, "LLM why-not summary")
 
-	output = execCmd(cb, "review weekly")
+	output = execCmdAsync(cb, "review weekly")
 	assert.Contains(t, output, "LLM weekly summary")
 }
 
@@ -138,7 +138,7 @@ func TestCommandBar_AskExecutedStatusIntent(t *testing.T) {
 		},
 	}
 
-	output := execCmd(cb, "ask show me status")
+	output := execCmdAsync(cb, "ask show me status")
 	require.NotEmpty(t, output)
 	assert.Contains(t, output, "Intent:")
 	assert.Contains(t, output, "status")

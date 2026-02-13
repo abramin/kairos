@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/testutil"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
@@ -26,24 +25,8 @@ func draftType(d *TestDriver, input string) {
 // seedProjectWithShortID creates a project+node+work-item with a specific ShortID.
 func seedProjectWithShortID(t *testing.T, app *App, shortID string) string {
 	t.Helper()
-	ctx := context.Background()
-	target := time.Now().UTC().AddDate(0, 3, 0)
-	proj := testutil.NewTestProject(shortID+" Project",
-		testutil.WithShortID(shortID),
-		testutil.WithTargetDate(target),
-	)
-	require.NoError(t, app.Projects.Create(ctx, proj))
-
-	node := testutil.NewTestNode(proj.ID, "Week 1", testutil.WithNodeKind(domain.NodeWeek))
-	require.NoError(t, app.Nodes.Create(ctx, node))
-
-	wi := testutil.NewTestWorkItem(node.ID, "Reading",
-		testutil.WithPlannedMin(60),
-		testutil.WithSessionBounds(15, 60, 30),
-	)
-	require.NoError(t, app.WorkItems.Create(ctx, wi))
-
-	return proj.ID
+	projID, _, _ := seedProjectCore(t, app, seedOpts{shortID: shortID, name: shortID + " Project"})
+	return projID
 }
 
 // walkToGroupPhase opens draft and advances through metadata to the group-count phase.

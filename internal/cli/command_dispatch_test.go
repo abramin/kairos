@@ -40,6 +40,30 @@ func execCmd(cb *commandBar, input string) string {
 	return ""
 }
 
+// execCmdAsync is like execCmd but handles commands that return tea.Batch
+// (e.g. async commands with a loading indicator + async work).
+func execCmdAsync(cb *commandBar, input string) string {
+	cmd := cb.executeCommand(input)
+	if cmd == nil {
+		return ""
+	}
+	msg := cmd()
+	if out, ok := msg.(cmdOutputMsg); ok {
+		return out.output
+	}
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			if c == nil {
+				continue
+			}
+			if out, ok := c().(cmdOutputMsg); ok {
+				return out.output
+			}
+		}
+	}
+	return ""
+}
+
 // --- Cobra dispatch tests ---
 
 func TestCommandBar_DispatchesToCobra(t *testing.T) {
