@@ -84,6 +84,33 @@ func (r *SQLiteSessionRepo) ListRecentByProject(ctx context.Context, projectID s
 	return r.scanSessions(rows)
 }
 
+func (r *SQLiteSessionRepo) ListRecentSummaryByType(ctx context.Context, days int) ([]domain.SessionSummaryByType, error) {
+	query := `SELECT w.title, w.type, SUM(s.minutes) as total_minutes
+		FROM work_session_logs s
+		JOIN work_items w ON s.work_item_id = w.id
+		WHERE s.started_at >= date('now', ? || ' days')
+		GROUP BY w.id, w.title, w.type
+		ORDER BY total_minutes DESC`
+	rows, err := r.db.QueryContext(ctx, query, fmt.Sprintf("-%d", days))
+	if err != nil {
+		return nil, fmt.Errorf("listing recent session summary by type: %w", err)
+	}
+	defer rows.Close()
+
+	var summaries []domain.SessionSummaryByType
+	for rows.Next() {
+		var s domain.SessionSummaryByType
+		if err := rows.Scan(&s.WorkItemTitle, &s.WorkItemType, &s.TotalMinutes); err != nil {
+			return nil, fmt.Errorf("scanning session summary row: %w", err)
+		}
+		summaries = append(summaries, s)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating session summaries: %w", err)
+	}
+	return summaries, nil
+}
+
 func (r *SQLiteSessionRepo) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM work_session_logs WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, query, id)

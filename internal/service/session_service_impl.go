@@ -64,6 +64,10 @@ func (s *sessionService) ListRecent(ctx context.Context, days int) ([]*domain.Wo
 	return s.sessions.ListRecent(ctx, days)
 }
 
+func (s *sessionService) ListRecentSummaryByType(ctx context.Context, days int) ([]domain.SessionSummaryByType, error) {
+	return s.sessions.ListRecentSummaryByType(ctx, days)
+}
+
 func (s *sessionService) Delete(ctx context.Context, id string) error {
 	return s.sessions.Delete(ctx, id)
 }

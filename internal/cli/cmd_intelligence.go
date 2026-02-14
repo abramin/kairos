@@ -228,5 +228,17 @@ func (c *commandBar) runReviewWeeklyTUI() string {
 		func() *intelligence.LLMExplanation { return intelligence.DeterministicWeeklyReview(trace) },
 	)
 
-	return formatter.FormatStatus(statusResp) + "\n" + formatter.FormatExplanation(explanation)
+	output := formatter.FormatStatus(statusResp) + "\n" + formatter.FormatExplanation(explanation)
+
+	// Keep parity with cobra `review weekly` by appending zettelkasten backlog.
+	summaries, err := c.state.App.Sessions.ListRecentSummaryByType(ctx, 7)
+	if err != nil {
+		return shellError(fmt.Errorf("listing session summaries: %w", err))
+	}
+	backlog := buildZettelBacklog(summaries)
+	if formatter.ShouldShowZettelBacklog(backlog) {
+		output += "\n" + formatter.FormatZettelBacklog(backlog)
+	}
+
+	return output
 }

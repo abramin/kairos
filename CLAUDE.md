@@ -54,7 +54,7 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 
 ### Key Packages
 
-**`internal/domain`** — Value objects and enums. All timestamps are `time.Time` (UTC). Nullable fields use pointers. String UUIDs for IDs. `Project` has a `ShortID` field for human-friendly identification (e.g., `PHI01`). `UserProfile` includes tuning weights plus `BaselineDailyMin` for daily commitment target.
+**`internal/domain`** — Value objects and enums. All timestamps are `time.Time` (UTC). Nullable fields use pointers. String UUIDs for IDs. `Project` has a `ShortID` field for human-friendly identification (e.g., `PHI01`). `UserProfile` includes tuning weights plus `BaselineDailyMin` for daily commitment target. `SessionSummaryByType` aggregates session minutes per work item with type info (used by weekly review).
 
 **`internal/contract`** — Request/response types for three core operations (`WhatNow`, `Status`, `Replan`). Builder constructors like `NewWhatNowRequest(availableMin)`. Custom error types with `Code` + `Message` fields.
 
@@ -65,7 +65,7 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 - `sorter.go` — `CanonicalSort()` deterministic ordering: risk level → due date → score → name → ID
 - `reestimate.go` — `SmoothReEstimate()` applies `0.7*old + 0.3*implied`, never below logged
 
-**`internal/repository`** — Six interfaces (`ProjectRepo`, `PlanNodeRepo`, `WorkItemRepo`, `DependencyRepo`, `SessionRepo`, `UserProfileRepo`) with SQLite implementations prefixed `SQLite*Repo`. Key query: `WorkItemRepo.ListSchedulable()` joins work_items + plan_nodes + projects for scoring input.
+**`internal/repository`** — Six interfaces (`ProjectRepo`, `PlanNodeRepo`, `WorkItemRepo`, `DependencyRepo`, `SessionRepo`, `UserProfileRepo`) with SQLite implementations prefixed `SQLite*Repo`. Key query: `WorkItemRepo.ListSchedulable()` joins work_items + plan_nodes + projects for scoring input. `SessionRepo` also provides `ListRecentByProject()` and `ListRecentSummaryByType()` for review/replan features.
 
 **`internal/service`** — Eight service interfaces wired via constructor injection (`NewWhatNowService(repos...)`). `ImportService` validates and converts JSON import files into domain objects. Core orchestration flow in `WhatNowService.Recommend()`: load candidates → compute risk per project → determine mode → score → sort → allocate.
 
@@ -92,7 +92,7 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 
 **TUI Architecture** (view-stack pattern):
 - **`app_model.go`** — Root bubbletea `appModel`: owns a `viewStack []View`, a persistent `commandBar`, and `SharedState`. Handles `pushViewMsg`/`popViewMsg`/`replaceViewMsg` navigation messages and `wizardCompleteMsg` for multi-step flows. Wizard completion batches the follow-up command with `refreshViewMsg` so views reload after mutations.
-- **`view.go`** — `View` interface (extends `tea.Model` with `ID()`, `ShortHelp()`, `Title()`). Nine `ViewID` constants: `ViewDashboard`, `ViewProjectList`, `ViewTaskList`, `ViewActionMenu`, `ViewRecommendation`, `ViewForm`, `ViewLogForm`, `ViewDraft`, `ViewHelpChat`.
+- **`view.go`** — `View` interface (extends `tea.Model` with `ID()`, `ShortHelp()`, `Title()`). Eight `ViewID` constants: `ViewDashboard`, `ViewProjectList`, `ViewTaskList`, `ViewActionMenu`, `ViewRecommendation`, `ViewForm`, `ViewDraft`, `ViewHelpChat`.
 - **`shared_state.go`** — `SharedState` holds active project/item context, terminal dimensions, project cache, and transient recommendation state. Shared across all views via pointer.
 - **`command_bar.go`** — Persistent text input at the bottom of the TUI with autocomplete suggestions and history navigation.
 - **`navigate.go`** — Navigation message types (`pushViewMsg`, `popViewMsg`, `replaceViewMsg`, `cmdOutputMsg`, `wizardCompleteMsg`, `refreshViewMsg`) and helper constructors (`pushView()`, `popView()`, `replaceView()`). `refreshViewMsg` notifies views to reload data after state mutations.
@@ -126,7 +126,7 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 - `draft_wizard.go` — Interactive structure wizard for guided project creation without LLM. `generateShortID()` creates human-friendly IDs (e.g., `"PHYS01"`).
 - `cmdspec.go` — `CommandSpec` built from the Cobra tree for grounding validation.
 
-**`internal/cli/formatter`** — Terminal output formatting with lipgloss: tables, tree views, progress bars, color helpers, animated spinner (`spinner.go`). Separate formatters for what-now, status, explain, ask, draft, and help output.
+**`internal/cli/formatter`** — Terminal output formatting with lipgloss: tables, tree views, progress bars, color helpers, animated spinner (`spinner.go`). Separate formatters for what-now, status, explain, ask, draft, review, and help output. `review_fmt.go` includes Zettelkasten backlog nudge (flags reading items not yet processed into notes).
 
 ### Data Flow: what-now Recommendation Pipeline
 
@@ -191,8 +191,10 @@ Key design patterns:
 | `KAIROS_LLM_EXPLAIN_TIMEOUT_MS` | `6000` | explain/review timeout override |
 | `KAIROS_LLM_TEMPLATE_DRAFT_TIMEOUT_MS` | `8000` | template draft timeout override |
 | `KAIROS_LLM_PROJECT_DRAFT_TIMEOUT_MS` | `30000` | project draft timeout override |
+| `KAIROS_LLM_HELP_TIMEOUT_MS` | `10000` | help task timeout override |
 | `KAIROS_LLM_MAX_RETRIES` | `1` | LLM retry count |
 | `KAIROS_LLM_CONFIDENCE_THRESHOLD` | `0.85` | Auto-execute threshold for read-only intents |
+| `KAIROS_LLM_LOG_CALLS` | `false` | Enable verbose LLM call logging to stderr |
 
 ## Key Dependencies
 
@@ -240,3 +242,4 @@ Intelligence package tests use `httptest` servers to validate the full HTTP seri
 - `docs/repl.md` — Interactive shell design and command reference
 - `docs/shell-first-prd.md` — Shell-first product direction and UX strategy
 - `docs/template-sample.json` — Example template schema for project scaffolding
+- `docs/testing-recommendations.md` — Testing strategy and recommendations

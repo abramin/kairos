@@ -159,6 +159,135 @@ func TestArchiveProject_UnarchiveRestoresScheduling(t *testing.T) {
 	assert.Equal(t, "Revived Task", resp.Recommendations[0].Title)
 }
 
+// TestE2E_ArchiveProject_FullWorkflow verifies end-to-end project archival workflow:
+// 1. Project-level archived_at timestamp is set
+// 2. All child work items are excluded from scheduling (via JOIN filters)
+// 3. Dependencies and session logs are preserved
+// 4. Unarchive restores full functionality
+//
+// Note: Kairos uses behavioral archival (SQL filters), not DB-level cascade.
+// Work items don't get archived_at set - they're excluded via `p.archived_at IS NOT NULL` JOIN.
+func TestE2E_ArchiveProject_FullWorkflow(t *testing.T) {
+	projects, nodes, workItems, deps, sessions, _ := setupRepos(t)
+	ctx := context.Background()
+
+	now := time.Now().UTC()
+	target := now.AddDate(0, 2, 0)
+
+	// Create project with nodes, work items, and session logs
+	proj := testutil.NewTestProject("Cascade Test",
+		testutil.WithTargetDate(target),
+		testutil.WithShortID("CASC01"))
+	require.NoError(t, projects.Create(ctx, proj))
+
+	node1 := testutil.NewTestNode(proj.ID, "Week 1", testutil.WithNodeKind(domain.NodeWeek))
+	node2 := testutil.NewTestNode(proj.ID, "Week 2", testutil.WithNodeKind(domain.NodeWeek))
+	require.NoError(t, nodes.Create(ctx, node1))
+	require.NoError(t, nodes.Create(ctx, node2))
+
+	wi1 := testutil.NewTestWorkItem(node1.ID, "Task A",
+		testutil.WithPlannedMin(60), testutil.WithSessionBounds(15, 60, 30))
+	wi2 := testutil.NewTestWorkItem(node1.ID, "Task B",
+		testutil.WithPlannedMin(45), testutil.WithSessionBounds(15, 60, 30))
+	wi3 := testutil.NewTestWorkItem(node2.ID, "Task C",
+		testutil.WithPlannedMin(90), testutil.WithSessionBounds(15, 90, 45))
+	require.NoError(t, workItems.Create(ctx, wi1))
+	require.NoError(t, workItems.Create(ctx, wi2))
+	require.NoError(t, workItems.Create(ctx, wi3))
+
+	// Create session logs
+	sessionSvc := NewSessionService(sessions, workItems)
+	session1 := &domain.WorkSessionLog{
+		WorkItemID: wi1.ID,
+		StartedAt:  now.Add(-2 * time.Hour),
+		Minutes:    30,
+	}
+	session2 := &domain.WorkSessionLog{
+		WorkItemID: wi2.ID,
+		StartedAt:  now.Add(-1 * time.Hour),
+		Minutes:    25,
+	}
+	require.NoError(t, sessionSvc.LogSession(ctx, session1))
+	require.NoError(t, sessionSvc.LogSession(ctx, session2))
+
+	// Create dependency (wi3 depends on wi1)
+	dep := &domain.Dependency{
+		PredecessorWorkItemID: wi1.ID,
+		SuccessorWorkItemID:   wi3.ID,
+	}
+	require.NoError(t, deps.Create(ctx, dep))
+
+	// === BEFORE ARCHIVE: Verify schedulability ===
+	beforeSchedulable, err := workItems.ListSchedulable(ctx, false)
+	require.NoError(t, err)
+	beforeCount := 0
+	for _, c := range beforeSchedulable {
+		if c.ProjectID == proj.ID {
+			beforeCount++
+		}
+	}
+	assert.Equal(t, 3, beforeCount, "all 3 work items should be schedulable before archive")
+
+	beforeProj, err := projects.GetByID(ctx, proj.ID)
+	require.NoError(t, err)
+	assert.Nil(t, beforeProj.ArchivedAt, "project should not be archived initially")
+	assert.Equal(t, domain.ProjectActive, beforeProj.Status)
+
+	// === ARCHIVE PROJECT ===
+	require.NoError(t, projects.Archive(ctx, proj.ID))
+
+	// === AFTER ARCHIVE: Verify project-level state ===
+	afterProj, err := projects.GetByID(ctx, proj.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, afterProj.ArchivedAt, "project should have archived_at set")
+	assert.WithinDuration(t, now, *afterProj.ArchivedAt, 5*time.Second,
+		"archived_at should be close to current time")
+	assert.Equal(t, domain.ProjectArchived, afterProj.Status)
+
+	// === BEHAVIORAL EXCLUSION: Work items excluded from scheduling via JOIN filters ===
+	// Note: Work items themselves don't have archived_at set - exclusion happens via:
+	//   WHERE p.archived_at IS NULL (in ListSchedulable JOIN)
+	schedulable, err := workItems.ListSchedulable(ctx, false)
+	require.NoError(t, err)
+	for _, candidate := range schedulable {
+		assert.NotEqual(t, proj.ID, candidate.ProjectID,
+			"archived project's items must not appear in schedulable candidates (filtered via JOIN)")
+	}
+
+	// Work items still retrievable via ListByProject (no filter on p.archived_at)
+	allItems, err := workItems.ListByProject(ctx, proj.ID)
+	require.NoError(t, err)
+	assert.Len(t, allItems, 3, "work items should still be retrievable via direct query")
+
+	// === Session logs and dependencies preserved (immutable history) ===
+	allSessions1, err := sessions.ListByWorkItem(ctx, wi1.ID)
+	require.NoError(t, err)
+	assert.Len(t, allSessions1, 1, "session logs should be preserved")
+
+	dependents, err := deps.ListPredecessors(ctx, wi3.ID)
+	require.NoError(t, err)
+	assert.Len(t, dependents, 1, "dependency should still exist")
+
+	// === UNARCHIVE: Verify restoration ===
+	require.NoError(t, projects.Unarchive(ctx, proj.ID))
+
+	unarchivedProj, err := projects.GetByID(ctx, proj.ID)
+	require.NoError(t, err)
+	assert.Nil(t, unarchivedProj.ArchivedAt, "project archived_at should be NULL after unarchive")
+	assert.Equal(t, domain.ProjectActive, unarchivedProj.Status)
+
+	// Items should be schedulable again
+	schedulableAfter, err := workItems.ListSchedulable(ctx, false)
+	require.NoError(t, err)
+	foundItems := 0
+	for _, candidate := range schedulableAfter {
+		if candidate.ProjectID == proj.ID {
+			foundItems++
+		}
+	}
+	assert.Equal(t, 3, foundItems, "all 3 work items should be schedulable after unarchive")
+}
+
 // TestArchiveWorkItem_ExcludesFromSchedulingOnly verifies that archiving a
 // single work item excludes only that item, while sibling items remain schedulable.
 func TestArchiveWorkItem_ExcludesFromSchedulingOnly(t *testing.T) {

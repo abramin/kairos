@@ -145,6 +145,12 @@ func WithWorkItemDueDate(d time.Time) WorkItemOption {
 	}
 }
 
+func WithNotBefore(d time.Time) WorkItemOption {
+	return func(w *domain.WorkItem) {
+		w.NotBefore = &d
+	}
+}
+
 func WithWorkItemStatus(s domain.WorkItemStatus) WorkItemOption {
 	return func(w *domain.WorkItem) {
 		w.Status = s

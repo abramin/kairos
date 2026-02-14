@@ -11,3 +11,10 @@ type WorkSessionLog struct {
 	Note           string
 	CreatedAt      time.Time
 }
+
+// SessionSummaryByType aggregates session minutes per work item, including type info.
+type SessionSummaryByType struct {
+	WorkItemTitle string
+	WorkItemType  string
+	TotalMinutes  int
+}

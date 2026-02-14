@@ -79,6 +79,7 @@ type SessionRepo interface {
 	ListByWorkItem(ctx context.Context, workItemID string) ([]*domain.WorkSessionLog, error)
 	ListRecent(ctx context.Context, days int) ([]*domain.WorkSessionLog, error)
 	ListRecentByProject(ctx context.Context, projectID string, days int) ([]*domain.WorkSessionLog, error)
+	ListRecentSummaryByType(ctx context.Context, days int) ([]domain.SessionSummaryByType, error)
 	Delete(ctx context.Context, id string) error
 }
 

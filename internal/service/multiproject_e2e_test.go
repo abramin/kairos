@@ -238,3 +238,123 @@ func testutil_newProjectWithWork(
 
 	return proj.ID
 }
+
+// TestE2E_WhatNow_AllocationInvariantsNeverViolated verifies the core allocation
+// contract invariants are never violated by the recommendation engine.
+func TestE2E_WhatNow_AllocationInvariantsNeverViolated(t *testing.T) {
+	t.Run("large item - allocated within requested time", func(t *testing.T) {
+		projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+		ctx := context.Background()
+		now := time.Now().UTC()
+
+		// 200-min item, user requests 60 min
+		proj := testutil.NewTestProject("Large", testutil.WithTargetDate(now.AddDate(0, 1, 0)))
+		require.NoError(t, projects.Create(ctx, proj))
+		node := testutil.NewTestNode(proj.ID, "M1", testutil.WithNodeKind(domain.NodeModule))
+		require.NoError(t, nodes.Create(ctx, node))
+		wi := testutil.NewTestWorkItem(node.ID, "Big Task",
+			testutil.WithPlannedMin(200),
+			testutil.WithSessionBounds(15, 90, 45))
+		require.NoError(t, workItems.Create(ctx, wi))
+
+		svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+		req := contract.NewWhatNowRequest(60)
+		req.Now = &now
+
+		resp, err := svc.Recommend(ctx, req)
+		require.NoError(t, err)
+
+		// INVARIANT 1: Total allocated ≤ requested
+		assert.LessOrEqual(t, resp.AllocatedMin, 60)
+		// INVARIANT 2: Each allocation respects session bounds
+		for _, rec := range resp.Recommendations {
+			assert.GreaterOrEqual(t, rec.AllocatedMin, rec.MinSessionMin)
+			assert.LessOrEqual(t, rec.AllocatedMin, rec.MaxSessionMin)
+		}
+	})
+
+	t.Run("session min exceeds available - blocker reported", func(t *testing.T) {
+		projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+		ctx := context.Background()
+		now := time.Now().UTC()
+
+		// Item min_session_min=60, user has 30 min
+		proj := testutil.NewTestProject("MinHigh", testutil.WithTargetDate(now.AddDate(0, 1, 0)))
+		require.NoError(t, projects.Create(ctx, proj))
+		node := testutil.NewTestNode(proj.ID, "M1", testutil.WithNodeKind(domain.NodeModule))
+		require.NoError(t, nodes.Create(ctx, node))
+		wi := testutil.NewTestWorkItem(node.ID, "Long Task",
+			testutil.WithPlannedMin(120),
+			testutil.WithSessionBounds(60, 90, 75))
+		require.NoError(t, workItems.Create(ctx, wi))
+
+		svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+		req := contract.NewWhatNowRequest(30)
+		req.Now = &now
+
+		resp, err := svc.Recommend(ctx, req)
+		require.NoError(t, err)
+
+		// Should not recommend (blocker instead)
+		assert.Empty(t, resp.Recommendations)
+		assert.NotEmpty(t, resp.Blockers)
+		// Verify blocker code
+		foundBlocker := false
+		for _, blocker := range resp.Blockers {
+			if blocker.Code == contract.BlockerSessionMinExceedsAvail {
+				foundBlocker = true
+				break
+			}
+		}
+		assert.True(t, foundBlocker, "Should report session min blocker")
+	})
+
+	t.Run("variation enforcement - multiple projects", func(t *testing.T) {
+		projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+		ctx := context.Background()
+		now := time.Now().UTC()
+
+		// Two equal-priority projects
+		proj1 := testutil.NewTestProject("Alpha", testutil.WithTargetDate(now.AddDate(0, 2, 0)))
+		proj2 := testutil.NewTestProject("Beta", testutil.WithTargetDate(now.AddDate(0, 2, 0)))
+		require.NoError(t, projects.Create(ctx, proj1))
+		require.NoError(t, projects.Create(ctx, proj2))
+
+		node1 := testutil.NewTestNode(proj1.ID, "M1", testutil.WithNodeKind(domain.NodeModule))
+		node2 := testutil.NewTestNode(proj2.ID, "M1", testutil.WithNodeKind(domain.NodeModule))
+		require.NoError(t, nodes.Create(ctx, node1))
+		require.NoError(t, nodes.Create(ctx, node2))
+
+		wi1 := testutil.NewTestWorkItem(node1.ID, "Alpha Task",
+			testutil.WithPlannedMin(100), testutil.WithSessionBounds(15, 60, 30))
+		wi2 := testutil.NewTestWorkItem(node2.ID, "Beta Task",
+			testutil.WithPlannedMin(100), testutil.WithSessionBounds(15, 60, 30))
+		require.NoError(t, workItems.Create(ctx, wi1))
+		require.NoError(t, workItems.Create(ctx, wi2))
+
+		svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+		req := contract.NewWhatNowRequest(90)
+		req.Now = &now
+		req.EnforceVariation = true
+
+		resp, err := svc.Recommend(ctx, req)
+		require.NoError(t, err)
+
+		// INVARIANT 3: Variation enforcement
+		if len(resp.Recommendations) > 1 {
+			projectIDs := make(map[string]bool)
+			for _, rec := range resp.Recommendations {
+				projectIDs[rec.ProjectID] = true
+			}
+			assert.Greater(t, len(projectIDs), 1, "Should allocate across multiple projects")
+		}
+
+		// Universal invariants
+		assert.LessOrEqual(t, resp.AllocatedMin, 90)
+		for _, rec := range resp.Recommendations {
+			assert.GreaterOrEqual(t, rec.AllocatedMin, rec.MinSessionMin)
+			assert.LessOrEqual(t, rec.AllocatedMin, rec.MaxSessionMin)
+			assert.Greater(t, rec.AllocatedMin, 0)
+		}
+	})
+}

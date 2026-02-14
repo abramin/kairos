@@ -61,7 +61,7 @@ var ValidWorkItemTypes = map[string]bool{
 	"reading": true, "practice": true, "review": true,
 	"assignment": true, "task": true, "quiz": true,
 	"study": true, "training": true, "activity": true,
-	"submission": true,
+	"submission": true, "zettel": true,
 }
 
 type DurationMode string

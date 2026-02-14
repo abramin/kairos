@@ -239,6 +239,7 @@ func wizardSelectWorkItemType(result *string) *huh.Form {
 				Title("Work Item Type").
 				Options(
 					huh.NewOption("Reading", "reading"),
+					huh.NewOption("Zettel", "zettel"),
 					huh.NewOption("Practice", "practice"),
 					huh.NewOption("Review", "review"),
 					huh.NewOption("Assignment", "assignment"),

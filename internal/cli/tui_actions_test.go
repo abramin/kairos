@@ -37,6 +37,11 @@ func TestTUI_ActionMenu_RecommendationEnterPushesMenu(t *testing.T) {
 	assert.Contains(t, view, "Mark Done")
 	assert.Contains(t, view, "Edit Details")
 	assert.Contains(t, view, "Adjust Logged Time")
+
+	// Work item details should be visible.
+	assert.Contains(t, view, "Todo")      // status pill
+	assert.Contains(t, view, "Progress")  // progress bar label
+	assert.Contains(t, view, "Week 1")    // parent node section
 }
 
 func TestTUI_ActionMenu_EscPops(t *testing.T) {
@@ -168,6 +173,94 @@ func TestTUI_ActionMenu_EditEscReturnsToMenu(t *testing.T) {
 	// ESC cancels the edit form → should return to action menu, not skip past it.
 	d.PressEsc()
 	assert.Equal(t, ViewActionMenu, d.ActiveViewID())
+}
+
+// =============================================================================
+// A2. Action Menu — work item detail display
+// =============================================================================
+
+func TestTUI_ActionMenu_ShowsWorkItemDetails(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	target := time.Now().UTC().AddDate(0, 3, 0)
+	proj := testutil.NewTestProject("Detail Test", testutil.WithShortID("DET01"),
+		testutil.WithTargetDate(target))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Module A", testutil.WithNodeKind(domain.NodeModule))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	due := time.Now().UTC().AddDate(0, 1, 0)
+	wi := testutil.NewTestWorkItem(node.ID, "Practice Problems",
+		testutil.WithPlannedMin(120),
+		testutil.WithLoggedMin(45),
+		testutil.WithSessionBounds(15, 60, 30),
+		testutil.WithUnits("problems", 20, 5),
+		testutil.WithWorkItemDueDate(due),
+	)
+	wi.Type = "practice"
+	require.NoError(t, app.WorkItems.Create(ctx, wi))
+
+	state := &SharedState{App: app}
+	menu := newActionMenuView(state, wi.ID, wi.Title, wi.Seq)
+
+	// Verify detail data was loaded.
+	require.NotNil(t, menu.item)
+	assert.Equal(t, 120, menu.item.PlannedMin)
+	assert.Equal(t, 45, menu.item.LoggedMin)
+	assert.Equal(t, "Module A", menu.nodeName)
+
+	// Verify rendered output contains detail elements.
+	view := menu.View()
+	assert.Contains(t, view, "Practice")       // type badge
+	assert.Contains(t, view, "Module A")       // section
+	assert.Contains(t, view, "Progress")       // progress label
+	assert.Contains(t, view, "45m")            // logged time
+	assert.Contains(t, view, "2h")             // planned time
+	assert.Contains(t, view, "5/20 problems")  // units
+	assert.Contains(t, view, "Due")            // due date label
+	assert.Contains(t, view, "Session")        // session constraints
+	assert.Contains(t, view, "ACTIONS")        // actions header still present
+	assert.Contains(t, view, "Start Timer")    // actions still present
+}
+
+func TestTUI_ActionMenu_GracefulDegradation(t *testing.T) {
+	app := testApp(t)
+	state := &SharedState{App: app}
+
+	// Create menu with a nonexistent item ID.
+	menu := newActionMenuView(state, "nonexistent-id", "Ghost Item", 99)
+
+	// Detail should be nil but view should still render without panic.
+	assert.Nil(t, menu.item)
+	view := menu.View()
+	assert.Contains(t, view, "ACTIONS")
+	assert.Contains(t, view, "Ghost Item")
+	assert.Contains(t, view, "Start Timer")
+}
+
+func TestTUI_ActionMenu_RefreshReloadsDetails(t *testing.T) {
+	app := testApp(t)
+	_, wiID := seedProjectWithWork(t, app)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	menu := newActionMenuView(state, wiID, "Reading", 1)
+	require.NotNil(t, menu.item)
+	assert.Equal(t, 0, menu.item.LoggedMin)
+
+	// Simulate external mutation.
+	wi, err := app.WorkItems.GetByID(ctx, wiID)
+	require.NoError(t, err)
+	wi.LoggedMin = 45
+	require.NoError(t, app.WorkItems.Update(ctx, wi))
+
+	// Send refreshViewMsg.
+	updated, _ := menu.Update(refreshViewMsg{})
+	menu = updated.(*actionMenuView)
+
+	assert.Equal(t, 45, menu.item.LoggedMin)
 }
 
 // =============================================================================

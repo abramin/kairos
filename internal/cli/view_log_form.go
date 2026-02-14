@@ -232,6 +232,7 @@ func newEditWorkItemView(state *SharedState, itemID, title string) View {
 	// Build type options, ensuring the current type is always present.
 	typeOptions := []huh.Option[string]{
 		huh.NewOption("Reading", "reading"),
+		huh.NewOption("Zettel", "zettel"),
 		huh.NewOption("Practice", "practice"),
 		huh.NewOption("Review", "review"),
 		huh.NewOption("Assignment", "assignment"),

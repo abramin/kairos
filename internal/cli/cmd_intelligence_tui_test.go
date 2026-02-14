@@ -4,7 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/intelligence"
+	"github.com/alexanderramin/kairos/internal/testutil"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -142,4 +144,44 @@ func TestCommandBar_AskExecutedStatusIntent(t *testing.T) {
 	require.NotEmpty(t, output)
 	assert.Contains(t, output, "Intent:")
 	assert.Contains(t, output, "status")
+}
+
+func TestCommandBar_ReviewWeekly_ShowsZettelkastenBacklog(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+	_, nodeID, _ := seedProjectCore(t, app, seedOpts{})
+
+	reading := testutil.NewTestWorkItem(nodeID, "Read Ch. 3")
+	reading.Type = "reading"
+	require.NoError(t, app.WorkItems.Create(ctx, reading))
+	require.NoError(t, app.Sessions.LogSession(ctx, testutil.NewTestSession(reading.ID, 75)))
+
+	cb := testCommandBar(t, app)
+	output := execCmdAsync(cb, "review weekly")
+
+	assert.Contains(t, output, "ZETTELKASTEN BACKLOG")
+	assert.Contains(t, output, "75 min reading / 0 min zettel processing")
+	assert.Contains(t, output, "Read Ch. 3")
+}
+
+func TestCommandBar_ReviewWeekly_HidesZettelkastenBacklogWhenRatioIsLow(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+	_, nodeID, _ := seedProjectCore(t, app, seedOpts{})
+
+	reading := testutil.NewTestWorkItem(nodeID, "Read Ch. 4")
+	reading.Type = "reading"
+	require.NoError(t, app.WorkItems.Create(ctx, reading))
+	require.NoError(t, app.Sessions.LogSession(ctx, testutil.NewTestSession(reading.ID, 60)))
+
+	zettel := testutil.NewTestWorkItem(nodeID, "Process Ch. 4 notes")
+	zettel.Type = "zettel"
+	zettel.Status = domain.WorkItemInProgress
+	require.NoError(t, app.WorkItems.Create(ctx, zettel))
+	require.NoError(t, app.Sessions.LogSession(ctx, testutil.NewTestSession(zettel.ID, 30)))
+
+	cb := testCommandBar(t, app)
+	output := execCmdAsync(cb, "review weekly")
+
+	assert.NotContains(t, output, "ZETTELKASTEN BACKLOG")
 }

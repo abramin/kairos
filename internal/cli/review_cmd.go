@@ -6,6 +6,7 @@ import (
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/contract"
+	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/intelligence"
 	"github.com/spf13/cobra"
 )
@@ -75,5 +76,31 @@ func runWeeklyReview(app *App) error {
 	fmt.Print(formatter.FormatStatus(statusResp))
 	fmt.Println()
 	fmt.Print(formatter.FormatExplanation(explanation))
+
+	// Zettelkasten backlog: check reading vs zettel time in the past 7 days.
+	summaries, err := app.Sessions.ListRecentSummaryByType(ctx, 7)
+	if err != nil {
+		return fmt.Errorf("listing session summaries: %w", err)
+	}
+	backlog := buildZettelBacklog(summaries)
+	if formatter.ShouldShowZettelBacklog(backlog) {
+		fmt.Println()
+		fmt.Print(formatter.FormatZettelBacklog(backlog))
+	}
+
 	return nil
+}
+
+func buildZettelBacklog(summaries []domain.SessionSummaryByType) formatter.ZettelBacklogData {
+	var data formatter.ZettelBacklogData
+	for _, s := range summaries {
+		switch s.WorkItemType {
+		case "reading":
+			data.ReadingMin += s.TotalMinutes
+			data.ReadingItems = append(data.ReadingItems, s)
+		case "zettel":
+			data.ZettelMin += s.TotalMinutes
+		}
+	}
+	return data
 }
