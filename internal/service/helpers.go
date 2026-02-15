@@ -30,7 +30,7 @@ func aggregateProjectMetrics(items []*domain.WorkItem, project *domain.Project, 
 		}
 		m.TotalCount++
 		m.PlannedMin += item.PlannedMin
-		m.LoggedMin += item.LoggedMin
+		m.LoggedMin += item.EffectiveLoggedMin()
 		if item.Status == domain.WorkItemDone || item.Status == domain.WorkItemSkipped {
 			m.DoneCount++
 			m.DonePlannedMin += item.PlannedMin

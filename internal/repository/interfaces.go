@@ -71,6 +71,7 @@ type DependencyRepo interface {
 	ListPredecessors(ctx context.Context, workItemID string) ([]domain.Dependency, error)
 	ListSuccessors(ctx context.Context, workItemID string) ([]domain.Dependency, error)
 	HasUnfinishedPredecessors(ctx context.Context, workItemID string) (bool, error)
+	ListBlockedWorkItemIDs(ctx context.Context, candidateIDs []string) (map[string]bool, error)
 }
 
 type SessionRepo interface {

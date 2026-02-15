@@ -15,10 +15,10 @@ import (
 // a project with a dependency graph, what-now correctly blocks items whose
 // predecessors are unfinished.
 func TestImportWithDependencies_SchedulerRespectsDeps(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps)
+	svc := NewImportService(projects, nodes, workItems, deps, uow)
 
 	// Import a project with chain: w1 → w2 → w3
 	schema := &importer.ImportSchema{
@@ -58,7 +58,7 @@ func TestImportWithDependencies_SchedulerRespectsDeps(t *testing.T) {
 	assert.Equal(t, 2, result.DependencyCount)
 
 	// Schedule: w2 and w3 should be dependency-blocked
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	now := time.Now().UTC()
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now

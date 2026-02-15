@@ -63,17 +63,28 @@ func run() error {
 	sessionRepo := repository.NewSQLiteSessionRepo(database)
 	profileRepo := repository.NewSQLiteUserProfileRepo(database)
 
+	// Wire unit of work for transactional operations
+	uow := db.NewSQLiteUnitOfWork(database)
+
 	// Wire services
+	sessionSvc := service.NewSessionService(sessionRepo, workItemRepo, uow)
+	templateSvc := service.NewTemplateService(templateDir, projectRepo, nodeRepo, workItemRepo, depRepo, uow)
+	importSvc := service.NewImportService(projectRepo, nodeRepo, workItemRepo, depRepo, uow)
+
 	app := &cli.App{
 		Projects:  service.NewProjectService(projectRepo),
 		Nodes:     service.NewNodeService(nodeRepo),
 		WorkItems: service.NewWorkItemService(workItemRepo, nodeRepo),
-		Sessions:  service.NewSessionService(sessionRepo, workItemRepo),
-		WhatNow:   service.NewWhatNowService(workItemRepo, sessionRepo, projectRepo, depRepo, profileRepo),
+		Sessions:  sessionSvc,
+		WhatNow:   service.NewWhatNowService(workItemRepo, sessionRepo, depRepo, profileRepo),
 		Status:    service.NewStatusService(projectRepo, workItemRepo, sessionRepo, profileRepo),
 		Replan:    service.NewReplanService(projectRepo, workItemRepo, sessionRepo, profileRepo),
-		Templates: service.NewTemplateService(templateDir, projectRepo, nodeRepo, workItemRepo, depRepo),
-		Import:    service.NewImportService(projectRepo, nodeRepo, workItemRepo, depRepo),
+		Templates: templateSvc,
+		Import:    importSvc,
+
+		LogSession:    sessionSvc,
+		InitProject:   templateSvc,
+		ImportProject: importSvc,
 	}
 
 	// Detect interactive terminal for shell-only entrypoint.

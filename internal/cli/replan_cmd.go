@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	kairosapp "github.com/alexanderramin/kairos/internal/app"
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
-	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/spf13/cobra"
 )
@@ -17,7 +17,7 @@ func newReplanCmd(app *App) *cobra.Command {
 		Use:   "replan",
 		Short: "Rebalance project schedules",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			req := contract.NewReplanRequest(domain.TriggerManual)
+			req := kairosapp.NewReplanRequest(domain.TriggerManual)
 
 			if cmd.Flags().Changed("strategy") {
 				req.Strategy = strategy

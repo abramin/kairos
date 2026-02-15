@@ -65,7 +65,7 @@ func (s *SharedState) SetActiveProject(ctx context.Context, projectID string) {
 // SetActiveProjectFrom sets the active project context from an already-loaded project.
 func (s *SharedState) SetActiveProjectFrom(p *domain.Project) {
 	s.ActiveProjectID = p.ID
-	s.ActiveShortID = domain.DisplayID(p.ShortID, p.ID)
+	s.ActiveShortID = p.DisplayID()
 	s.ActiveProjectName = p.Name
 }
 

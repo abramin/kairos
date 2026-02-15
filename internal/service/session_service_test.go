@@ -12,7 +12,7 @@ import (
 )
 
 func TestLogSession_UpdatesLoggedMin(t *testing.T) {
-	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	projRepo, nodes, wiRepo, _, sessRepo, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	proj := testutil.NewTestProject("Study")
@@ -27,7 +27,7 @@ func TestLogSession_UpdatesLoggedMin(t *testing.T) {
 	)
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo)
+	svc := NewSessionService(sessRepo, wiRepo, uow)
 
 	sess := testutil.NewTestSession(wi.ID, 45)
 	require.NoError(t, svc.LogSession(ctx, sess))
@@ -47,7 +47,7 @@ func TestLogSession_UpdatesLoggedMin(t *testing.T) {
 }
 
 func TestLogSession_AutoTransitionsToInProgress(t *testing.T) {
-	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	projRepo, nodes, wiRepo, _, sessRepo, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	proj := testutil.NewTestProject("Study")
@@ -64,7 +64,7 @@ func TestLogSession_AutoTransitionsToInProgress(t *testing.T) {
 
 	assert.Equal(t, domain.WorkItemTodo, wi.Status, "should start as todo")
 
-	svc := NewSessionService(sessRepo, wiRepo)
+	svc := NewSessionService(sessRepo, wiRepo, uow)
 	sess := testutil.NewTestSession(wi.ID, 20)
 	require.NoError(t, svc.LogSession(ctx, sess))
 
@@ -74,7 +74,7 @@ func TestLogSession_AutoTransitionsToInProgress(t *testing.T) {
 }
 
 func TestLogSession_TriggersReEstimation(t *testing.T) {
-	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	projRepo, nodes, wiRepo, _, sessRepo, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	proj := testutil.NewTestProject("Study")
@@ -92,7 +92,7 @@ func TestLogSession_TriggersReEstimation(t *testing.T) {
 	)
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo)
+	svc := NewSessionService(sessRepo, wiRepo, uow)
 
 	// Log session: 60 min, completed 3 pages → pace = 20 min/page → implied = 200 min
 	// Smooth: round(0.7*100 + 0.3*200) = round(70+60) = 130
@@ -107,7 +107,7 @@ func TestLogSession_TriggersReEstimation(t *testing.T) {
 }
 
 func TestSessionService_ListRecent(t *testing.T) {
-	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	projRepo, nodes, wiRepo, _, sessRepo, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	proj := testutil.NewTestProject("Recent Sessions")
@@ -117,7 +117,7 @@ func TestSessionService_ListRecent(t *testing.T) {
 	wi := testutil.NewTestWorkItem(node.ID, "Task", testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo)
+	svc := NewSessionService(sessRepo, wiRepo, uow)
 	recent := testutil.NewTestSession(wi.ID, 25, testutil.WithStartedAt(time.Now().UTC().Add(-24*time.Hour)))
 	old := testutil.NewTestSession(wi.ID, 25, testutil.WithStartedAt(time.Now().UTC().AddDate(0, 0, -10)))
 	require.NoError(t, svc.LogSession(ctx, recent))
@@ -130,7 +130,7 @@ func TestSessionService_ListRecent(t *testing.T) {
 }
 
 func TestSessionService_Delete(t *testing.T) {
-	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	projRepo, nodes, wiRepo, _, sessRepo, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	proj := testutil.NewTestProject("Delete Session")
@@ -140,7 +140,7 @@ func TestSessionService_Delete(t *testing.T) {
 	wi := testutil.NewTestWorkItem(node.ID, "Task", testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo)
+	svc := NewSessionService(sessRepo, wiRepo, uow)
 	session := testutil.NewTestSession(wi.ID, 30)
 	require.NoError(t, svc.LogSession(ctx, session))
 

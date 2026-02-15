@@ -19,11 +19,11 @@ import (
 // correct recommendations: critical-first ordering, session bounds, variation, and
 // allocation invariants.
 func TestE2E_MultiProjectWhatNow_FullPipeline(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
-	importSvc := NewImportService(projects, nodes, workItems, deps)
+	importSvc := NewImportService(projects, nodes, workItems, deps, uow)
 
 	// === Import 3 projects via ImportSchema (same path as JSON import) ===
 
@@ -92,7 +92,7 @@ func TestE2E_MultiProjectWhatNow_FullPipeline(t *testing.T) {
 	require.NoError(t, err)
 
 	// === Phase 1: Critical mode — only project A recommended ===
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 
@@ -174,7 +174,7 @@ func TestE2E_MultiProjectWhatNow_FullPipeline(t *testing.T) {
 // TestE2E_StatusMixedRiskLevels creates projects at different risk levels and
 // verifies StatusService correctly classifies each.
 func TestE2E_StatusMixedRiskLevels(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 	now := time.Now().UTC()
 
@@ -243,7 +243,7 @@ func testutil_newProjectWithWork(
 // contract invariants are never violated by the recommendation engine.
 func TestE2E_WhatNow_AllocationInvariantsNeverViolated(t *testing.T) {
 	t.Run("large item - allocated within requested time", func(t *testing.T) {
-		projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+		projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 		ctx := context.Background()
 		now := time.Now().UTC()
 
@@ -257,7 +257,7 @@ func TestE2E_WhatNow_AllocationInvariantsNeverViolated(t *testing.T) {
 			testutil.WithSessionBounds(15, 90, 45))
 		require.NoError(t, workItems.Create(ctx, wi))
 
-		svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+		svc := NewWhatNowService(workItems, sessions, deps, profiles)
 		req := contract.NewWhatNowRequest(60)
 		req.Now = &now
 
@@ -274,7 +274,7 @@ func TestE2E_WhatNow_AllocationInvariantsNeverViolated(t *testing.T) {
 	})
 
 	t.Run("session min exceeds available - blocker reported", func(t *testing.T) {
-		projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+		projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 		ctx := context.Background()
 		now := time.Now().UTC()
 
@@ -288,7 +288,7 @@ func TestE2E_WhatNow_AllocationInvariantsNeverViolated(t *testing.T) {
 			testutil.WithSessionBounds(60, 90, 75))
 		require.NoError(t, workItems.Create(ctx, wi))
 
-		svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+		svc := NewWhatNowService(workItems, sessions, deps, profiles)
 		req := contract.NewWhatNowRequest(30)
 		req.Now = &now
 
@@ -310,7 +310,7 @@ func TestE2E_WhatNow_AllocationInvariantsNeverViolated(t *testing.T) {
 	})
 
 	t.Run("variation enforcement - multiple projects", func(t *testing.T) {
-		projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+		projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 		ctx := context.Background()
 		now := time.Now().UTC()
 
@@ -332,7 +332,7 @@ func TestE2E_WhatNow_AllocationInvariantsNeverViolated(t *testing.T) {
 		require.NoError(t, workItems.Create(ctx, wi1))
 		require.NoError(t, workItems.Create(ctx, wi2))
 
-		svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+		svc := NewWhatNowService(workItems, sessions, deps, profiles)
 		req := contract.NewWhatNowRequest(90)
 		req.Now = &now
 		req.EnforceVariation = true

@@ -1,0 +1,582 @@
+{
+    "project": {
+        "short_id": "PSY-V2-Y1",
+        "name": "Psychology v2 - Year 1 (Parallel Programme)",
+        "domain": "education",
+        "start_date": "2026-02-15"
+    },
+    "defaults": {
+        "duration_mode": "estimate",
+        "session_policy": {
+            "min_session_min": 15,
+            "max_session_min": 90,
+            "default_session_min": 45,
+            "splittable": true
+        }
+    },
+    "nodes": [
+        {
+            "ref": "p1",
+            "title": "Paper 1: Foundations & Methods",
+            "kind": "stage",
+            "order": 1
+        },
+        {
+            "ref": "p1w1",
+            "title": "Week 1 - D110 Block 1 Review + Contemporary Foundations",
+            "kind": "module",
+            "parent_ref": "p1",
+            "order": 1
+        },
+        {
+            "ref": "p1w2",
+            "title": "Week 2 - D110 Block 1 Review + Replication Crisis",
+            "kind": "module",
+            "parent_ref": "p1",
+            "order": 2
+        },
+        {
+            "ref": "p1w3",
+            "title": "Week 3 - D110 Block 4 Review + Embodied Cognition",
+            "kind": "module",
+            "parent_ref": "p1",
+            "order": 3
+        },
+        {
+            "ref": "p1w4",
+            "title": "Week 4 - D110 Block 4 Review + Critical Neuroscience",
+            "kind": "module",
+            "parent_ref": "p1",
+            "order": 4
+        },
+        {
+            "ref": "p1w5",
+            "title": "Week 5 - Research Methods Integration",
+            "kind": "module",
+            "parent_ref": "p1",
+            "order": 5
+        },
+        {
+            "ref": "p1w6",
+            "title": "Week 6 - Paper 1 Integration & Review",
+            "kind": "module",
+            "parent_ref": "p1",
+            "order": 6
+        },
+        {
+            "ref": "p2",
+            "title": "Paper 2: Social & Applied Psychology",
+            "kind": "stage",
+            "order": 2
+        },
+        {
+            "ref": "p2w7",
+            "title": "Week 7 - D110 Block 2 Review + Structural Oppression",
+            "kind": "module",
+            "parent_ref": "p2",
+            "order": 7
+        },
+        {
+            "ref": "p2w8",
+            "title": "Week 8 - D110 Block 2 Review + Epistemic Injustice",
+            "kind": "module",
+            "parent_ref": "p2",
+            "order": 8
+        },
+        {
+            "ref": "p2w9",
+            "title": "Week 9 - D110 Block 2 Review + Philosophy of Addiction",
+            "kind": "module",
+            "parent_ref": "p2",
+            "order": 9
+        },
+        {
+            "ref": "p2w10",
+            "title": "Week 10 - D110 Block 6 Review + Climate Psychology",
+            "kind": "module",
+            "parent_ref": "p2",
+            "order": 10
+        },
+        {
+            "ref": "p2w11",
+            "title": "Week 11 - D110 Block 6 Review + Social Identity",
+            "kind": "module",
+            "parent_ref": "p2",
+            "order": 11
+        },
+        {
+            "ref": "p2w12",
+            "title": "Week 12 - Paper 2 Integration & Review",
+            "kind": "module",
+            "parent_ref": "p2",
+            "order": 12
+        },
+        {
+            "ref": "p3",
+            "title": "Paper 3: Self, Development & Therapeutic Foundations",
+            "kind": "stage",
+            "order": 3
+        },
+        {
+            "ref": "p3w13",
+            "title": "Week 13 - D110 Block 3 Review + Narrative Self",
+            "kind": "module",
+            "parent_ref": "p3",
+            "order": 13
+        },
+        {
+            "ref": "p3w14",
+            "title": "Week 14 - D110 Block 3 Review + Existential Psychology",
+            "kind": "module",
+            "parent_ref": "p3",
+            "order": 14
+        },
+        {
+            "ref": "p3w15",
+            "title": "Week 15 - D110 Block 3 Review + Person-Centered Philosophy",
+            "kind": "module",
+            "parent_ref": "p3",
+            "order": 15
+        },
+        {
+            "ref": "p3w16",
+            "title": "Week 16 - D110 Block 5 Review + Attachment Philosophy",
+            "kind": "module",
+            "parent_ref": "p3",
+            "order": 16
+        },
+        {
+            "ref": "p3w17",
+            "title": "Week 17 - Therapeutic Integration",
+            "kind": "module",
+            "parent_ref": "p3",
+            "order": 17
+        },
+        {
+            "ref": "p3w18",
+            "title": "Week 18 - Paper 3 Integration & Final Programme Review",
+            "kind": "module",
+            "parent_ref": "p3",
+            "order": 18
+        },
+        {
+            "ref": "final",
+            "title": "Final Programme Integration Essay",
+            "kind": "stage",
+            "order": 19
+        }
+    ],
+    "work_items": [
+        {
+            "ref": "p1w1_review",
+            "node_ref": "p1w1",
+            "title": "Review D110 Block 1 materials",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p1w1_read",
+            "node_ref": "p1w1",
+            "title": "Stanovich: How to Think Straight (Ch. 1-3)",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p1w1_reflect",
+            "node_ref": "p1w1",
+            "title": "Reflection: Stanovich vs D110 on psychology as science",
+            "type": "assignment",
+            "planned_min": 60
+        },
+        {
+            "ref": "p1w2_review",
+            "node_ref": "p1w2",
+            "title": "Continue D110 Block 1 review (research methods)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p1w2_read",
+            "node_ref": "p1w2",
+            "title": "Replication crisis papers (Simmons et al., OSC)",
+            "type": "reading",
+            "planned_min": 210
+        },
+        {
+            "ref": "p1w2_essay",
+            "node_ref": "p1w2",
+            "title": "Supervision Essay 1: Responding to replication crisis (1,500 words)",
+            "type": "assignment",
+            "planned_min": 150
+        },
+        {
+            "ref": "p1w3_review",
+            "node_ref": "p1w3",
+            "title": "Review D110 Block 4 (brain & behaviour - start)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p1w3_read",
+            "node_ref": "p1w3",
+            "title": "Merleau-Ponty: Phenomenology of Perception (Intro + Ch. 1)",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p1w3_reflect",
+            "node_ref": "p1w3",
+            "title": "Reflection: Body as subject vs brain as object",
+            "type": "assignment",
+            "planned_min": 60
+        },
+        {
+            "ref": "p1w4_review",
+            "node_ref": "p1w4",
+            "title": "Complete D110 Block 4 review",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p1w4_read",
+            "node_ref": "p1w4",
+            "title": "Bennett & Hacker: Philosophical Foundations (Ch. 3 - Mereological Fallacy)",
+            "type": "reading",
+            "planned_min": 210
+        },
+        {
+            "ref": "p1w4_essay",
+            "node_ref": "p1w4",
+            "title": "Supervision Essay 2: Limits of neural explanation (1,500 words)",
+            "type": "assignment",
+            "planned_min": 150
+        },
+        {
+            "ref": "p1w5_review",
+            "node_ref": "p1w5",
+            "title": "Review all D110 research methods material",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p1w5_read",
+            "node_ref": "p1w5",
+            "title": "Hume: Enquiry Concerning Human Understanding (Sections IV-V)",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p1w5_reflect",
+            "node_ref": "p1w5",
+            "title": "Reflection: Causation in psychological experiments",
+            "type": "assignment",
+            "planned_min": 60
+        },
+        {
+            "ref": "p1w6_consolidate",
+            "node_ref": "p1w6",
+            "title": "Consolidate all Paper 1 notes",
+            "type": "review",
+            "planned_min": 120
+        },
+        {
+            "ref": "p1w6_integration",
+            "node_ref": "p1w6",
+            "title": "Paper 1 Integration Essay: Limits of psychological explanation (2,500 words)",
+            "type": "assignment",
+            "planned_min": 300
+        },
+        {
+            "ref": "p1w6_study_aids",
+            "node_ref": "p1w6",
+            "title": "Create study aids (timeline, concept map, summary sheet)",
+            "type": "practice",
+            "planned_min": 120
+        },
+        {
+            "ref": "p2w7_review",
+            "node_ref": "p2w7",
+            "title": "Review D110 Block 2 (elections, persuasion, leadership)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p2w7_read",
+            "node_ref": "p2w7",
+            "title": "Fanon: Black Skin, White Masks (Ch. 5)",
+            "type": "reading",
+            "planned_min": 210
+        },
+        {
+            "ref": "p2w7_reflect",
+            "node_ref": "p2w7",
+            "title": "Reflection: Phenomenology of racism vs cognitive prejudice",
+            "type": "assignment",
+            "planned_min": 60
+        },
+        {
+            "ref": "p2w8_review",
+            "node_ref": "p2w8",
+            "title": "Review D110 Block 2 (prejudice and discrimination)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p2w8_read",
+            "node_ref": "p2w8",
+            "title": "Fricker: Epistemic Injustice (Ch. 1)",
+            "type": "reading",
+            "planned_min": 210
+        },
+        {
+            "ref": "p2w8_essay",
+            "node_ref": "p2w8",
+            "title": "Supervision Essay 3: Prejudice as cognitive or structural? (1,500 words)",
+            "type": "assignment",
+            "planned_min": 150
+        },
+        {
+            "ref": "p2w9_review",
+            "node_ref": "p2w9",
+            "title": "Review D110 Block 2 (drugs and addiction)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p2w9_read",
+            "node_ref": "p2w9",
+            "title": "Frankfurt & Pickard on addiction and responsibility",
+            "type": "reading",
+            "planned_min": 210
+        },
+        {
+            "ref": "p2w9_reflect",
+            "node_ref": "p2w9",
+            "title": "Reflection: Responsibility without blame in addiction treatment",
+            "type": "assignment",
+            "planned_min": 60
+        },
+        {
+            "ref": "p2w10_review",
+            "node_ref": "p2w10",
+            "title": "Review D110 Block 6 (environmental psychology - start)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p2w10_read",
+            "node_ref": "p2w10",
+            "title": "Jamieson: Reason in a Dark Time (Ch. 4)",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p2w10_essay",
+            "node_ref": "p2w10",
+            "title": "Supervision Essay 4: Why knowledge fails to motivate climate action (1,500 words)",
+            "type": "assignment",
+            "planned_min": 150
+        },
+        {
+            "ref": "p2w11_review",
+            "node_ref": "p2w11",
+            "title": "Complete D110 Block 6 review (activism, social movements)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p2w11_read",
+            "node_ref": "p2w11",
+            "title": "Optional: Social Identity Theory or catch-up reading",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p2w11_reflect",
+            "node_ref": "p2w11",
+            "title": "Reflection: Social identity in therapeutic context",
+            "type": "assignment",
+            "planned_min": 60
+        },
+        {
+            "ref": "p2w12_consolidate",
+            "node_ref": "p2w12",
+            "title": "Consolidate all Paper 2 notes",
+            "type": "review",
+            "planned_min": 120
+        },
+        {
+            "ref": "p2w12_integration",
+            "node_ref": "p2w12",
+            "title": "Paper 2 Integration Essay: Psychology and social/political life (2,500 words)",
+            "type": "assignment",
+            "planned_min": 300
+        },
+        {
+            "ref": "p2w12_study_aids",
+            "node_ref": "p2w12",
+            "title": "Create study aids (cognitive vs structural matrix, concept map)",
+            "type": "practice",
+            "planned_min": 120
+        },
+        {
+            "ref": "p3w13_review",
+            "node_ref": "p3w13",
+            "title": "Review D110 Block 3 (personality theories)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p3w13_read",
+            "node_ref": "p3w13",
+            "title": "Ricoeur: Oneself as Another (Narrative Identity chapter)",
+            "type": "reading",
+            "planned_min": 210
+        },
+        {
+            "ref": "p3w13_reflect",
+            "node_ref": "p3w13",
+            "title": "Reflection: Narrative identity vs trait personality",
+            "type": "assignment",
+            "planned_min": 60
+        },
+        {
+            "ref": "p3w14_review",
+            "node_ref": "p3w14",
+            "title": "Review D110 Block 3 (understanding anxiety)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p3w14_read",
+            "node_ref": "p3w14",
+            "title": "Rollo May: The Meaning of Anxiety (Ch. 1-2)",
+            "type": "reading",
+            "planned_min": 210
+        },
+        {
+            "ref": "p3w14_essay",
+            "node_ref": "p3w14",
+            "title": "Supervision Essay 5: Anxiety as disorder or existential condition? (1,500 words)",
+            "type": "assignment",
+            "planned_min": 150
+        },
+        {
+            "ref": "p3w15_review",
+            "node_ref": "p3w15",
+            "title": "Review D110 Block 3 (person-centered counseling)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p3w15_read",
+            "node_ref": "p3w15",
+            "title": "Rogers: On Becoming a Person (Ch. 2-3) + Buber excerpt",
+            "type": "reading",
+            "planned_min": 210
+        },
+        {
+            "ref": "p3w15_reflect",
+            "node_ref": "p3w15",
+            "title": "Reflection: I-Thou relationship in person-centered practice",
+            "type": "assignment",
+            "planned_min": 60
+        },
+        {
+            "ref": "p3w16_review",
+            "node_ref": "p3w16",
+            "title": "Review D110 Block 5 (developmental psychology, attachment)",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p3w16_read",
+            "node_ref": "p3w16",
+            "title": "Bowlby or Benjamin on attachment and intersubjectivity",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p3w16_essay",
+            "node_ref": "p3w16",
+            "title": "Supervision Essay 6: Attachment and therapeutic relationships (1,500 words)",
+            "type": "assignment",
+            "planned_min": 150
+        },
+        {
+            "ref": "p3w17_review",
+            "node_ref": "p3w17",
+            "title": "Review all D110 Block 3 + 5 materials",
+            "type": "review",
+            "planned_min": 210
+        },
+        {
+            "ref": "p3w17_read",
+            "node_ref": "p3w17",
+            "title": "Pickard: Purpose of Psychotherapy or catch-up",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p3w17_reflect",
+            "node_ref": "p3w17",
+            "title": "Reflection: What is the purpose of psychotherapy?",
+            "type": "assignment",
+            "planned_min": 60
+        },
+        {
+            "ref": "p3w18_consolidate",
+            "node_ref": "p3w18",
+            "title": "Consolidate all Paper 3 notes",
+            "type": "review",
+            "planned_min": 120
+        },
+        {
+            "ref": "p3w18_integration",
+            "node_ref": "p3w18",
+            "title": "Paper 3 Integration Essay: What does it mean to understand a person? (2,500 words)",
+            "type": "assignment",
+            "planned_min": 300
+        },
+        {
+            "ref": "p3w18_study_aids",
+            "node_ref": "p3w18",
+            "title": "Create master study aids (timeline, levels of explanation map, framework matrix)",
+            "type": "practice",
+            "planned_min": 120
+        },
+        {
+            "ref": "final_plan",
+            "node_ref": "final",
+            "title": "Plan final integration essay structure",
+            "type": "review",
+            "planned_min": 120
+        },
+        {
+            "ref": "final_draft",
+            "node_ref": "final",
+            "title": "Draft final essay: Psychological science and therapeutic practice (3,000 words)",
+            "type": "assignment",
+            "planned_min": 360
+        },
+        {
+            "ref": "final_revise",
+            "node_ref": "final",
+            "title": "Revise and polish final essay",
+            "type": "assignment",
+            "planned_min": 180
+        },
+        {
+            "ref": "final_submit",
+            "node_ref": "final",
+            "title": "Finalize and archive programme materials",
+            "type": "task",
+            "planned_min": 60,
+            "session_policy": {
+                "min_session_min": 30,
+                "max_session_min": 60,
+                "splittable": false
+            }
+        }
+    ]
+}

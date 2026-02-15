@@ -1,9 +1,12 @@
 package cli
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
+	"github.com/charmbracelet/bubbles/key"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -18,6 +21,10 @@ type appModel struct {
 
 	// Transient output from the command bar, displayed in content area.
 	lastOutput string
+
+	// Scrollable viewport for command output that exceeds terminal height.
+	outputVP     viewport.Model
+	outputActive bool // true when lastOutput is being displayed in the viewport
 }
 
 func newAppModel(app *App) appModel {
@@ -27,9 +34,15 @@ func newAppModel(app *App) appModel {
 	}
 	cb := newCommandBar(state)
 
+	vp := viewport.New(0, 0)
+	vp.KeyMap = outputViewportKeyMap()
+	vp.MouseWheelEnabled = true
+	vp.MouseWheelDelta = 3
+
 	m := appModel{
-		state:  state,
-		cmdBar: cb,
+		state:    state,
+		cmdBar:   cb,
+		outputVP: vp,
 	}
 
 	// Start with the dashboard as the home view.
@@ -71,6 +84,11 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state.Width = msg.Width
 		m.state.Height = msg.Height
 		m.cmdBar.SetWidth(msg.Width)
+		// Resize the output viewport if active.
+		if m.outputActive {
+			m.outputVP.Width = msg.Width
+			m.outputVP.Height = m.state.ContentHeight()
+		}
 		// Forward to active view
 		if v := m.activeView(); v != nil {
 			updated, cmd := v.Update(msg)
@@ -82,10 +100,17 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		return m.handleKey(msg)
 
+	case tea.MouseMsg:
+		if m.outputActive {
+			var cmd tea.Cmd
+			m.outputVP, cmd = m.outputVP.Update(msg)
+			return m, cmd
+		}
+
 	// Navigation messages from views or command bar
 	case pushViewMsg:
 		m.cmdBar.Blur()
-		m.lastOutput = ""
+		m.clearOutput()
 		m.viewStack = append(m.viewStack, msg.view)
 		return m, msg.view.Init()
 
@@ -97,7 +122,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case replaceViewMsg:
 		m.cmdBar.Blur()
-		m.lastOutput = ""
+		m.clearOutput()
 		if len(m.viewStack) > 0 {
 			m.viewStack[len(m.viewStack)-1] = msg.view
 		} else {
@@ -105,12 +130,35 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, msg.view.Init()
 
+	case refreshViewMsg:
+		// Broadcast to ALL views in the stack so underlying views (e.g. task list)
+		// reload data after mutations made in views above them (e.g. action menu forms).
+		var cmds []tea.Cmd
+		for i, v := range m.viewStack {
+			updated, cmd := v.Update(msg)
+			m.viewStack[i] = updated.(View)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		}
+		return m, tea.Batch(cmds...)
+
 	case cmdOutputMsg:
 		m.lastOutput = msg.output
+		m.outputActive = true
+		m.outputVP.SetContent(msg.output)
+		m.outputVP.Width = m.state.Width
+		m.outputVP.Height = m.state.ContentHeight()
+		m.outputVP.GotoTop()
 		return m, nil
 
 	case cmdLoadingMsg:
 		m.lastOutput = "\n  " + formatter.Dim(msg.message)
+		m.outputActive = true
+		m.outputVP.SetContent(m.lastOutput)
+		m.outputVP.Width = m.state.Width
+		m.outputVP.Height = m.state.ContentHeight()
+		m.outputVP.GotoTop()
 		return m, nil
 
 	case wizardCompleteMsg:
@@ -118,7 +166,7 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(m.viewStack) > 1 {
 			m.viewStack = m.viewStack[:len(m.viewStack)-1]
 		}
-		m.lastOutput = ""
+		m.clearOutput()
 		m.cmdBar.Focus()
 		// Batch the follow-up command with a refresh so the underlying view reloads.
 		return m, tea.Batch(msg.nextCmd, func() tea.Msg { return refreshViewMsg{} })
@@ -154,16 +202,22 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// If command bar is focused, route keys there
 	if m.cmdBar.Focused() {
 		if msg.Type == tea.KeyEnter {
-			m.lastOutput = "" // Clear stale output before new command runs
+			m.clearOutput() // Clear stale output before new command runs
 		}
 		cmd := m.cmdBar.Update(msg)
 		return m, cmd
 	}
 
-	// Dismiss any lingering command output on first view-mode key press.
-	// This prevents stale output (e.g., LLM errors) from blocking the
-	// underlying view once the user has moved on (Esc to blur, then interact).
-	m.lastOutput = ""
+	// When output is displayed, intercept scroll keys for the viewport.
+	// Non-scroll keys dismiss the output, then fall through to normal handling.
+	if m.outputActive {
+		if isOutputScrollKey(msg) {
+			var cmd tea.Cmd
+			m.outputVP, cmd = m.outputVP.Update(msg)
+			return m, cmd
+		}
+		m.clearOutput()
+	}
 
 	// If active view captures input (has its own text input), forward directly.
 	// This bypasses global keybindings so views like draft and help chat can
@@ -191,7 +245,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			break // already on recommendation view, let it handle
 		}
 		m.cmdBar.Blur()
-		m.lastOutput = ""
+		m.clearOutput()
 		v := newRecommendationView(m.state, 60)
 		m.viewStack = append(m.viewStack, v)
 		return m, v.Init()
@@ -200,7 +254,7 @@ func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Pop view stack (go back)
 		if len(m.viewStack) > 1 {
 			m.viewStack = m.viewStack[:len(m.viewStack)-1]
-			m.lastOutput = ""
+			m.clearOutput()
 			return m, nil
 		}
 		return m, nil
@@ -226,16 +280,13 @@ func (m appModel) View() string {
 	// Header
 	sections = append(sections, m.renderHeader())
 
-	// Content area: active view or command output
+	// Content area: active view or scrollable command output
 	if m.lastOutput != "" {
-		content := m.lastOutput
-		if m.state.Height > 0 {
-			content = truncateToHeight(content, m.state.ContentHeight())
+		if m.outputActive && m.state.Height > 0 {
+			sections = append(sections, m.outputVP.View())
+		} else {
+			sections = append(sections, m.lastOutput)
 		}
-		if m.state.Width > 0 {
-			content = lipgloss.NewStyle().MaxWidth(m.state.Width).Render(content)
-		}
-		sections = append(sections, content)
 	} else if v := m.activeView(); v != nil {
 		sections = append(sections, v.View())
 	}
@@ -291,13 +342,20 @@ func (m *appModel) renderHeader() string {
 
 func (m *appModel) renderStatusBar() string {
 	var hints []string
-	if v := m.activeView(); v != nil {
+
+	if m.outputActive && m.outputVP.TotalLineCount() > m.outputVP.Height {
+		// Scrollable output: show scroll position and controls.
+		hints = append(hints, scrollIndicator(m.outputVP))
+		hints = append(hints, formatter.Dim("↑↓ pgup/pgdn: scroll"))
+		hints = append(hints, formatter.Dim("esc: dismiss"))
+	} else if v := m.activeView(); v != nil && !m.outputActive {
 		for _, b := range v.ShortHelp() {
 			hints = append(hints, formatter.Dim(b.Help().Key+": "+b.Help().Desc))
 		}
 	}
+
 	// Show navigation hints
-	if !m.cmdBar.Focused() {
+	if !m.cmdBar.Focused() && !m.outputActive {
 		if len(m.viewStack) > 1 {
 			hints = append(hints, formatter.Dim("esc: back"))
 		}
@@ -310,17 +368,47 @@ func (m *appModel) renderStatusBar() string {
 	return sep + "\n" + bar
 }
 
-// truncateToHeight keeps only the last maxLines lines from s,
-// showing the bottom of the output which is typically most relevant.
-func truncateToHeight(s string, maxLines int) string {
-	if maxLines <= 0 {
-		return ""
+// clearOutput dismisses the transient command output and deactivates the viewport.
+func (m *appModel) clearOutput() {
+	m.lastOutput = ""
+	m.outputActive = false
+}
+
+// outputViewportKeyMap returns a restricted keymap for the output viewport.
+// Only arrow/page keys scroll — letter keys (q, j, k, etc.) are left free
+// so they can dismiss the output or trigger global shortcuts.
+func outputViewportKeyMap() viewport.KeyMap {
+	return viewport.KeyMap{
+		PageDown:     key.NewBinding(key.WithKeys("pgdown")),
+		PageUp:       key.NewBinding(key.WithKeys("pgup")),
+		HalfPageUp:   key.NewBinding(key.WithKeys("ctrl+u")),
+		HalfPageDown: key.NewBinding(key.WithKeys("ctrl+d")),
+		Up:           key.NewBinding(key.WithKeys("up")),
+		Down:         key.NewBinding(key.WithKeys("down")),
 	}
-	lines := strings.Split(s, "\n")
-	if len(lines) <= maxLines {
-		return s
+}
+
+// isOutputScrollKey returns true if the key should scroll the output viewport
+// rather than dismissing the output.
+func isOutputScrollKey(msg tea.KeyMsg) bool {
+	switch msg.Type {
+	case tea.KeyUp, tea.KeyDown, tea.KeyPgUp, tea.KeyPgDown,
+		tea.KeyHome, tea.KeyEnd, tea.KeyCtrlU, tea.KeyCtrlD:
+		return true
 	}
-	return strings.Join(lines[len(lines)-maxLines:], "\n")
+	return false
+}
+
+// scrollIndicator returns a dim scroll position string for the status bar.
+func scrollIndicator(vp viewport.Model) string {
+	if vp.AtTop() {
+		return formatter.Dim("[TOP]")
+	}
+	if vp.AtBottom() {
+		return formatter.Dim("[END]")
+	}
+	pct := int(vp.ScrollPercent() * 100)
+	return formatter.Dim(fmt.Sprintf("[%d%%]", pct))
 }
 
 // viewCapturesInput returns true if the active view has its own text input

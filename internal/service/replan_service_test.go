@@ -13,7 +13,7 @@ import (
 )
 
 func TestReplan_SmoothReEstimation_UpdatesDB(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -59,7 +59,7 @@ func TestReplan_SmoothReEstimation_UpdatesDB(t *testing.T) {
 }
 
 func TestReplan_Converges_WithRepeatedRuns(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -113,7 +113,7 @@ func TestReplan_Converges_WithRepeatedRuns(t *testing.T) {
 }
 
 func TestReplan_NoActiveProjects_ReturnsError(t *testing.T) {
-	projects, _, _, _, sessions, profiles := setupRepos(t)
+	projects, _, _, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -136,7 +136,7 @@ func TestReplan_NoActiveProjects_ReturnsError(t *testing.T) {
 }
 
 func TestReplan_RiskDeltaCalculated(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -175,7 +175,7 @@ func TestReplan_RiskDeltaCalculated(t *testing.T) {
 }
 
 func TestReplan_Idempotency_UnchangedInputProducesZeroChanges(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -238,7 +238,7 @@ func TestReplan_Idempotency_UnchangedInputProducesZeroChanges(t *testing.T) {
 }
 
 func TestReplan_Idempotency_MultipleCallsConvergeThenStabilize(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()

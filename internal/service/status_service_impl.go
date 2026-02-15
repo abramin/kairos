@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/alexanderramin/kairos/internal/contract"
+	"github.com/alexanderramin/kairos/internal/app"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/alexanderramin/kairos/internal/scheduler"
@@ -33,7 +33,7 @@ func NewStatusService(
 	}
 }
 
-func (s *statusService) GetStatus(ctx context.Context, req contract.StatusRequest) (*contract.StatusResponse, error) {
+func (s *statusService) GetStatus(ctx context.Context, req app.StatusRequest) (*app.StatusResponse, error) {
 	now := time.Now().UTC()
 	if req.Now != nil {
 		now = *req.Now
@@ -56,7 +56,7 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 
 	projects = filterProjectsByScope(projects, req.ProjectScope)
 
-	var views []contract.ProjectStatusView
+	var views []app.ProjectStatusView
 	countOnTrack, countAtRisk, countCritical := 0, 0, 0
 	hasCritical := false
 
@@ -91,7 +91,7 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 			dueDateStr = &ds
 		}
 
-		view := contract.ProjectStatusView{
+		view := app.ProjectStatusView{
 			ProjectID:             p.ID,
 			ProjectName:           p.Name,
 			Status:                p.Status,
@@ -151,8 +151,8 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 		policyMsg = "Some projects at risk, monitor closely"
 	}
 
-	return &contract.StatusResponse{
-		Summary: contract.GlobalStatusSummary{
+	return &app.StatusResponse{
+		Summary: app.GlobalStatusSummary{
 			GeneratedAt:     now,
 			CountsTotal:     countOnTrack + countAtRisk + countCritical,
 			CountsOnTrack:   countOnTrack,
@@ -164,4 +164,3 @@ func (s *statusService) GetStatus(ctx context.Context, req contract.StatusReques
 		Projects: views,
 	}, nil
 }
-

@@ -16,7 +16,7 @@ import (
 // work items require more session time than available, the response contains
 // blockers and zero recommendations — not a panic or opaque error.
 func TestWhatNow_AllItemsBlocked_SessionMinExceedsAvail(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -35,7 +35,7 @@ func TestWhatNow_AllItemsBlocked_SessionMinExceedsAvail(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wi))
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 
 	// Only 20 minutes available — less than min_session_min of 45.
 	req := contract.NewWhatNowRequest(20)
@@ -55,7 +55,7 @@ func TestWhatNow_AllItemsBlocked_SessionMinExceedsAvail(t *testing.T) {
 // TestWhatNow_AllItemsDone_NoCandidates verifies that when every work item
 // is completed, the service returns ErrNoCandidates.
 func TestWhatNow_AllItemsDone_NoCandidates(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -74,7 +74,7 @@ func TestWhatNow_AllItemsDone_NoCandidates(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wi))
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -90,7 +90,7 @@ func TestWhatNow_AllItemsDone_NoCandidates(t *testing.T) {
 // blocked by session bounds, others schedulable. The response should contain
 // both recommendations and blockers.
 func TestWhatNow_MixedBlockedAndSchedulable(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -116,7 +116,7 @@ func TestWhatNow_MixedBlockedAndSchedulable(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wiFits))
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(30)
 	req.Now = &now
 
@@ -147,7 +147,7 @@ func TestWhatNow_MixedBlockedAndSchedulable(t *testing.T) {
 // TestWhatNow_DependencyBlocked verifies that items with unfinished
 // predecessors are blocked and reported correctly.
 func TestWhatNow_DependencyBlocked(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -178,7 +178,7 @@ func TestWhatNow_DependencyBlocked(t *testing.T) {
 	}
 	require.NoError(t, deps.Create(ctx, dep))
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	kairosapp "github.com/alexanderramin/kairos/internal/app"
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
-	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ func newStatusCmd(app *App) *cobra.Command {
 		Use:   "status",
 		Short: "Show project status overview",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			req := contract.NewStatusRequest()
+			req := kairosapp.NewStatusRequest()
 
 			if cmd.Flags().Changed("recalc") {
 				req.Recalc = recalc
@@ -31,7 +31,7 @@ func newStatusCmd(app *App) *cobra.Command {
 				return err
 			}
 
-			fmt.Print(formatter.FormatStatus(resp))
+			fmt.Print(formatter.FormatStatus(mapStatusResponseToContract(resp)))
 			return nil
 		},
 	}

@@ -3,15 +3,12 @@ package service
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/google/uuid"
 )
-
-var shortIDPattern = regexp.MustCompile(`^[A-Z]{3,6}[0-9]{2,4}$`)
 
 type projectService struct {
 	projects repository.ProjectRepo
@@ -22,11 +19,8 @@ func NewProjectService(projects repository.ProjectRepo) ProjectService {
 }
 
 func (s *projectService) Create(ctx context.Context, p *domain.Project) error {
-	if p.ShortID == "" {
-		return fmt.Errorf("short ID is required (use --id flag)")
-	}
-	if !shortIDPattern.MatchString(p.ShortID) {
-		return fmt.Errorf("short ID %q must be 3-6 uppercase letters followed by 2-4 digits (e.g. PHI01)", p.ShortID)
+	if err := p.ValidateShortID(); err != nil {
+		return err
 	}
 	if p.ID == "" {
 		p.ID = uuid.New().String()

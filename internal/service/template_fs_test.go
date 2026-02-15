@@ -13,7 +13,7 @@ import (
 // TestTemplateService_MissingDirectory verifies graceful behavior when the
 // template directory does not exist.
 func TestTemplateService_MissingDirectory(t *testing.T) {
-	svc := NewTemplateService("/nonexistent/templates/path", nil, nil, nil, nil)
+	svc := NewTemplateService("/nonexistent/templates/path", nil, nil, nil, nil, nil)
 
 	list, err := svc.List(context.Background())
 	require.NoError(t, err, "List should not error on missing directory (Glob returns nil)")
@@ -24,7 +24,7 @@ func TestTemplateService_MissingDirectory(t *testing.T) {
 // directory exists but contains no JSON files.
 func TestTemplateService_EmptyDirectory(t *testing.T) {
 	emptyDir := t.TempDir()
-	svc := NewTemplateService(emptyDir, nil, nil, nil, nil)
+	svc := NewTemplateService(emptyDir, nil, nil, nil, nil, nil)
 
 	list, err := svc.List(context.Background())
 	require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestTemplateService_MalformedJSONFile(t *testing.T) {
 	// Non-JSON file (should be ignored by Glob pattern)
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("not a template"), 0644))
 
-	svc := NewTemplateService(dir, nil, nil, nil, nil)
+	svc := NewTemplateService(dir, nil, nil, nil, nil, nil)
 
 	list, err := svc.List(context.Background())
 	require.NoError(t, err)
@@ -65,7 +65,7 @@ func TestTemplateService_MalformedJSONFile(t *testing.T) {
 // TestTemplateService_Get_MissingDirectory verifies Get returns an appropriate
 // error when the template directory doesn't exist.
 func TestTemplateService_Get_MissingDirectory(t *testing.T) {
-	svc := NewTemplateService("/nonexistent/path", nil, nil, nil, nil)
+	svc := NewTemplateService("/nonexistent/path", nil, nil, nil, nil, nil)
 
 	_, err := svc.Get(context.Background(), "anything")
 	assert.Error(t, err)
@@ -75,8 +75,8 @@ func TestTemplateService_Get_MissingDirectory(t *testing.T) {
 // TestTemplateService_InitProject_MissingTemplate verifies that InitProject
 // returns a clear error when referencing a non-existent template.
 func TestTemplateService_InitProject_MissingTemplate(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
-	svc := NewTemplateService(t.TempDir(), projects, nodes, workItems, deps)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
+	svc := NewTemplateService(t.TempDir(), projects, nodes, workItems, deps, uow)
 
 	_, err := svc.InitProject(context.Background(), "nonexistent_template", "Test", "TST01", "2026-01-01", nil, nil)
 	assert.Error(t, err)
@@ -106,7 +106,7 @@ func TestTemplateService_DirectoryWithSubdirectories(t *testing.T) {
 		"domain": "test"
 	}`), 0644))
 
-	svc := NewTemplateService(dir, nil, nil, nil, nil)
+	svc := NewTemplateService(dir, nil, nil, nil, nil, nil)
 
 	list, err := svc.List(context.Background())
 	require.NoError(t, err)

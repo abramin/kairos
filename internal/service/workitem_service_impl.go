@@ -77,8 +77,9 @@ func (s *workItemService) MarkDone(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	w.Status = domain.WorkItemDone
-	w.UpdatedAt = time.Now().UTC()
+	if err := w.MarkDone(time.Now().UTC()); err != nil {
+		return err
+	}
 	return s.workItems.Update(ctx, w)
 }
 
@@ -87,8 +88,9 @@ func (s *workItemService) MarkInProgress(ctx context.Context, id string) error {
 	if err != nil {
 		return err
 	}
-	w.Status = domain.WorkItemInProgress
-	w.UpdatedAt = time.Now().UTC()
+	if err := w.MarkInProgress(time.Now().UTC()); err != nil {
+		return err
+	}
 	return s.workItems.Update(ctx, w)
 }
 

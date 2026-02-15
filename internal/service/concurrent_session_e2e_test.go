@@ -37,6 +37,7 @@ func setupConcurrentRepos(t *testing.T) (
 	repository.DependencyRepo,
 	repository.SessionRepo,
 	repository.UserProfileRepo,
+	db.UnitOfWork,
 ) {
 	database := newConcurrentTestDB(t)
 	return repository.NewSQLiteProjectRepo(database),
@@ -44,7 +45,8 @@ func setupConcurrentRepos(t *testing.T) (
 		repository.NewSQLiteWorkItemRepo(database),
 		repository.NewSQLiteDependencyRepo(database),
 		repository.NewSQLiteSessionRepo(database),
-		repository.NewSQLiteUserProfileRepo(database)
+		repository.NewSQLiteUserProfileRepo(database),
+		testutil.NewTestUoW(database)
 }
 
 // TestE2E_ConcurrentSessionLogging_NoDataLoss verifies that concurrent log
@@ -61,7 +63,7 @@ func setupConcurrentRepos(t *testing.T) (
 // 2. Work item logged_min is AT LEAST as high as some sessions succeeded
 // 3. No crashes or database corruption occur
 func TestE2E_ConcurrentSessionLogging_NoDataLoss(t *testing.T) {
-	projects, nodes, workItems, _, sessions, _ := setupConcurrentRepos(t)
+	projects, nodes, workItems, _, sessions, _, uow := setupConcurrentRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -81,7 +83,7 @@ func TestE2E_ConcurrentSessionLogging_NoDataLoss(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, item))
 
 	// Create session service
-	sessionSvc := NewSessionService(sessions, workItems)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 
 	// Simulate 10 concurrent log commands from different terminals/processes
 	// Each logs a different number of minutes (1, 2, 3, ..., 10)
@@ -195,7 +197,7 @@ func TestE2E_ConcurrentSessionLogging_NoDataLoss(t *testing.T) {
 // For concurrent writes to DIFFERENT work items, SQLite's row-level locking should
 // prevent interference (each goroutine updates a different row).
 func TestE2E_ConcurrentSessionLogging_DifferentWorkItems(t *testing.T) {
-	projects, nodes, workItems, _, sessions, _ := setupConcurrentRepos(t)
+	projects, nodes, workItems, _, sessions, _, uow := setupConcurrentRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -216,7 +218,7 @@ func TestE2E_ConcurrentSessionLogging_DifferentWorkItems(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, item2))
 	require.NoError(t, workItems.Create(ctx, item3))
 
-	sessionSvc := NewSessionService(sessions, workItems)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 
 	// Helper to retry on SQLITE_BUSY errors
 	retryLogSession := func(ctx context.Context, svc SessionService, session *domain.WorkSessionLog) error {

@@ -17,7 +17,7 @@ import (
 // create project + items → what-now → build trace → DeterministicExplainNow → verify
 // output references only valid TraceKeys.
 func TestExplainIntegration_RealTrace_DeterministicExplainNow(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -43,7 +43,7 @@ func TestExplainIntegration_RealTrace_DeterministicExplainNow(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wi2))
 
 	// Step 1: Run what-now to get a real response.
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -104,7 +104,7 @@ func TestExplainIntegration_RealTrace_DeterministicExplainNow(t *testing.T) {
 // TestExplainIntegration_WhyNot_BlockedByDependency exercises the why-not pipeline
 // when an item is blocked by an unfinished dependency.
 func TestExplainIntegration_WhyNot_BlockedByDependency(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -135,7 +135,7 @@ func TestExplainIntegration_WhyNot_BlockedByDependency(t *testing.T) {
 	}))
 
 	// Run what-now — dependent should be blocked.
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 

@@ -352,7 +352,11 @@ func newProjectInitCmd(app *App) *cobra.Command {
 				duePtr = &due
 			}
 
-			p, err := app.Templates.InitProject(context.Background(), templateName, name, strings.ToUpper(shortID), start, duePtr, varMap)
+			initProject := app.initProjectUseCase()
+			if initProject == nil {
+				return fmt.Errorf("init-project use case is not configured")
+			}
+			p, err := initProject.InitProject(context.Background(), templateName, name, strings.ToUpper(shortID), start, duePtr, varMap)
 			if err != nil {
 				return err
 			}
@@ -382,7 +386,11 @@ func newProjectImportCmd(app *App) *cobra.Command {
 		Short: "Import a project from a JSON file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			result, err := app.Import.ImportProject(context.Background(), args[0])
+			importProject := app.importProjectUseCase()
+			if importProject == nil {
+				return fmt.Errorf("import-project use case is not configured")
+			}
+			result, err := importProject.ImportProject(context.Background(), args[0])
 			if err != nil {
 				return err
 			}

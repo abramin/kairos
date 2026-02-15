@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/alexanderramin/kairos/internal/scheduler"
@@ -13,10 +14,11 @@ import (
 type sessionService struct {
 	sessions  repository.SessionRepo
 	workItems repository.WorkItemRepo
+	uow       db.UnitOfWork
 }
 
-func NewSessionService(sessions repository.SessionRepo, workItems repository.WorkItemRepo) SessionService {
-	return &sessionService{sessions: sessions, workItems: workItems}
+func NewSessionService(sessions repository.SessionRepo, workItems repository.WorkItemRepo, uow db.UnitOfWork) SessionService {
+	return &sessionService{sessions: sessions, workItems: workItems, uow: uow}
 }
 
 func (s *sessionService) LogSession(ctx context.Context, session *domain.WorkSessionLog) error {
@@ -25,31 +27,31 @@ func (s *sessionService) LogSession(ctx context.Context, session *domain.WorkSes
 	}
 	session.CreatedAt = time.Now().UTC()
 
-	// Update work item logged_min and units_done
-	wi, err := s.workItems.GetByID(ctx, session.WorkItemID)
-	if err != nil {
-		return err
-	}
+	return s.uow.WithinTx(ctx, func(ctx context.Context, tx db.DBTX) error {
+		txWorkItems := repository.NewSQLiteWorkItemRepo(tx)
+		txSessions := repository.NewSQLiteSessionRepo(tx)
 
-	wi.LoggedMin += session.Minutes
-	wi.UnitsDone += session.UnitsDoneDelta
+		// Read work item within transaction
+		wi, err := txWorkItems.GetByID(ctx, session.WorkItemID)
+		if err != nil {
+			return err
+		}
 
-	// Auto-set status to in_progress if still todo
-	if wi.Status == domain.WorkItemTodo {
-		wi.Status = domain.WorkItemInProgress
-	}
+		now := time.Now().UTC()
+		if err := wi.ApplySession(session.Minutes, session.UnitsDoneDelta, now); err != nil {
+			return err
+		}
 
-	// Smooth re-estimation if units tracking available
-	if wi.UnitsTotal > 0 && wi.UnitsDone > 0 && wi.DurationMode == domain.DurationEstimate {
-		wi.PlannedMin = scheduler.SmoothReEstimate(wi.PlannedMin, wi.LoggedMin, wi.UnitsTotal, wi.UnitsDone)
-	}
+		if wi.EligibleForReestimate() {
+			newPlanned := scheduler.SmoothReEstimate(wi.PlannedMin, wi.LoggedMin, wi.UnitsTotal, wi.UnitsDone)
+			wi.ApplyReestimate(newPlanned, now)
+		}
+		if err := txWorkItems.Update(ctx, wi); err != nil {
+			return err
+		}
 
-	wi.UpdatedAt = time.Now().UTC()
-	if err := s.workItems.Update(ctx, wi); err != nil {
-		return err
-	}
-
-	return s.sessions.Create(ctx, session)
+		return txSessions.Create(ctx, session)
+	})
 }
 
 func (s *sessionService) GetByID(ctx context.Context, id string) (*domain.WorkSessionLog, error) {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alexanderramin/kairos/internal/contract"
+	kairosapp "github.com/alexanderramin/kairos/internal/app"
 	"github.com/spf13/cobra"
 )
 
@@ -16,7 +16,7 @@ func newWhatNowCmd(app *App) *cobra.Command {
 		Use:   "what-now",
 		Short: "Get session recommendations for available time",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			req := contract.NewWhatNowRequest(minutes)
+			req := kairosapp.NewWhatNowRequest(minutes)
 
 			if cmd.Flags().Changed("dry-run") {
 				req.DryRun = dryRun
@@ -30,7 +30,7 @@ func newWhatNowCmd(app *App) *cobra.Command {
 				return err
 			}
 
-			fmt.Print(formatWhatNowResponse(context.Background(), app, resp))
+			fmt.Print(formatWhatNowResponse(context.Background(), app, mapWhatNowResponseToContract(resp)))
 			return nil
 		},
 	}

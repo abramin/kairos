@@ -13,7 +13,7 @@ import (
 )
 
 func TestStatus_CriticalProjectDetected(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -47,7 +47,7 @@ func TestStatus_CriticalProjectDetected(t *testing.T) {
 }
 
 func TestStatus_AllOnTrack_SafeForSecondary(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -86,7 +86,7 @@ func TestStatus_AllOnTrack_SafeForSecondary(t *testing.T) {
 }
 
 func TestStatus_ArchivedProjectExcluded(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -118,7 +118,7 @@ func TestStatus_ArchivedProjectExcluded(t *testing.T) {
 }
 
 func TestStatus_ProgressPctCanExceed100(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -154,7 +154,7 @@ func TestStatus_ProgressPctCanExceed100(t *testing.T) {
 }
 
 func TestStatus_SortingOrder_CriticalBeforeOnTrack(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()

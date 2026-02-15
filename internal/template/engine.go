@@ -11,6 +11,7 @@ import (
 	"unicode"
 
 	"github.com/alexanderramin/kairos/internal/domain"
+	"github.com/alexanderramin/kairos/internal/generation"
 	"github.com/google/uuid"
 )
 
@@ -37,18 +38,14 @@ func LoadSchema(path string) (*TemplateSchema, error) {
 
 // Execute generates all domain objects from a template schema.
 func Execute(schema *TemplateSchema, projectName, startDate string, dueDate *string, userVars map[string]string) (*GeneratedProject, error) {
-	start, err := time.Parse("2006-01-02", startDate)
+	start, err := generation.ParseRequiredDate(startDate, "start date")
 	if err != nil {
-		return nil, fmt.Errorf("invalid start date: %w", err)
+		return nil, err
 	}
 
-	var targetDate *time.Time
-	if dueDate != nil {
-		t, err := time.Parse("2006-01-02", *dueDate)
-		if err != nil {
-			return nil, fmt.Errorf("invalid due date: %w", err)
-		}
-		targetDate = &t
+	targetDate, err := generation.ParseOptionalDate(dueDate, "due date")
+	if err != nil {
+		return nil, err
 	}
 
 	// Resolve variables: apply defaults, then user overrides
@@ -176,6 +173,11 @@ func Execute(schema *TemplateSchema, projectName, startDate string, dueDate *str
 
 	// Generate work items
 	var workItems []*domain.WorkItem
+	defaults := generation.WorkItemDefaultsInput{}
+	if schema.Defaults != nil {
+		defaults.DurationMode = schema.Defaults.DurationMode
+		defaults.SessionPolicy = schema.Defaults.SessionPolicy
+	}
 	for _, wc := range schema.WorkItems {
 		repeats, err := ParseRepeats(wc.Repeat)
 		if err != nil {
@@ -207,13 +209,15 @@ func Execute(schema *TemplateSchema, projectName, startDate string, dueDate *str
 			}
 
 			// Apply defaults, then override with work item config
-			durationMode := domain.CoalesceStr(wc.DurationMode, defaultDurationMode(schema.Defaults), "estimate")
-			minSession := domain.IntFromPtrWithDefault(15, SessionPolicyField(wc.SessionPolicy, "min"), SessionPolicyField(defaultSessionPolicy(schema.Defaults), "min"))
-			maxSession := domain.IntFromPtrWithDefault(60, SessionPolicyField(wc.SessionPolicy, "max"), SessionPolicyField(defaultSessionPolicy(schema.Defaults), "max"))
-			defSession := domain.IntFromPtrWithDefault(30, SessionPolicyField(wc.SessionPolicy, "default"), SessionPolicyField(defaultSessionPolicy(schema.Defaults), "default"))
-			splittable := domain.BoolFromPtrWithDefault(true, SessionPolicySplittable(wc.SessionPolicy), SessionPolicySplittable(defaultSessionPolicy(schema.Defaults)))
-			plannedMin := domain.IntFromPtrWithDefault(0, wc.PlannedMin)
-			estimateConf := domain.Float64FromPtrWithDefault(0.5, wc.EstimateConf)
+			resolved := generation.ResolveWorkItemDefaults(
+				generation.WorkItemDefaultsInput{
+					DurationMode:       wc.DurationMode,
+					SessionPolicy:      wc.SessionPolicy,
+					PlannedMin:         wc.PlannedMin,
+					EstimateConfidence: wc.EstimateConf,
+				},
+				defaults,
+			)
 
 			var unitsKind string
 			var unitsTotal int
@@ -247,14 +251,14 @@ func Execute(schema *TemplateSchema, projectName, startDate string, dueDate *str
 				Title:              title,
 				Type:               wc.Type,
 				Status:             domain.WorkItemTodo,
-				DurationMode:       domain.DurationMode(durationMode),
-				PlannedMin:         plannedMin,
+				DurationMode:       domain.DurationMode(resolved.DurationMode),
+				PlannedMin:         resolved.PlannedMin,
 				DurationSource:     domain.SourceTemplate,
-				EstimateConfidence: estimateConf,
-				MinSessionMin:      minSession,
-				MaxSessionMin:      maxSession,
-				DefaultSessionMin:  defSession,
-				Splittable:         splittable,
+				EstimateConfidence: resolved.EstimateConfidence,
+				MinSessionMin:      resolved.MinSessionMin,
+				MaxSessionMin:      resolved.MaxSessionMin,
+				DefaultSessionMin:  resolved.DefaultSessionMin,
+				Splittable:         resolved.Splittable,
 				UnitsKind:          unitsKind,
 				UnitsTotal:         unitsTotal,
 				DueDate:            wiDueDate,
@@ -269,6 +273,9 @@ func Execute(schema *TemplateSchema, projectName, startDate string, dueDate *str
 			return nil, err
 		}
 	}
+
+	// Assign deterministic sequence IDs in tree order.
+	generation.AssignSequentialIDs(nodes, workItems)
 
 	// Generate dependencies.
 	// If omitted, infer a default linear chain by node order, then work item order.
@@ -569,20 +576,6 @@ func tokenizeExprIdentifiers(expr string) []string {
 	return names
 }
 
-func defaultDurationMode(d *DefaultsConfig) string {
-	if d != nil {
-		return d.DurationMode
-	}
-	return ""
-}
-
-func defaultSessionPolicy(d *DefaultsConfig) *SessionPolicyConfig {
-	if d != nil {
-		return d.SessionPolicy
-	}
-	return nil
-}
-
 // inferTemplateDeps builds DependencyCandidate entries from domain objects
 // and delegates to the shared InferLinearDependencies algorithm.
 func inferTemplateDeps(nodes []*domain.PlanNode, workItems []*domain.WorkItem) []domain.Dependency {
@@ -593,9 +586,9 @@ func inferTemplateDeps(nodes []*domain.PlanNode, workItems []*domain.WorkItem) [
 		nodeOrder[n.ID] = n.OrderIndex
 	}
 
-	candidates := make([]DependencyCandidate, 0, len(workItems))
+	candidates := make([]generation.DependencyCandidate, 0, len(workItems))
 	for i, wi := range workItems {
-		candidates = append(candidates, DependencyCandidate{
+		candidates = append(candidates, generation.DependencyCandidate{
 			ID:        wi.ID,
 			NodeOrder: nodeOrder[wi.NodeID],
 			NodePos:   nodePos[wi.NodeID],
@@ -603,5 +596,5 @@ func inferTemplateDeps(nodes []*domain.PlanNode, workItems []*domain.WorkItem) [
 		})
 	}
 
-	return InferLinearDependencies(candidates)
+	return generation.InferLinearDependencies(candidates)
 }

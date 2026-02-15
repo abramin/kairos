@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/importer"
 	"github.com/alexanderramin/kairos/internal/repository"
 )
@@ -13,6 +14,7 @@ type importService struct {
 	nodes     repository.PlanNodeRepo
 	workItems repository.WorkItemRepo
 	deps      repository.DependencyRepo
+	uow       db.UnitOfWork
 }
 
 func NewImportService(
@@ -20,12 +22,14 @@ func NewImportService(
 	nodes repository.PlanNodeRepo,
 	workItems repository.WorkItemRepo,
 	deps repository.DependencyRepo,
+	uow db.UnitOfWork,
 ) ImportService {
 	return &importService{
 		projects:  projects,
 		nodes:     nodes,
 		workItems: workItems,
 		deps:      deps,
+		uow:       uow,
 	}
 }
 
@@ -51,26 +55,38 @@ func (s *importService) importSchema(ctx context.Context, schema *importer.Impor
 		return nil, fmt.Errorf("converting import schema: %w", err)
 	}
 
-	if err := s.projects.Create(ctx, generated.Project); err != nil {
-		return nil, fmt.Errorf("creating project: %w", err)
-	}
+	err = s.uow.WithinTx(ctx, func(ctx context.Context, tx db.DBTX) error {
+		txProjects := repository.NewSQLiteProjectRepo(tx)
+		txNodes := repository.NewSQLitePlanNodeRepo(tx)
+		txWorkItems := repository.NewSQLiteWorkItemRepo(tx)
+		txDeps := repository.NewSQLiteDependencyRepo(tx)
 
-	for _, node := range generated.Nodes {
-		if err := s.nodes.Create(ctx, node); err != nil {
-			return nil, fmt.Errorf("creating node %q: %w", node.Title, err)
+		if err := txProjects.Create(ctx, generated.Project); err != nil {
+			return fmt.Errorf("creating project: %w", err)
 		}
-	}
 
-	for _, wi := range generated.WorkItems {
-		if err := s.workItems.Create(ctx, wi); err != nil {
-			return nil, fmt.Errorf("creating work item %q: %w", wi.Title, err)
+		for _, node := range generated.Nodes {
+			if err := txNodes.Create(ctx, node); err != nil {
+				return fmt.Errorf("creating node %q: %w", node.Title, err)
+			}
 		}
-	}
 
-	for _, dep := range generated.Dependencies {
-		if err := s.deps.Create(ctx, &dep); err != nil {
-			return nil, fmt.Errorf("creating dependency: %w", err)
+		for _, wi := range generated.WorkItems {
+			if err := txWorkItems.Create(ctx, wi); err != nil {
+				return fmt.Errorf("creating work item %q: %w", wi.Title, err)
+			}
 		}
+
+		for _, dep := range generated.Dependencies {
+			if err := txDeps.Create(ctx, &dep); err != nil {
+				return fmt.Errorf("creating dependency: %w", err)
+			}
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	return &ImportResult{

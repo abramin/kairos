@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 )
 
@@ -26,12 +27,12 @@ const workItemColumnsAliased = `w.id, w.node_id, w.title, w.type, w.status, w.ar
 
 // SQLiteWorkItemRepo implements WorkItemRepo using a SQLite database.
 type SQLiteWorkItemRepo struct {
-	db *sql.DB
+	db db.DBTX
 }
 
 // NewSQLiteWorkItemRepo creates a new SQLiteWorkItemRepo.
-func NewSQLiteWorkItemRepo(db *sql.DB) *SQLiteWorkItemRepo {
-	return &SQLiteWorkItemRepo{db: db}
+func NewSQLiteWorkItemRepo(conn db.DBTX) *SQLiteWorkItemRepo {
+	return &SQLiteWorkItemRepo{db: conn}
 }
 
 func (r *SQLiteWorkItemRepo) Create(ctx context.Context, w *domain.WorkItem) error {

@@ -6,17 +6,18 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 )
 
 // SQLiteProjectRepo implements ProjectRepo using a SQLite database.
 type SQLiteProjectRepo struct {
-	db *sql.DB
+	db db.DBTX
 }
 
 // NewSQLiteProjectRepo creates a new SQLiteProjectRepo.
-func NewSQLiteProjectRepo(db *sql.DB) *SQLiteProjectRepo {
-	return &SQLiteProjectRepo{db: db}
+func NewSQLiteProjectRepo(conn db.DBTX) *SQLiteProjectRepo {
+	return &SQLiteProjectRepo{db: conn}
 }
 
 func (r *SQLiteProjectRepo) Create(ctx context.Context, p *domain.Project) error {

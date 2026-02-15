@@ -159,8 +159,8 @@ func assertSchemaContractHolds(
 	}
 
 	// Contract 4: Schema must import into the DB via ImportService.
-	projRepo, nodeRepo, wiRepo, depRepo, sessRepo, profRepo := setupRepos(t)
-	importSvc := NewImportService(projRepo, nodeRepo, wiRepo, depRepo)
+	projRepo, nodeRepo, wiRepo, depRepo, sessRepo, profRepo, uow := setupRepos(t)
+	importSvc := NewImportService(projRepo, nodeRepo, wiRepo, depRepo, uow)
 	result, err := importSvc.ImportProjectFromSchema(ctx, schema)
 	require.NoError(t, err, "%s: import failed", producer)
 	require.NotNil(t, result.Project, "%s: import returned nil project", producer)
@@ -211,7 +211,7 @@ func assertWhatNowRecommends(
 ) {
 	t.Helper()
 
-	whatNowSvc := NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo)
+	whatNowSvc := NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo)
 	now := time.Now().UTC()
 	req := contract.NewWhatNowRequest(90)
 	req.Now = &now

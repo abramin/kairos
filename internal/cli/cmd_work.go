@@ -9,6 +9,7 @@ import (
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/domain"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 )
 
 // resolveItemTitle fetches the work item title and seq, falling back to a truncated ID.
@@ -247,17 +248,33 @@ func (c *commandBar) addSelectNode(title string, minutesArg int) tea.Cmd {
 
 func (c *commandBar) addAfterNode(nodeID, title string, minutesArg int) tea.Cmd {
 	if minutesArg > 0 {
-		return c.addExecute(nodeID, title, minutesArg)
+		return c.addGetDueDate(nodeID, title, minutesArg)
 	}
 
 	var result string
 	form := wizardInputDuration(60, &result)
 	return startWizardCmd(c.state, "Duration", form, func() tea.Cmd {
-		return c.addExecute(nodeID, title, parsePositiveInt(result, 60))
+		return c.addGetDueDate(nodeID, title, parsePositiveInt(result, 60))
 	})
 }
 
-func (c *commandBar) addExecute(nodeID, title string, minutes int) tea.Cmd {
+func (c *commandBar) addGetDueDate(nodeID, title string, minutes int) tea.Cmd {
+	var dueDate string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Due Date (YYYY-MM-DD, blank for none)").
+				Placeholder("2025-06-30").
+				Value(&dueDate).
+				Validate(validateOptionalDate),
+		),
+	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
+	return startWizardCmd(c.state, "Due Date", form, func() tea.Cmd {
+		return c.addExecute(nodeID, title, minutes, dueDate)
+	})
+}
+
+func (c *commandBar) addExecute(nodeID, title string, minutes int, dueDate string) tea.Cmd {
 	ctx := context.Background()
 
 	cobraArgs := []string{"work", "add",
@@ -265,6 +282,9 @@ func (c *commandBar) addExecute(nodeID, title string, minutes int) tea.Cmd {
 		"--title", title,
 		"--type", "task",
 		"--planned-min", strconv.Itoa(minutes),
+	}
+	if dueDate != "" {
+		cobraArgs = append(cobraArgs, "--due-date", dueDate)
 	}
 	output := c.cobraCapture(cobraArgs)
 

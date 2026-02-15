@@ -4,18 +4,20 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 )
 
 // SQLiteDependencyRepo implements DependencyRepo using a SQLite database.
 type SQLiteDependencyRepo struct {
-	db *sql.DB
+	db db.DBTX
 }
 
 // NewSQLiteDependencyRepo creates a new SQLiteDependencyRepo.
-func NewSQLiteDependencyRepo(db *sql.DB) *SQLiteDependencyRepo {
-	return &SQLiteDependencyRepo{db: db}
+func NewSQLiteDependencyRepo(conn db.DBTX) *SQLiteDependencyRepo {
+	return &SQLiteDependencyRepo{db: conn}
 }
 
 func (r *SQLiteDependencyRepo) Create(ctx context.Context, d *domain.Dependency) error {
@@ -69,6 +71,44 @@ func (r *SQLiteDependencyRepo) HasUnfinishedPredecessors(ctx context.Context, wo
 		return false, fmt.Errorf("checking unfinished predecessors: %w", err)
 	}
 	return count > 0, nil
+}
+
+func (r *SQLiteDependencyRepo) ListBlockedWorkItemIDs(ctx context.Context, candidateIDs []string) (map[string]bool, error) {
+	if len(candidateIDs) == 0 {
+		return make(map[string]bool), nil
+	}
+
+	placeholders := make([]string, len(candidateIDs))
+	args := make([]any, len(candidateIDs))
+	for i, id := range candidateIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	query := `SELECT DISTINCT d.successor_work_item_id
+		FROM dependencies d
+		JOIN work_items w ON d.predecessor_work_item_id = w.id
+		WHERE d.successor_work_item_id IN (` + strings.Join(placeholders, ",") + `)
+		  AND w.status NOT IN ('done', 'skipped', 'archived')`
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("listing blocked work item IDs: %w", err)
+	}
+	defer rows.Close()
+
+	blocked := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scanning blocked work item ID: %w", err)
+		}
+		blocked[id] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating blocked work item IDs: %w", err)
+	}
+	return blocked, nil
 }
 
 // scanDependencies scans multiple dependency rows from *sql.Rows.

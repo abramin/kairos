@@ -304,10 +304,28 @@ func newEditWorkItemView(state *SharedState, itemID, title string) View {
 }
 
 // newAddWorkItemView creates a wizard form for adding a new work item to a node.
-// Collects title and planned duration, then creates via the service layer.
+// Collects title, type, planned duration, and optional due date, then creates
+// via the service layer. The DB write runs synchronously inside done() so that
+// the subsequent refreshViewMsg sees the committed row.
 func newAddWorkItemView(state *SharedState, nodeID string) View {
 	var newTitle string
 	newDuration := "60"
+	itemType := "task"
+	var dueDate string
+
+	typeOptions := []huh.Option[string]{
+		huh.NewOption("Reading", "reading"),
+		huh.NewOption("Zettel", "zettel"),
+		huh.NewOption("Practice", "practice"),
+		huh.NewOption("Review", "review"),
+		huh.NewOption("Assignment", "assignment"),
+		huh.NewOption("Task", "task"),
+		huh.NewOption("Quiz", "quiz"),
+		huh.NewOption("Study", "study"),
+		huh.NewOption("Training", "training"),
+		huh.NewOption("Activity", "activity"),
+		huh.NewOption("Submission", "submission"),
+	}
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -321,6 +339,10 @@ func newAddWorkItemView(state *SharedState, nodeID string) View {
 					}
 					return nil
 				}),
+			huh.NewSelect[string]().
+				Title("Type").
+				Options(typeOptions...).
+				Value(&itemType),
 		),
 		huh.NewGroup(
 			huh.NewInput().
@@ -328,24 +350,34 @@ func newAddWorkItemView(state *SharedState, nodeID string) View {
 				Placeholder("60").
 				Value(&newDuration).
 				Validate(validatePositiveInt),
+			huh.NewInput().
+				Title("Due Date (YYYY-MM-DD, blank for none)").
+				Placeholder("2025-06-30").
+				Value(&dueDate).
+				Validate(validateOptionalDate),
 		),
 	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
 
 	done := func() tea.Cmd {
+		dur := parsePositiveInt(newDuration, 60)
+
+		w := &domain.WorkItem{
+			NodeID:     nodeID,
+			Title:      newTitle,
+			Type:       itemType,
+			PlannedMin: dur,
+		}
+		if dueDate != "" {
+			if t, err := time.Parse("2006-01-02", dueDate); err == nil {
+				w.DueDate = &t
+			}
+		}
+		if err := state.App.WorkItems.Create(context.Background(), w); err != nil {
+			return func() tea.Msg { return formErrorOutput(err) }
+		}
+
+		state.SetActiveItem(w.ID, w.Title, w.Seq)
 		return func() tea.Msg {
-			dur := parsePositiveInt(newDuration, 60)
-
-			w := &domain.WorkItem{
-				NodeID:     nodeID,
-				Title:      newTitle,
-				Type:       "task",
-				PlannedMin: dur,
-			}
-			if err := state.App.WorkItems.Create(context.Background(), w); err != nil {
-				return formErrorOutput(err)
-			}
-
-			state.SetActiveItem(w.ID, w.Title, w.Seq)
 			return formSuccessOutput(fmt.Sprintf("%s Added: %s (%s)",
 				formatter.StyleGreen.Render("✔"),
 				formatter.Bold(newTitle),

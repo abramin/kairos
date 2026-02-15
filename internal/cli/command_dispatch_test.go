@@ -414,6 +414,57 @@ func TestCommandBar_ImportUseInspectWhatNow(t *testing.T) {
 	assert.Equal(t, projects[0].ID, cb.state.ActiveProjectID)
 }
 
+func TestCommandBar_ProjectImport_EmitsRefreshForDashboard(t *testing.T) {
+	app := testAppFull(t)
+	ctx := context.Background()
+
+	importJSON := `{
+		"project": {
+			"short_id": "RFS01",
+			"name": "Refresh Test",
+			"domain": "education",
+			"start_date": "2026-01-15"
+		},
+		"nodes": [
+			{"ref": "n1", "title": "Week 1", "kind": "week", "order": 0}
+		],
+		"work_items": [
+			{"ref": "w1", "node_ref": "n1", "title": "Read", "type": "reading", "planned_min": 60}
+		]
+	}`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "import.json")
+	require.NoError(t, os.WriteFile(path, []byte(importJSON), 0o644))
+
+	cb := testCommandBar(t, app)
+	cmd := cb.executeCommand("project import " + path)
+	require.NotNil(t, cmd)
+
+	msg := cmd()
+	batch, ok := msg.(tea.BatchMsg)
+	require.True(t, ok, "expected tea.BatchMsg, got %T", msg)
+
+	var gotOutput, gotRefresh bool
+	for _, c := range batch {
+		if c == nil {
+			continue
+		}
+		switch c().(type) {
+		case cmdOutputMsg:
+			gotOutput = true
+		case refreshViewMsg:
+			gotRefresh = true
+		}
+	}
+	assert.True(t, gotOutput, "project import should emit command output")
+	assert.True(t, gotRefresh, "project import should emit refreshViewMsg")
+
+	projects, err := app.Projects.List(ctx, false)
+	require.NoError(t, err)
+	require.Len(t, projects, 1)
+	assert.Equal(t, "RFS01", projects[0].ShortID)
+}
+
 func TestCommandBar_UseContextScopesScheduling(t *testing.T) {
 	app := testApp(t)
 	ctx := context.Background()

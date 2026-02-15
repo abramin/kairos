@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/contract"
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/alexanderramin/kairos/internal/testutil"
@@ -21,18 +22,20 @@ func setupRepos(t *testing.T) (
 	repository.DependencyRepo,
 	repository.SessionRepo,
 	repository.UserProfileRepo,
+	db.UnitOfWork,
 ) {
-	db := testutil.NewTestDB(t)
-	return repository.NewSQLiteProjectRepo(db),
-		repository.NewSQLitePlanNodeRepo(db),
-		repository.NewSQLiteWorkItemRepo(db),
-		repository.NewSQLiteDependencyRepo(db),
-		repository.NewSQLiteSessionRepo(db),
-		repository.NewSQLiteUserProfileRepo(db)
+	database := testutil.NewTestDB(t)
+	return repository.NewSQLiteProjectRepo(database),
+		repository.NewSQLitePlanNodeRepo(database),
+		repository.NewSQLiteWorkItemRepo(database),
+		repository.NewSQLiteDependencyRepo(database),
+		repository.NewSQLiteSessionRepo(database),
+		repository.NewSQLiteUserProfileRepo(database),
+		testutil.NewTestUoW(database)
 }
 
 func TestWhatNow_CriticalDeadline_OnlyCriticalRecommended(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -68,7 +71,7 @@ func TestWhatNow_CriticalDeadline_OnlyCriticalRecommended(t *testing.T) {
 	)
 	require.NoError(t, sessions.Create(ctx, sessB))
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -82,7 +85,7 @@ func TestWhatNow_CriticalDeadline_OnlyCriticalRecommended(t *testing.T) {
 }
 
 func TestWhatNow_Balanced_IncludesSecondaryProject(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -124,7 +127,7 @@ func TestWhatNow_Balanced_IncludesSecondaryProject(t *testing.T) {
 	)
 	require.NoError(t, sessions.Create(ctx, sessB))
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(90)
 	req.Now = &now
 
@@ -140,7 +143,7 @@ func TestWhatNow_Balanced_IncludesSecondaryProject(t *testing.T) {
 }
 
 func TestWhatNow_ArchivedItemsExcluded(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -165,7 +168,7 @@ func TestWhatNow_ArchivedItemsExcluded(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wiArchived))
 	require.NoError(t, workItems.Archive(ctx, wiArchived.ID))
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -178,7 +181,7 @@ func TestWhatNow_ArchivedItemsExcluded(t *testing.T) {
 }
 
 func TestWhatNow_DeterministicOutput(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -197,7 +200,7 @@ func TestWhatNow_DeterministicOutput(t *testing.T) {
 		require.NoError(t, workItems.Create(ctx, wi))
 	}
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(90)
 	req.Now = &now
 
@@ -217,7 +220,7 @@ func TestWhatNow_DeterministicOutput(t *testing.T) {
 }
 
 func TestWhatNow_BaselineFloor_PreventsSpuriousCritical(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -240,7 +243,7 @@ func TestWhatNow_BaselineFloor_PreventsSpuriousCritical(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wi))
 	// No sessions logged — recentDailyMin = 0
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -252,7 +255,7 @@ func TestWhatNow_BaselineFloor_PreventsSpuriousCritical(t *testing.T) {
 }
 
 func TestWhatNow_BaselineZero_AllowsCritical(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	// Set baseline to 0 to disable the floor
@@ -277,7 +280,7 @@ func TestWhatNow_BaselineZero_AllowsCritical(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wi))
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -289,7 +292,7 @@ func TestWhatNow_BaselineZero_AllowsCritical(t *testing.T) {
 }
 
 func TestWhatNow_BackLoadedProject_NotFalseCritical(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -346,7 +349,7 @@ func TestWhatNow_BackLoadedProject_NotFalseCritical(t *testing.T) {
 	)
 	require.NoError(t, sessions.Create(ctx, sess))
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -361,7 +364,7 @@ func TestWhatNow_BackLoadedProject_NotFalseCritical(t *testing.T) {
 }
 
 func TestWhatNow_DeadlineUpdate_ChangesRiskAndRanking(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -384,7 +387,7 @@ func TestWhatNow_DeadlineUpdate_ChangesRiskAndRanking(t *testing.T) {
 	require.NoError(t, sessions.Create(ctx, sess))
 
 	// First request: should be balanced (comfortable deadline, has recent activity)
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -408,7 +411,7 @@ func TestWhatNow_DeadlineUpdate_ChangesRiskAndRanking(t *testing.T) {
 // UserProfile scoring weights actually changes recommendation ordering.
 // This is the only personalization mechanism — zero coverage without this test.
 func TestWhatNow_UserProfileWeightsAffectOrdering(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -451,7 +454,7 @@ func TestWhatNow_UserProfileWeightsAffectOrdering(t *testing.T) {
 	)
 	require.NoError(t, sessions.Create(ctx, sessB))
 
-	svc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles)
 
 	// --- Weight set 1: Heavy deadline pressure, zero spacing/variation ---
 	profile, err := profiles.Get(ctx)

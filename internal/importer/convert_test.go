@@ -272,6 +272,15 @@ func TestConvert_DateParsing(t *testing.T) {
 	assert.Equal(t, 4, int(gen.WorkItems[0].NotBefore.Month()))
 }
 
+func TestConvert_InvalidOptionalDateReturnsError(t *testing.T) {
+	schema := validMinimalSchema()
+	schema.Nodes[0].DueDate = ptrStr("invalid-date")
+
+	_, err := Convert(schema)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "nodes[0].due_date")
+}
+
 func TestConvert_DurationSourceAlwaysManual(t *testing.T) {
 	schema := &ImportSchema{
 		Project: ProjectImport{

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/alexanderramin/kairos/internal/contract"
+	"github.com/alexanderramin/kairos/internal/app"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/alexanderramin/kairos/internal/scheduler"
@@ -32,7 +32,7 @@ func NewReplanService(
 	}
 }
 
-func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) (*contract.ReplanResponse, error) {
+func (s *replanService) Replan(ctx context.Context, req app.ReplanRequest) (*app.ReplanResponse, error) {
 	now := time.Now().UTC()
 	if req.Now != nil {
 		now = *req.Now
@@ -63,13 +63,13 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 	}
 
 	if len(activeProjects) == 0 {
-		return nil, &contract.ReplanError{
-			Code:    contract.ReplanErrNoActiveProjects,
+		return nil, &app.ReplanError{
+			Code:    app.ReplanErrNoActiveProjects,
 			Message: "no active projects to replan",
 		}
 	}
 
-	var deltas []contract.ProjectReplanDelta
+	var deltas []app.ProjectReplanDelta
 	hasCritical := false
 
 	for _, p := range activeProjects {
@@ -91,19 +91,15 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 		// Re-estimate work items with units tracking
 		changedCount := 0
 		for _, item := range items {
-			if item.Status == domain.WorkItemArchived || item.Status == domain.WorkItemDone {
+			if !item.EligibleForReestimate() {
 				continue
 			}
-			if item.UnitsTotal > 0 && item.UnitsDone > 0 && item.DurationMode == domain.DurationEstimate {
-				newPlanned := scheduler.SmoothReEstimate(item.PlannedMin, item.LoggedMin, item.UnitsTotal, item.UnitsDone)
-				if newPlanned != item.PlannedMin {
-					item.PlannedMin = newPlanned
-					item.UpdatedAt = now
-					if err := s.workItems.Update(ctx, item); err != nil {
-						return nil, fmt.Errorf("updating work item %s: %w", item.ID, err)
-					}
-					changedCount++
+			newPlanned := scheduler.SmoothReEstimate(item.PlannedMin, item.LoggedMin, item.UnitsTotal, item.UnitsDone)
+			if item.ApplyReestimate(newPlanned, now) {
+				if err := s.workItems.Update(ctx, item); err != nil {
+					return nil, fmt.Errorf("updating work item %s: %w", item.ID, err)
 				}
+				changedCount++
 			}
 		}
 
@@ -115,7 +111,7 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 			hasCritical = true
 		}
 
-		delta := contract.ProjectReplanDelta{
+		delta := app.ProjectReplanDelta{
 			ProjectID:              p.ID,
 			ProjectName:            p.Name,
 			RiskBefore:             riskBefore.Level,
@@ -135,7 +131,7 @@ func (s *replanService) Replan(ctx context.Context, req contract.ReplanRequest) 
 		globalMode = domain.ModeCritical
 	}
 
-	resp := &contract.ReplanResponse{
+	resp := &app.ReplanResponse{
 		GeneratedAt:        now,
 		Trigger:            req.Trigger,
 		Strategy:           strategy,

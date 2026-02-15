@@ -203,10 +203,15 @@ func (v *taskListView) toggleDone(row taskRow) tea.Cmd {
 		if err != nil {
 			return taskListLoadedMsg{err: err}
 		}
+		now := time.Now().UTC()
 		if item.Status == domain.WorkItemDone {
-			item.Status = domain.WorkItemTodo
+			if err := item.Reopen(now); err != nil {
+				return taskListLoadedMsg{err: err}
+			}
 		} else {
-			item.Status = domain.WorkItemDone
+			if err := item.MarkDone(now); err != nil {
+				return taskListLoadedMsg{err: err}
+			}
 		}
 		if err := app.WorkItems.Update(ctx, item); err != nil {
 			return taskListLoadedMsg{err: err}
@@ -368,6 +373,9 @@ func (v *taskListView) renderRow(row taskRow, isCursor bool, colWidth int) strin
 		progress := ""
 		if row.planned > 0 {
 			pct := float64(row.logged) / float64(row.planned)
+			if (row.status == domain.WorkItemDone || row.status == domain.WorkItemSkipped) && pct < 1.0 {
+				pct = 1.0
+			}
 			progress = " " + formatter.RenderProgress(pct, 6)
 		}
 

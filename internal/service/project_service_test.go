@@ -11,7 +11,7 @@ import (
 )
 
 func TestProjectService_Create_ValidShortID(t *testing.T) {
-	projects, _, _, _, _, _ := setupRepos(t)
+	projects, _, _, _, _, _, _ := setupRepos(t)
 	ctx := context.Background()
 
 	svc := NewProjectService(projects)
@@ -35,7 +35,7 @@ func TestProjectService_Create_ValidShortID(t *testing.T) {
 }
 
 func TestProjectService_Create_InvalidShortID(t *testing.T) {
-	projects, _, _, _, _, _ := setupRepos(t)
+	projects, _, _, _, _, _, _ := setupRepos(t)
 	ctx := context.Background()
 
 	svc := NewProjectService(projects)
@@ -67,7 +67,7 @@ func TestProjectService_Create_InvalidShortID(t *testing.T) {
 }
 
 func TestProjectService_Delete_RequiresArchiveFirst(t *testing.T) {
-	projects, _, _, _, _, _ := setupRepos(t)
+	projects, _, _, _, _, _, _ := setupRepos(t)
 	ctx := context.Background()
 
 	svc := NewProjectService(projects)
@@ -86,7 +86,7 @@ func TestProjectService_Delete_RequiresArchiveFirst(t *testing.T) {
 }
 
 func TestProjectService_Delete_ForceBypassesGuard(t *testing.T) {
-	projects, _, _, _, _, _ := setupRepos(t)
+	projects, _, _, _, _, _, _ := setupRepos(t)
 	ctx := context.Background()
 
 	svc := NewProjectService(projects)

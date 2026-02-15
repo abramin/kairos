@@ -289,16 +289,16 @@ func TestGenerateShortID(t *testing.T) {
 func TestRunStructureWizard_BasicFlow(t *testing.T) {
 	// Simulate user input for: 1 group, 3 modules, 7 days each, 1 work item, no special nodes.
 	input := strings.Join([]string{
-		"",          // groups = 1 (default)
-		"Chapter",   // label
-		"3",         // count
-		"module",    // kind
-		"7",         // days per node
-		"Reading",   // work item title
-		"reading",   // work item type
-		"60",        // estimated minutes
-		"",          // done with work items
-		"",          // no special nodes
+		"",        // groups = 1 (default)
+		"Chapter", // label
+		"3",       // count
+		"module",  // kind
+		"7",       // days per node
+		"Reading", // work item title
+		"reading", // work item type
+		"60",      // estimated minutes
+		"",        // done with work items
+		"",        // no special nodes
 	}, "\n") + "\n"
 
 	result, err := runStructureWizard(strings.NewReader(input))
@@ -320,23 +320,23 @@ func TestRunStructureWizard_BasicFlow(t *testing.T) {
 
 func TestRunStructureWizard_TwoGroups(t *testing.T) {
 	input := strings.Join([]string{
-		"2",            // 2 groups
-		"A2 Module",    // group 1 label
-		"9",            // group 1 count
-		"",             // group 1 kind = default module
-		"10",           // group 1 days
-		"B1 Module",    // group 2 label
-		"11",           // group 2 count
-		"",             // group 2 kind = default module
-		"14",           // group 2 days
-		"Exercises",    // work item
-		"practice",     // type
-		"45",           // minutes
-		"Grammar",      // work item 2
-		"review",       // type
-		"30",           // minutes
-		"",             // done with work items
-		"",             // no special nodes
+		"2",         // 2 groups
+		"A2 Module", // group 1 label
+		"9",         // group 1 count
+		"",          // group 1 kind = default module
+		"10",        // group 1 days
+		"B1 Module", // group 2 label
+		"11",        // group 2 count
+		"",          // group 2 kind = default module
+		"14",        // group 2 days
+		"Exercises", // work item
+		"practice",  // type
+		"45",        // minutes
+		"Grammar",   // work item 2
+		"review",    // type
+		"30",        // minutes
+		"",          // done with work items
+		"",          // no special nodes
 	}, "\n") + "\n"
 
 	result, err := runStructureWizard(strings.NewReader(input))
@@ -420,6 +420,7 @@ func TestDraftWizard_FullPipeline(t *testing.T) {
 
 	// Step 4: Import into a real in-memory DB.
 	db := testutil.NewTestDB(t)
+	uow := testutil.NewTestUoW(db)
 	projRepo := repository.NewSQLiteProjectRepo(db)
 	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
 	wiRepo := repository.NewSQLiteWorkItemRepo(db)
@@ -427,17 +428,17 @@ func TestDraftWizard_FullPipeline(t *testing.T) {
 	sessRepo := repository.NewSQLiteSessionRepo(db)
 	profRepo := repository.NewSQLiteUserProfileRepo(db)
 
-	importSvc := service.NewImportService(projRepo, nodeRepo, wiRepo, depRepo)
+	importSvc := service.NewImportService(projRepo, nodeRepo, wiRepo, depRepo, uow)
 	ctx := context.Background()
 
 	importResult, err := importSvc.ImportProjectFromSchema(ctx, schema)
 	require.NoError(t, err)
 	assert.Equal(t, "Physics Study Plan", importResult.Project.Name)
-	assert.Equal(t, 4, importResult.NodeCount)    // 3 chapters + 1 final exam
+	assert.Equal(t, 4, importResult.NodeCount)     // 3 chapters + 1 final exam
 	assert.Equal(t, 7, importResult.WorkItemCount) // 3*2 regular + 1 exam prep
 
 	// Step 5: Verify items are schedulable via what-now.
-	whatNowSvc := service.NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo)
+	whatNowSvc := service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo)
 	req := contract.NewWhatNowRequest(120)
 	resp, err := whatNowSvc.Recommend(ctx, req)
 	require.NoError(t, err)

@@ -1,0 +1,360 @@
+{
+    "project": {
+        "short_id": "JOL-L1",
+        "name": "Joy of Living - Level 1: Calming the Mind",
+        "domain": "education",
+        "start_date": "2026-07-01"
+    },
+    "defaults": {
+        "duration_mode": "estimate",
+        "session_policy": {
+            "min_session_min": 5,
+            "max_session_min": 30,
+            "default_session_min": 15,
+            "splittable": true
+        }
+    },
+    "nodes": [
+        {
+            "ref": "level1",
+            "title": "Level 1: Calming the Mind",
+            "kind": "stage",
+            "order": 1
+        },
+        {
+            "ref": "module2",
+            "title": "1.1 Recognizing Awareness",
+            "kind": "module",
+            "parent_ref": "level1",
+            "order": 2
+        },
+        {
+            "ref": "module3",
+            "title": "1.2 Everything Is Meditation",
+            "kind": "module",
+            "parent_ref": "level1",
+            "order": 3
+        },
+        {
+            "ref": "module4",
+            "title": "1.3 Emotional Balance",
+            "kind": "module",
+            "parent_ref": "level1",
+            "order": 4
+        }
+    ],
+    "work_items": [
+        {
+            "ref": "section1",
+            "node_ref": "module2",
+            "title": "Section 1: Finding Happiness Within",
+            "type": "practice",
+            "planned_min": 35,
+            "session_policy": {
+                "min_session_min": 5,
+                "max_session_min": 5,
+                "splittable": true
+            },
+            "notes": "Practice 5 min/day for 2 days"
+        },
+        {
+            "ref": "section2",
+            "node_ref": "module2",
+            "title": "Section 2: Inner Balance",
+            "type": "practice",
+            "planned_min": 70,
+            "session_policy": {
+                "min_session_min": 10,
+                "max_session_min": 10,
+                "splittable": true
+            },
+            "notes": "Practice 10 min/day for 3 days"
+        },
+        {
+            "ref": "section3",
+            "node_ref": "module2",
+            "title": "Section 3: Anywhere, Anytime",
+            "type": "practice",
+            "planned_min": 70,
+            "session_policy": {
+                "min_session_min": 10,
+                "max_session_min": 10,
+                "splittable": true
+            },
+            "notes": "Practice 10 min/day for 3 days"
+        },
+        {
+            "ref": "section4",
+            "node_ref": "module2",
+            "title": "Section 4: The Waterfall of Thoughts",
+            "type": "practice",
+            "planned_min": 70,
+            "session_policy": {
+                "min_session_min": 10,
+                "max_session_min": 10,
+                "splittable": true
+            },
+            "notes": "Practice 10 min/day for 3 days"
+        },
+        {
+            "ref": "section5",
+            "node_ref": "module2",
+            "title": "Section 5: It's all about awareness",
+            "type": "practice",
+            "planned_min": 105,
+            "session_policy": {
+                "min_session_min": 15,
+                "max_session_min": 15,
+                "splittable": true
+            },
+            "notes": "Practice 15 min/day for 4 days"
+        },
+        {
+            "ref": "section6",
+            "node_ref": "module2",
+            "title": "Section 6: Non-Meditation, Non-Distraction",
+            "type": "practice",
+            "planned_min": 105,
+            "session_policy": {
+                "min_session_min": 15,
+                "max_session_min": 15,
+                "splittable": true
+            },
+            "notes": "Practice 15 min/day for 4 days"
+        },
+        {
+            "ref": "section7",
+            "node_ref": "module2",
+            "title": "Section 7: Short times, Many Times",
+            "type": "practice",
+            "planned_min": 105,
+            "session_policy": {
+                "min_session_min": 15,
+                "max_session_min": 15,
+                "splittable": true
+            },
+            "notes": "Practice 15 min/day for 4 days"
+        },
+        {
+            "ref": "section8",
+            "node_ref": "module2",
+            "title": "Section 8: From Doing to Being",
+            "type": "practice",
+            "planned_min": 140,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 20,
+                "splittable": true
+            },
+            "notes": "Practice 20 min/day for 5 days"
+        },
+        {
+            "ref": "section9",
+            "node_ref": "module3",
+            "title": "Section 1: Meditating with Visual Objects",
+            "type": "practice",
+            "planned_min": 105,
+            "session_policy": {
+                "min_session_min": 15,
+                "max_session_min": 15,
+                "splittable": true
+            },
+            "notes": "Practice 15 min/day for 4 days"
+        },
+        {
+            "ref": "section10",
+            "node_ref": "module3",
+            "title": "Section 2: Making Everything Meaningul",
+            "type": "practice",
+            "planned_min": 140,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 20,
+                "splittable": true
+            },
+            "notes": "Practice 20 min/day for 5 days"
+        },
+        {
+            "ref": "section11",
+            "node_ref": "module3",
+            "title": "Section 3: Making Meditation a Habit",
+            "type": "practice",
+            "planned_min": 140,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 20,
+                "splittable": true
+            },
+            "notes": "Practice 20 min/day for 5 days"
+        },
+        {
+            "ref": "section12",
+            "node_ref": "module3",
+            "title": "Section 4: Non-Meditation",
+            "type": "practice",
+            "planned_min": 140,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 20,
+                "splittable": true
+            },
+            "notes": "Practice 20 min/day for 5 days"
+        },
+        {
+            "ref": "section13",
+            "node_ref": "module3",
+            "title": "Section 5: The Problem is the Solution",
+            "type": "practice",
+            "planned_min": 140,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 20,
+                "splittable": true
+            },
+            "notes": "Practice 20 min/day for 6 days"
+        },
+        {
+            "ref": "section14",
+            "node_ref": "module3",
+            "title": "Section 6: The Ups and Downs of Meditation ",
+            "type": "practice",
+            "planned_min": 140,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 20,
+                "splittable": true
+            },
+            "notes": "Practice 20 min/day for 6 days"
+        },
+        {
+            "ref": "section15",
+            "node_ref": "module3",
+            "title": "Section 7: Energy Movement",
+            "type": "practice",
+            "planned_min": 140,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 20,
+                "splittable": true
+            },
+            "notes": "Practice 20 min/day for 6 days"
+        },
+        {
+            "ref": "section16",
+            "node_ref": "module3",
+            "title": "Section 8: Key Points of Meditation ",
+            "type": "practice",
+            "planned_min": 140,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 20,
+                "splittable": true
+            },
+            "notes": "Practice 20 min/day for 7 days"
+        },
+        {
+            "ref": "section17",
+            "node_ref": "module4",
+            "title": "Section 1: Transforming Thoughts",
+            "type": "practice",
+            "planned_min": 140,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 20,
+                "splittable": true
+            },
+            "notes": "Practice 20 min/day for 7 days"
+        },
+        {
+            "ref": "section18",
+            "node_ref": "module4",
+            "title": "Section 2: It's just a thought",
+            "type": "practice",
+            "planned_min": 175,
+            "session_policy": {
+                "min_session_min": 25,
+                "max_session_min": 25,
+                "splittable": true
+            },
+            "notes": "Practice 25 min/day for 7 days"
+        },
+        {
+            "ref": "section19",
+            "node_ref": "module4",
+            "title": "Section 3: Embracing Difficulties",
+            "type": "practice",
+            "planned_min": 175,
+            "session_policy": {
+                "min_session_min": 25,
+                "max_session_min": 25,
+                "splittable": true
+            },
+            "notes": "Practice 25 min/day for 7 days"
+        },
+        {
+            "ref": "section20",
+            "node_ref": "module4",
+            "title": "Section 4: Transforming Emotions",
+            "type": "practice",
+            "planned_min": 175,
+            "session_policy": {
+                "min_session_min": 25,
+                "max_session_min": 25,
+                "splittable": true
+            },
+            "notes": "Practice 25 min/day for 7 days"
+        },
+        {
+            "ref": "section21",
+            "node_ref": "module4",
+            "title": "Section 5: Everything is your Friend",
+            "type": "practice",
+            "planned_min": 175,
+            "session_policy": {
+                "min_session_min": 25,
+                "max_session_min": 25,
+                "splittable": true
+            },
+            "notes": "Practice 25 min/day for 7 days"
+        },
+        {
+            "ref": "section22",
+            "node_ref": "module4",
+            "title": "Section 6: Choiceless Awareness",
+            "type": "practice",
+            "planned_min": 175,
+            "session_policy": {
+                "min_session_min": 25,
+                "max_session_min": 25,
+                "splittable": true
+            },
+            "notes": "Practice 25 min/day for 7 days"
+        },
+        {
+            "ref": "section23",
+            "node_ref": "module4",
+            "title": "Section 7: Freedom from Within",
+            "type": "practice",
+            "planned_min": 175,
+            "session_policy": {
+                "min_session_min": 25,
+                "max_session_min": 25,
+                "splittable": true
+            },
+            "notes": "Practice 25 min/day for 7 days"
+        },
+        {
+            "ref": "section24",
+            "node_ref": "module4",
+            "title": "Section 8: Stillness, Movement, Awareness",
+            "type": "practice",
+            "planned_min": 175,
+            "session_policy": {
+                "min_session_min": 25,
+                "max_session_min": 25,
+                "splittable": true
+            },
+            "notes": "Practice 25 min/day for 7 days"
+        }
+    ]
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 )
 
@@ -16,12 +17,12 @@ const planNodeColumns = `id, project_id, parent_id, title, kind, order_index,
 
 // SQLitePlanNodeRepo implements PlanNodeRepo using a SQLite database.
 type SQLitePlanNodeRepo struct {
-	db *sql.DB
+	db db.DBTX
 }
 
 // NewSQLitePlanNodeRepo creates a new SQLitePlanNodeRepo.
-func NewSQLitePlanNodeRepo(db *sql.DB) *SQLitePlanNodeRepo {
-	return &SQLitePlanNodeRepo{db: db}
+func NewSQLitePlanNodeRepo(conn db.DBTX) *SQLitePlanNodeRepo {
+	return &SQLitePlanNodeRepo{db: conn}
 }
 
 func (r *SQLitePlanNodeRepo) Create(ctx context.Context, n *domain.PlanNode) error {

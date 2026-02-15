@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -97,4 +98,42 @@ func TestShellProjectCache_FallsBackToUUIDPrefix(t *testing.T) {
 	suggestions := cb.projectSuggestions("")
 	require.NotEmpty(t, suggestions)
 	assert.Equal(t, projects[0].ID[:8], suggestions[0])
+}
+
+func TestCommandBar_UpdateSuggestions_PrunesExactMatch(t *testing.T) {
+	app := testApp(t)
+	cb := testCommandBar(t, app)
+
+	cb.input.SetValue("add")
+	cb.updateSuggestions()
+
+	assert.Empty(t, cb.input.MatchedSuggestions(), "exact match should not remain as a suggestion")
+}
+
+func TestCommandBar_UpdateSuggestions_UsesFullLineForSubcommands(t *testing.T) {
+	app := testApp(t)
+	cb := testCommandBar(t, app)
+
+	cb.input.SetValue("project a")
+	cb.updateSuggestions()
+
+	assert.Contains(t, cb.input.MatchedSuggestions(), "project add")
+}
+
+func TestCommandBar_TabCompletion_StaysInteractiveAfterExactMatch(t *testing.T) {
+	app := testApp(t)
+	cb := testCommandBar(t, app)
+	cb.Focus()
+
+	cb.input.SetValue("a")
+	cb.updateSuggestions()
+	require.Contains(t, cb.input.MatchedSuggestions(), "add")
+
+	_ = cb.Update(tea.KeyMsg{Type: tea.KeyTab})
+	assert.Equal(t, "add", cb.input.Value())
+	assert.Empty(t, cb.input.MatchedSuggestions(), "cursor should remain visible after completing exact match")
+
+	_ = cb.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	_ = cb.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	assert.Equal(t, "add x", cb.input.Value())
 }

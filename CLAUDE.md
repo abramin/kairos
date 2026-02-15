@@ -25,6 +25,13 @@ make clean                                            # remove built binary + co
 go test -run TestFunctionName ./internal/scheduler/   # single test
 ```
 
+## Local Dev Setup
+
+```bash
+export KAIROS_DB="$PWD/.kairos/kairos.db"
+export KAIROS_TEMPLATES="$PWD/templates"
+```
+
 ## Architecture
 
 ### Package Dependency Graph
@@ -34,15 +41,17 @@ cmd/kairos/main.go              (CLI entry point — wires all deps, runs Cobra 
   ↓
 internal/cli/                    (Cobra command definitions + App struct + shell REPL)
   ├→ internal/cli/formatter/     (terminal output: tables, trees, colors, progress bars)
-  ├→ internal/service/           (orchestrates repos + scheduler)
+  ├→ internal/app/               (use-case interfaces + domain-oriented request/response types)
+  ├→ internal/service/           (orchestrates repos + scheduler, implements app/ interfaces)
   │    ├→ internal/contract/     (transport-agnostic request/response DTOs)
-  │    ├→ internal/repository/   (SQLite data access via interfaces)
+  │    ├→ internal/repository/   (SQLite data access via interfaces, accepts db.DBTX)
   │    │    ├→ internal/domain/  (entity structs + enums)
-  │    │    └→ internal/db/      (OpenDB, migrations, WAL+FK config)
+  │    │    └→ internal/db/      (OpenDB, migrations, WAL+FK config, DBTX, UnitOfWork)
   │    ├→ internal/scheduler/    (pure scoring/allocation functions — NO DB calls)
   │    │    └→ internal/domain/
   │    ├→ internal/template/     (JSON template parsing + expression evaluation + validation)
-  │    └→ internal/importer/     (JSON import schema validation + domain conversion)
+  │    ├→ internal/importer/     (JSON import schema validation + domain conversion)
+  │    └→ internal/generation/   (shared defaults resolution + dependency inference)
   └→ internal/intelligence/      (v2 LLM-powered services: intent, explain, template/project draft)
        ├→ internal/llm/          (Ollama HTTP client, structured JSON extraction, config)
        └→ internal/importer/     (validates draft output against import schema)
@@ -67,9 +76,13 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 
 **`internal/repository`** — Six interfaces (`ProjectRepo`, `PlanNodeRepo`, `WorkItemRepo`, `DependencyRepo`, `SessionRepo`, `UserProfileRepo`) with SQLite implementations prefixed `SQLite*Repo`. Key query: `WorkItemRepo.ListSchedulable()` joins work_items + plan_nodes + projects for scoring input. `SessionRepo` also provides `ListRecentByProject()` and `ListRecentSummaryByType()` for review/replan features.
 
-**`internal/service`** — Eight service interfaces wired via constructor injection (`NewWhatNowService(repos...)`). `ImportService` validates and converts JSON import files into domain objects. Core orchestration flow in `WhatNowService.Recommend()`: load candidates → compute risk per project → determine mode → score → sort → allocate.
+**`internal/service`** — Eight service interfaces wired via constructor injection (`NewWhatNowService(repos...)`). `ImportService` validates and converts JSON import files into domain objects. Core orchestration flow in `WhatNowService.Recommend()`: load candidates → compute risk per project → determine mode → score → sort → allocate. The pipeline is decomposed into reusable stages in `recommend_pipeline.go` (`ContextLoader`, `ComputeAggregates`, `BlockResolver`, `ScoreCandidates`, `AssembleResponse`) — these stages are shared by Status and Replan services.
 
-**`internal/db`** — `OpenDB(path)` opens SQLite (`:memory:` for tests), enables WAL mode + foreign keys, runs migrations. Schema has 6 tables with indexes, soft-delete via `archived_at`. Migrations include `short_id` column on `projects` (unique index) and `baseline_daily_min` on `user_profile`.
+**`internal/db`** — `OpenDB(path)` opens SQLite (`:memory:` for tests), enables WAL mode + foreign keys, runs migrations. Schema has 6 tables with indexes, soft-delete via `archived_at`. Migrations include `short_id` column on `projects` (unique index) and `baseline_daily_min` on `user_profile`. `DBTX` interface abstracts over `*sql.DB` and `*sql.Tx` so repositories can operate within transactions. `UnitOfWork` (`SQLiteUnitOfWork`) provides `WithinTx()` for atomic multi-entity operations (e.g., import creates project + nodes + items + dependencies in one transaction).
+
+**`internal/app`** — Use-case layer with domain-oriented request/response types and interface definitions. Provides `WhatNowUseCase`, `StatusUseCase`, `ReplanUseCase`, `LogSessionUseCase`, `InitProjectUseCase`, `ImportProjectUseCase` interfaces. Types (`WhatNowRequest`/`WhatNowResponse`, `StatusRequest`/`StatusResponse`, `ReplanRequest`/`ReplanResponse`) are the canonical API contracts; `internal/contract` re-exports them. Domain-aware error types (`WhatNowError`, `StatusError`, `ReplanError`) with structured codes.
+
+**`internal/generation`** — Shared helpers for resolving work-item defaults and dependencies across both template and import paths. `ResolveWorkItemDefaults()` applies a 3-level cascade (item → node/defaults → hardcoded). `InferLinearDependencies()` creates predecessor→successor links from node/position ordering. `SessionPolicy` interface bridges template and import schema types without circular dependencies.
 
 **`internal/template`** — JSON template schema types (`TemplateSchema`, `NodeConfig`, `WorkItemConfig`) and expression evaluation. `EvalExpr()` handles arithmetic with variables (e.g., `(i-1)*7`), `ExpandTemplate()` expands `{expr}` placeholders in template strings. Used by `TemplateService` to scaffold project structures from JSON files in `templates/`.
 
@@ -131,11 +144,20 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 ### Data Flow: what-now Recommendation Pipeline
 
 ```
-SchedulableCandidate (from repo)
-  → ScoreWorkItem() → ScoredCandidate (with score + reasons)
+WhatNowRequest
+  → ContextLoader.Load() → RecommendationContext (candidates, sessions, profile)
+  → ComputeAggregates() → ProjectAggregates (per-project risk, planned/logged)
+  → DetermineMode() → Critical | Balanced
+  → BlockResolver.Resolve() → (unblocked candidates, blockers)
+  → ScoreCandidates() → []ScoredCandidate (6 weighted factors + reasons)
   → CanonicalSort() → deterministic ordering
-  → AllocateSlices() → []WorkSlice + []ConstraintBlocker
+  → AllocateSlices() → []WorkSlice + allocation blockers
+  → AssembleResponse() → WhatNowResponse
 ```
+
+### CLI ↔ App Layer Adapters
+
+`app_ports.go` provides adapter methods on `App` that resolve to use-case interfaces (e.g., `a.logSessionUseCase()` returns `App.LogSession` if set, else falls back to `App.Sessions`). This enables dependency injection and gradual refactoring. `app_contract_mapper.go` maps between `app/` types and `contract/` types, currently near-identity but allows future divergence.
 
 ### v2 Intelligence: LLM Integration Pattern
 
@@ -167,6 +189,8 @@ Key design patterns:
 5. **Replanning is explicit** — user-triggered or command-triggered, no background daemon
 6. **Templates scaffold upfront** — full node/work-item tree generated at init, not lazy-loaded
 7. **Re-estimation via smoothing** — `new_planned = 0.7*old + 0.3*implied` from unit pace; never hard-jump
+8. **DBTX abstraction** — repositories accept `db.DBTX` (satisfied by both `*sql.DB` and `*sql.Tx`), enabling transactional composition via `UnitOfWork.WithinTx()`
+9. **Pipeline decomposition** — WhatNow recommendation broken into reusable stages (`ContextLoader`, `BlockResolver`, `ScoreCandidates`, etc.) shared by Status/Replan services
 
 ## Contract Invariants
 

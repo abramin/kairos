@@ -33,6 +33,7 @@ func newWorkCmd(app *App) *cobra.Command {
 func newWorkAddCmd(app *App) *cobra.Command {
 	var (
 		nodeID, title, typ, unitsKind      string
+		dueDateStr                         string
 		plannedMin, minSession, maxSession int
 		defaultSession, unitsTotal         int
 		splittable                         bool
@@ -59,6 +60,14 @@ func newWorkAddCmd(app *App) *cobra.Command {
 				UpdatedAt:         time.Now(),
 			}
 
+			if dueDateStr != "" {
+				t, err := time.Parse("2006-01-02", dueDateStr)
+				if err != nil {
+					return fmt.Errorf("invalid due date %q (use YYYY-MM-DD): %w", dueDateStr, err)
+				}
+				w.DueDate = &t
+			}
+
 			if err := app.WorkItems.Create(context.Background(), w); err != nil {
 				return err
 			}
@@ -72,6 +81,7 @@ func newWorkAddCmd(app *App) *cobra.Command {
 	cmd.Flags().StringVar(&title, "title", "", "Work item title")
 	cmd.Flags().StringVar(&typ, "type", "", "Work item type")
 	cmd.Flags().IntVar(&plannedMin, "planned-min", 0, "Planned duration in minutes")
+	cmd.Flags().StringVar(&dueDateStr, "due-date", "", "Due date (YYYY-MM-DD)")
 	cmd.Flags().IntVar(&minSession, "min-session", 0, "Minimum session length in minutes")
 	cmd.Flags().IntVar(&maxSession, "max-session", 0, "Maximum session length in minutes")
 	cmd.Flags().IntVar(&defaultSession, "default-session", 0, "Default session length in minutes")

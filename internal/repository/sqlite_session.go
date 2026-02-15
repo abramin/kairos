@@ -6,17 +6,18 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 )
 
 // SQLiteSessionRepo implements SessionRepo using a SQLite database.
 type SQLiteSessionRepo struct {
-	db *sql.DB
+	db db.DBTX
 }
 
 // NewSQLiteSessionRepo creates a new SQLiteSessionRepo.
-func NewSQLiteSessionRepo(db *sql.DB) *SQLiteSessionRepo {
-	return &SQLiteSessionRepo{db: db}
+func NewSQLiteSessionRepo(conn db.DBTX) *SQLiteSessionRepo {
+	return &SQLiteSessionRepo{db: conn}
 }
 
 func (r *SQLiteSessionRepo) Create(ctx context.Context, s *domain.WorkSessionLog) error {

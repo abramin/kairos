@@ -27,6 +27,7 @@ type dashboardDetailData struct {
 	project    *domain.Project
 	statusView *contract.ProjectStatusView
 	itemCounts struct{ total, done, inProgress, todo int }
+	taskRows   []taskRow // flattened task tree for preview in detail pane
 }
 
 // ── messages ─────────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ func newDashboardView(state *SharedState) *dashboardView {
 	}
 }
 
-func (v *dashboardView) ID() ViewID { return ViewDashboard }
+func (v *dashboardView) ID() ViewID    { return ViewDashboard }
 func (v *dashboardView) Title() string { return "Dashboard" }
 
 func (v *dashboardView) ShortHelp() []key.Binding {
@@ -157,11 +158,15 @@ func (v *dashboardView) loadSelectedDetail() tea.Cmd {
 			}
 		}
 
+		// Build flattened task tree for the detail pane preview.
+		taskRows, _ := buildTaskRows(ctx, app, projectID)
+
 		return dashboardDetailLoadedMsg{
 			data: &dashboardDetailData{
 				project:    project,
 				statusView: sv,
 				itemCounts: counts,
+				taskRows:   taskRows,
 			},
 		}
 	}
@@ -264,7 +269,16 @@ func (v *dashboardView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // ── view rendering ───────────────────────────────────────────────────────────
 
-const dashLeftPaneWidth = 36
+const dashLeftPaneWidth = 44
+
+// Column widths for project list rows.
+const (
+	colIndicatorW = 2  // ▸ (selected) or risk glyph
+	colShortIDW   = 8  // e.g. "PHI01" padded
+	colNameW      = 15 // truncated with …
+	colBarW       = 10 // compact progress blocks
+	colPctW       = 5  // e.g. " 40%"
+)
 
 func (v *dashboardView) View() string {
 	if v.loading {
@@ -294,9 +308,20 @@ func (v *dashboardView) View() string {
 
 	// Decide layout: split pane vs. single column.
 	useSplit := v.state.Width >= 80
+	contentHeight := v.state.ContentHeight()
+	badgeLines := strings.Count(b.String(), "\n")
+	paneHeight := contentHeight - badgeLines
+	if paneHeight < 5 {
+		paneHeight = 5
+	}
+
+	rightWidth := v.state.Width - dashLeftPaneWidth - 3
+	if rightWidth < 20 {
+		rightWidth = 20
+	}
 
 	leftPane := v.renderLeftPane(active)
-	rightPane := v.renderRightPane()
+	rightPane := v.renderRightPane(paneHeight, rightWidth)
 
 	if !useSplit {
 		b.WriteString(leftPane)
@@ -305,18 +330,18 @@ func (v *dashboardView) View() string {
 		return b.String()
 	}
 
-	rightWidth := v.state.Width - dashLeftPaneWidth - 3
-	if rightWidth < 20 {
-		rightWidth = 20
+	leftCol := lipgloss.NewStyle().Width(dashLeftPaneWidth).Height(paneHeight).Render(leftPane)
+
+	// Full-height divider
+	divLines := make([]string, paneHeight)
+	for i := range divLines {
+		divLines[i] = " " + formatter.Dim("│") + " "
 	}
+	divider := strings.Join(divLines, "\n")
 
-	leftCol := lipgloss.NewStyle().Width(dashLeftPaneWidth).Render(leftPane)
-	divider := lipgloss.NewStyle().
-		Foreground(lipgloss.Color(formatter.ColorDim)).
-		Render("│")
-	rightCol := lipgloss.NewStyle().Width(rightWidth).Render(rightPane)
+	rightCol := lipgloss.NewStyle().Width(rightWidth).Height(paneHeight).Render(rightPane)
 
-	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, leftCol, " "+divider+" ", rightCol))
+	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, leftCol, divider, rightCol))
 
 	return b.String()
 }
@@ -337,48 +362,80 @@ func (v *dashboardView) renderLeftPane(projects []*domain.Project) string {
 	b.WriteString(formatter.StyleHeader.Render("PROJECTS") + "\n\n")
 
 	for i, p := range projects {
-		cursor := "  "
-		nameStyle := formatter.StyleFg
-		if i == v.cursor {
-			cursor = formatter.StyleGreen.Render("▸ ")
-			nameStyle = formatter.StyleBold
-		}
-
-		shortID := domain.DisplayID(p.ShortID, p.ID)
-		name := p.Name
-		if len(name) > 16 {
-			name = name[:15] + "…"
-		}
-
-		progress := progressMap[p.ID]
-		progressBar := formatter.RenderProgress(progress, 6)
-
-		risk := riskMap[p.ID]
-		riskDot := formatter.Dim("·")
-		switch risk {
-		case domain.RiskCritical:
-			riskDot = formatter.StyleRed.Render("●")
-		case domain.RiskAtRisk:
-			riskDot = formatter.StyleYellow.Render("●")
-		case domain.RiskOnTrack:
-			riskDot = formatter.StyleGreen.Render("●")
-		}
-
-		b.WriteString(fmt.Sprintf("%s%-7s %s %s %s\n",
-			cursor,
-			formatter.StyleGreen.Render(shortID),
-			nameStyle.Render(padRight(name, 16)),
-			progressBar,
-			riskDot,
-		))
+		row := v.renderProjectRow(p, i == v.cursor, riskMap[p.ID], progressMap[p.ID])
+		b.WriteString(row + "\n")
 	}
 
 	return b.String()
 }
 
+// renderProjectRow renders a single fixed-width project row for the sidebar.
+func (v *dashboardView) renderProjectRow(
+	p *domain.Project, selected bool, risk domain.RiskLevel, progress float64,
+) string {
+	// Indicator (2 chars): selection marker when selected, risk glyph otherwise.
+	var indicator string
+	if selected {
+		indicator = formatter.StyleGreen.Render("▸ ")
+	} else {
+		switch risk {
+		case domain.RiskOnTrack:
+			indicator = formatter.StyleGreen.Render("✔ ")
+		case domain.RiskAtRisk:
+			indicator = formatter.StyleYellow.Render("○ ")
+		case domain.RiskCritical:
+			indicator = formatter.StyleRed.Render("▲ ")
+		default:
+			indicator = formatter.Dim("· ")
+		}
+	}
+	indicatorCol := lipgloss.NewStyle().Width(colIndicatorW).Render(indicator)
+
+	// ShortID (8 chars, always dim).
+	shortID := p.DisplayID()
+	shortIDCol := lipgloss.NewStyle().Foreground(formatter.ColorDim).Width(colShortIDW).Render(shortID)
+
+	// Name (15 chars, truncated with ellipsis, bold when selected).
+	name := p.Name
+	if len(name) > colNameW {
+		name = name[:colNameW-1] + "…"
+	}
+	nameStyle := lipgloss.NewStyle().Foreground(formatter.ColorFg).Width(colNameW)
+	if selected {
+		nameStyle = nameStyle.Bold(true)
+	}
+	nameCol := nameStyle.Render(name)
+
+	// Compact progress bar (10 chars, dimmed when not selected).
+	barCol := formatter.RenderCompactBar(progress, colBarW, !selected)
+
+	// Percentage (5 chars, dimmed when not selected).
+	pctVal := progress * 100
+	if pctVal > 999 {
+		pctVal = 999
+	}
+	pctStr := fmt.Sprintf("%3.0f%%", pctVal)
+	pctStyle := lipgloss.NewStyle().Width(colPctW).Foreground(formatter.ColorDim)
+	if selected {
+		pctStyle = pctStyle.Foreground(formatter.ColorFg)
+	}
+	pctCol := pctStyle.Render(pctStr)
+
+	// Assemble row with lipgloss for ANSI-aware alignment.
+	row := lipgloss.JoinHorizontal(lipgloss.Left,
+		indicatorCol, shortIDCol, nameCol, barCol, pctCol,
+	)
+
+	if selected {
+		row = lipgloss.NewStyle().Background(formatter.ColorBg2).Width(dashLeftPaneWidth).Render(row)
+	}
+
+	return row
+}
+
 // ── right pane: project detail ───────────────────────────────────────────────
 
-func (v *dashboardView) renderRightPane() string {
+func (v *dashboardView) renderRightPane(contentHeight, rightWidth int) string {
 	if v.detailLoading {
 		return formatter.Dim("Loading details...")
 	}
@@ -442,5 +499,100 @@ func (v *dashboardView) renderRightPane() string {
 		formatter.StyleBlue.Render(fmt.Sprintf("%d", d.itemCounts.todo)),
 	))
 
+	// Task tree preview
+	statsLines := strings.Count(b.String(), "\n")
+	availForTasks := contentHeight - statsLines - 4 // header + truncation hint + padding
+	if availForTasks > 0 {
+		b.WriteString(v.renderTaskPreview(availForTasks, rightWidth))
+	}
+
 	return b.String()
+}
+
+// ── task tree preview (read-only) ────────────────────────────────────────────
+
+func (v *dashboardView) renderTaskPreview(maxLines, maxWidth int) string {
+	if v.detailData == nil || len(v.detailData.taskRows) == 0 {
+		return ""
+	}
+
+	// Filter out default node rows (same as taskListView.visibleRows).
+	var visible []taskRow
+	for _, r := range v.detailData.taskRows {
+		if r.isNode && r.isDefault {
+			continue
+		}
+		visible = append(visible, r)
+	}
+	if len(visible) == 0 {
+		return ""
+	}
+
+	var b strings.Builder
+	b.WriteString("\n" + formatter.StyleHeader.Render("TASKS") + "\n\n")
+
+	truncated := false
+	if len(visible) > maxLines {
+		visible = visible[:maxLines]
+		truncated = true
+	}
+
+	for _, row := range visible {
+		b.WriteString(v.renderPreviewRow(row, maxWidth))
+		b.WriteByte('\n')
+	}
+
+	if truncated {
+		total := len(v.detailData.taskRows)
+		b.WriteString(formatter.Dim(fmt.Sprintf("  ... %d more (enter to view all)", total-maxLines)))
+		b.WriteByte('\n')
+	}
+
+	return b.String()
+}
+
+func (v *dashboardView) renderPreviewRow(row taskRow, maxWidth int) string {
+	indent := strings.Repeat("  ", row.depth)
+
+	var line string
+	if row.isNode {
+		line = fmt.Sprintf("  %s%s %s",
+			indent,
+			formatter.Dim("▾"),
+			formatter.StyleBold.Render(row.title)+" "+formatter.Dim(string(row.kind)),
+		)
+	} else {
+		statusIcon := " "
+		switch row.status {
+		case domain.WorkItemDone:
+			statusIcon = formatter.StyleGreen.Render("✓")
+		case domain.WorkItemInProgress:
+			statusIcon = formatter.StyleYellow.Render("▶")
+		case domain.WorkItemSkipped:
+			statusIcon = formatter.Dim("—")
+		}
+
+		progress := ""
+		if row.planned > 0 {
+			pct := float64(row.logged) / float64(row.planned)
+			if (row.status == domain.WorkItemDone || row.status == domain.WorkItemSkipped) && pct < 1.0 {
+				pct = 1.0
+			}
+			progress = " " + formatter.RenderProgress(pct, 6)
+		}
+
+		seqStr := ""
+		if row.seq > 0 {
+			seqStr = formatter.Dim(fmt.Sprintf("#%d ", row.seq))
+		}
+
+		line = fmt.Sprintf("  %s%s %s%s%s",
+			indent, statusIcon, seqStr, row.title, progress,
+		)
+	}
+
+	if maxWidth > 0 {
+		line = lipgloss.NewStyle().MaxWidth(maxWidth).Render(line)
+	}
+	return line
 }

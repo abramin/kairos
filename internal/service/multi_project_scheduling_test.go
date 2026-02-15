@@ -17,7 +17,7 @@ import (
 // at-risk (due next week), and on-track (due in 3 months).
 // Verifies critical mode → complete critical → balanced mode with variation.
 func TestMultiProject_ThreeProjectsMixedRisk_VariationEnforced(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -49,7 +49,7 @@ func TestMultiProject_ThreeProjectsMixedRisk_VariationEnforced(t *testing.T) {
 		testutil.WithPlannedMin(100), testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, workItems.Create(ctx, wiC))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 
 	// Phase 1: Critical mode — only project A should be recommended.
 	req := contract.NewWhatNowRequest(120)
@@ -94,7 +94,7 @@ func TestMultiProject_ThreeProjectsMixedRisk_VariationEnforced(t *testing.T) {
 // all projects are on-track with sufficient available time and variation
 // enforcement, recommendations span at least 2 projects.
 func TestMultiProject_AllOnTrack_VariationDistributesWork(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -121,7 +121,7 @@ func TestMultiProject_AllOnTrack_VariationDistributesWork(t *testing.T) {
 		require.NoError(t, sessions.Create(ctx, sess))
 	}
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(180) // 3 hours = plenty of time
 	req.Now = &now
 	req.EnforceVariation = true
@@ -144,7 +144,7 @@ func TestMultiProject_AllOnTrack_VariationDistributesWork(t *testing.T) {
 // blocking works correctly when the predecessor and successor items are
 // in projects with different risk levels.
 func TestMultiProject_DependenciesAcrossRiskLevels(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -178,7 +178,7 @@ func TestMultiProject_DependenciesAcrossRiskLevels(t *testing.T) {
 		SuccessorWorkItemID:   wiDependent.ID,
 	}))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 

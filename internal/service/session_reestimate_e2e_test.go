@@ -16,11 +16,11 @@ import (
 // import project → what-now → log session with units → verify re-estimation → replan → verify convergence.
 // This catches integration issues between session logging, re-estimation smoothing, and replan.
 func TestSessionLogReEstimation_E2E(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	// === Step 1: Import a project with units tracking ===
-	importSvc := NewImportService(projects, nodes, workItems, deps)
+	importSvc := NewImportService(projects, nodes, workItems, deps, uow)
 	targetDate := "2026-06-01"
 	pm120 := 120
 	pm90 := 90
@@ -89,7 +89,7 @@ func TestSessionLogReEstimation_E2E(t *testing.T) {
 	originalPlannedMin := readingItem.PlannedMin
 
 	// === Step 2: What-now should recommend the project ===
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 	req.ProjectScope = []string{result.Project.ID}
@@ -101,7 +101,7 @@ func TestSessionLogReEstimation_E2E(t *testing.T) {
 	// === Step 3: Log session with units on the reading item ===
 	// 30 min for 2 chapters → implied pace = 15 min/chapter → 150 min for 10 chapters
 	// Smooth: round(0.7*120 + 0.3*150) = round(84 + 45) = 129
-	sessionSvc := NewSessionService(sessions, workItems)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 	sess := &domain.WorkSessionLog{
 		WorkItemID:     readingItem.ID,
 		StartedAt:      now.Add(-time.Hour),

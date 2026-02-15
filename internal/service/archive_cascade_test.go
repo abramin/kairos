@@ -16,7 +16,7 @@ import (
 // causes all its work items to be excluded from ListSchedulable() and
 // WhatNow recommendations.
 func TestArchiveProject_ExcludesFromScheduling(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -53,7 +53,7 @@ func TestArchiveProject_ExcludesFromScheduling(t *testing.T) {
 	}
 
 	// WhatNow should not recommend archived project items.
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 
@@ -77,7 +77,7 @@ func TestArchiveProject_ExcludesFromScheduling(t *testing.T) {
 // TestArchiveProject_ExcludesFromStatus verifies that StatusService omits
 // archived projects from the status summary.
 func TestArchiveProject_ExcludesFromStatus(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -121,7 +121,7 @@ func TestArchiveProject_ExcludesFromStatus(t *testing.T) {
 // TestArchiveProject_UnarchiveRestoresScheduling verifies that unarchiving
 // a project causes its items to reappear in scheduling.
 func TestArchiveProject_UnarchiveRestoresScheduling(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -150,7 +150,7 @@ func TestArchiveProject_UnarchiveRestoresScheduling(t *testing.T) {
 	assert.Len(t, candidates, 1, "item should reappear after unarchive")
 
 	// Verify WhatNow works.
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 	resp, err := whatNowSvc.Recommend(ctx, req)
@@ -168,7 +168,7 @@ func TestArchiveProject_UnarchiveRestoresScheduling(t *testing.T) {
 // Note: Kairos uses behavioral archival (SQL filters), not DB-level cascade.
 // Work items don't get archived_at set - they're excluded via `p.archived_at IS NOT NULL` JOIN.
 func TestE2E_ArchiveProject_FullWorkflow(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, _ := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -196,7 +196,7 @@ func TestE2E_ArchiveProject_FullWorkflow(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wi3))
 
 	// Create session logs
-	sessionSvc := NewSessionService(sessions, workItems)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 	session1 := &domain.WorkSessionLog{
 		WorkItemID: wi1.ID,
 		StartedAt:  now.Add(-2 * time.Hour),
@@ -291,7 +291,7 @@ func TestE2E_ArchiveProject_FullWorkflow(t *testing.T) {
 // TestArchiveWorkItem_ExcludesFromSchedulingOnly verifies that archiving a
 // single work item excludes only that item, while sibling items remain schedulable.
 func TestArchiveWorkItem_ExcludesFromSchedulingOnly(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -319,7 +319,7 @@ func TestArchiveWorkItem_ExcludesFromSchedulingOnly(t *testing.T) {
 	assert.Equal(t, wiActive.ID, candidates[0].WorkItem.ID)
 
 	// WhatNow should only recommend the surviving item.
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 	resp, err := whatNowSvc.Recommend(ctx, req)

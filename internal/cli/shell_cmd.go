@@ -19,7 +19,7 @@ var destructiveCommands = map[string]map[string]bool{
 
 func runShell(app *App) error {
 	m := newAppModel(app)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err := p.Run()
 	return err
 }

@@ -18,7 +18,7 @@ import (
 // - C remains blocked until B is done
 // Tests through the service layer (not just repo).
 func TestDependencyBlocked_ChainABC(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -57,7 +57,7 @@ func TestDependencyBlocked_ChainABC(t *testing.T) {
 		SuccessorWorkItemID:   wiC.ID,
 	}))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 	req.ProjectScope = []string{proj.ID}
@@ -122,7 +122,7 @@ func TestDependencyBlocked_ChainABC(t *testing.T) {
 // TestDependencyBlocked_SkippedPredecessorUnblocks verifies that marking a predecessor
 // as "skipped" also unblocks the successor (not just "done").
 func TestDependencyBlocked_SkippedPredecessorUnblocks(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -150,7 +150,7 @@ func TestDependencyBlocked_SkippedPredecessorUnblocks(t *testing.T) {
 		SuccessorWorkItemID:   wiB.ID,
 	}))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 	req.ProjectScope = []string{proj.ID}
@@ -174,7 +174,7 @@ func TestDependencyBlocked_SkippedPredecessorUnblocks(t *testing.T) {
 // TestDependencyBlocked_DiamondDependency verifies a diamond dependency pattern:
 // A → B, A → C, B → D, C → D. D requires both B and C to complete.
 func TestDependencyBlocked_DiamondDependency(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -213,7 +213,7 @@ func TestDependencyBlocked_DiamondDependency(t *testing.T) {
 		}))
 	}
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 	req.ProjectScope = []string{proj.ID}

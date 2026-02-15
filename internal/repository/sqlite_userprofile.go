@@ -5,17 +5,18 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 )
 
 // SQLiteUserProfileRepo implements UserProfileRepo using a SQLite database.
 type SQLiteUserProfileRepo struct {
-	db *sql.DB
+	db db.DBTX
 }
 
 // NewSQLiteUserProfileRepo creates a new SQLiteUserProfileRepo.
-func NewSQLiteUserProfileRepo(db *sql.DB) *SQLiteUserProfileRepo {
-	return &SQLiteUserProfileRepo{db: db}
+func NewSQLiteUserProfileRepo(conn db.DBTX) *SQLiteUserProfileRepo {
+	return &SQLiteUserProfileRepo{db: conn}
 }
 
 func (r *SQLiteUserProfileRepo) Get(ctx context.Context) (*domain.UserProfile, error) {

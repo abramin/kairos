@@ -16,7 +16,7 @@ import (
 // does NOT decrement the work item's logged_min. This is intentional: session
 // deletion is atomic and does not trigger compensating updates.
 func TestSessionDelete_DoesNotRollBackLoggedMin(t *testing.T) {
-	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	projRepo, nodes, wiRepo, _, sessRepo, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	proj := testutil.NewTestProject("Deletion Test")
@@ -29,7 +29,7 @@ func TestSessionDelete_DoesNotRollBackLoggedMin(t *testing.T) {
 		testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo)
+	svc := NewSessionService(sessRepo, wiRepo, uow)
 
 	// Log a session — logged_min should increase.
 	sess := testutil.NewTestSession(wi.ID, 45)
@@ -52,7 +52,7 @@ func TestSessionDelete_DoesNotRollBackLoggedMin(t *testing.T) {
 // TestSessionDelete_DoesNotAffectReEstimation documents that deleting a session
 // with units does NOT reverse the re-estimation that occurred during logging.
 func TestSessionDelete_DoesNotAffectReEstimation(t *testing.T) {
-	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	projRepo, nodes, wiRepo, _, sessRepo, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	proj := testutil.NewTestProject("Re-Est Deletion")
@@ -68,7 +68,7 @@ func TestSessionDelete_DoesNotAffectReEstimation(t *testing.T) {
 		testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo)
+	svc := NewSessionService(sessRepo, wiRepo, uow)
 
 	// Log session: 60 min for 3 chapters → pace = 20 min/ch → implied = 200
 	// Smooth: round(0.7*100 + 0.3*200) = 130
@@ -93,7 +93,7 @@ func TestSessionDelete_DoesNotAffectReEstimation(t *testing.T) {
 // TestSessionDelete_SessionNoLongerListed verifies that a deleted session
 // no longer appears in ListByWorkItem or ListRecent queries.
 func TestSessionDelete_SessionNoLongerListed(t *testing.T) {
-	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	projRepo, nodes, wiRepo, _, sessRepo, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	proj := testutil.NewTestProject("List After Delete")
@@ -106,7 +106,7 @@ func TestSessionDelete_SessionNoLongerListed(t *testing.T) {
 		testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo)
+	svc := NewSessionService(sessRepo, wiRepo, uow)
 
 	// Log two sessions.
 	sess1 := testutil.NewTestSession(wi.ID, 30)
@@ -139,7 +139,7 @@ func TestSessionDelete_SessionNoLongerListed(t *testing.T) {
 // TestSessionDelete_WorkItemStatusPreserved documents that deleting a session
 // does not revert the work item's auto-transitioned status.
 func TestSessionDelete_WorkItemStatusPreserved(t *testing.T) {
-	projRepo, nodes, wiRepo, _, sessRepo, _ := setupRepos(t)
+	projRepo, nodes, wiRepo, _, sessRepo, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	proj := testutil.NewTestProject("Status Preserve")
@@ -153,7 +153,7 @@ func TestSessionDelete_WorkItemStatusPreserved(t *testing.T) {
 		testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo)
+	svc := NewSessionService(sessRepo, wiRepo, uow)
 
 	// Log session → auto-transitions to in_progress.
 	sess := testutil.NewTestSession(wi.ID, 20)
@@ -177,7 +177,7 @@ func TestSessionDelete_WorkItemStatusPreserved(t *testing.T) {
 // replan and what-now to verify the pipeline remains consistent when logged_min
 // is stale relative to actual sessions.
 func TestSessionDelete_ReplanConvergesAfterDeletion(t *testing.T) {
-	projRepo, nodeRepo, wiRepo, depRepo, sessRepo, profRepo := setupRepos(t)
+	projRepo, nodeRepo, wiRepo, depRepo, sessRepo, profRepo, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -197,9 +197,9 @@ func TestSessionDelete_ReplanConvergesAfterDeletion(t *testing.T) {
 	)
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	sessSvc := NewSessionService(sessRepo, wiRepo)
+	sessSvc := NewSessionService(sessRepo, wiRepo, uow)
 	replanSvc := NewReplanService(projRepo, wiRepo, sessRepo, profRepo)
-	whatNowSvc := NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo)
+	whatNowSvc := NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo)
 
 	// Log two sessions with units (triggers re-estimation each time).
 	sess1 := testutil.NewTestSession(wi.ID, 30, testutil.WithUnitsDelta(2))

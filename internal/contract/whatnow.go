@@ -1,58 +1,22 @@
 package contract
 
-import (
-	"time"
+import "github.com/alexanderramin/kairos/internal/app"
 
-	"github.com/alexanderramin/kairos/internal/domain"
-)
-
-type WhatNowRequest struct {
-	AvailableMin     int
-	Now              *time.Time
-	ProjectScope     []string
-	IncludeArchived  bool
-	DryRun           bool
-	MaxSlices        int
-	EnforceVariation bool
-	Explain          bool
-}
+type WhatNowRequest = app.WhatNowRequest
 
 func NewWhatNowRequest(availableMin int) WhatNowRequest {
-	return WhatNowRequest{
-		AvailableMin:     availableMin,
-		MaxSlices:        3,
-		EnforceVariation: true,
-		Explain:          true,
-	}
+	return app.NewWhatNowRequest(availableMin)
 }
 
-type WhatNowResponse struct {
-	GeneratedAt     time.Time
-	Mode            domain.PlanMode
-	RequestedMin    int
-	AllocatedMin    int
-	UnallocatedMin  int
-	Recommendations []WorkSlice
-	Blockers        []ConstraintBlocker
-	TopRiskProjects []RiskSummary
-	PolicyMessages  []string
-	Warnings        []string
-}
+type WhatNowResponse = app.WhatNowResponse
 
-type WhatNowErrorCode string
+type WhatNowErrorCode = app.WhatNowErrorCode
 
 const (
-	ErrInvalidAvailableMin WhatNowErrorCode = "INVALID_AVAILABLE_MIN"
-	ErrNoCandidates        WhatNowErrorCode = "NO_CANDIDATES"
-	ErrDataIntegrity       WhatNowErrorCode = "DATA_INTEGRITY"
-	ErrInternalError       WhatNowErrorCode = "INTERNAL_ERROR"
+	ErrInvalidAvailableMin WhatNowErrorCode = app.ErrInvalidAvailableMin
+	ErrNoCandidates        WhatNowErrorCode = app.ErrNoCandidates
+	ErrDataIntegrity       WhatNowErrorCode = app.ErrDataIntegrity
+	ErrInternalError       WhatNowErrorCode = app.ErrInternalError
 )
 
-type WhatNowError struct {
-	Code    WhatNowErrorCode
-	Message string
-}
-
-func (e *WhatNowError) Error() string {
-	return string(e.Code) + ": " + e.Message
-}
+type WhatNowError = app.WhatNowError

@@ -19,7 +19,7 @@ import (
 // Exercises: critical mode from zero-activity project, logging shifts priorities,
 // momentum bonus, status accuracy, determinism.
 func TestPersona_GradStudent_MixedCompletion(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -72,8 +72,8 @@ func TestPersona_GradStudent_MixedCompletion(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wiC))
 	// No sessions for C — zero activity.
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 
 	// === Phase 1: Initial query — C should trigger critical mode ===
 	req := contract.NewWhatNowRequest(60)
@@ -183,7 +183,7 @@ func TestPersona_GradStudent_MixedCompletion(t *testing.T) {
 // Exercises: deadline clustering competition, no-deadline handling, logging shifts
 // priority between competing deadlines, mode transitions.
 func TestPersona_Freelancer_DeadlineCrunch(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -243,8 +243,8 @@ func TestPersona_Freelancer_DeadlineCrunch(t *testing.T) {
 	sessD := testutil.NewTestSession(wiD.ID, 20, testutil.WithStartedAt(now.Add(-48*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sessD))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 
 	// === Phase 1: Initial query — A and B are urgent, should drive mode ===
 	req := contract.NewWhatNowRequest(120)
@@ -352,11 +352,11 @@ func TestPersona_Freelancer_DeadlineCrunch(t *testing.T) {
 // with zero session history. Tests the import->schedule pipeline, baseline_daily_min
 // floor, zero-session bootstrap, and first-session spacing effects.
 func TestPersona_FreshStart_AllNewProjects(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
-	importSvc := NewImportService(projects, nodes, workItems, deps)
+	importSvc := NewImportService(projects, nodes, workItems, deps, uow)
 
 	// === Import Project A: due in 21 days, 300 min total ===
 	targetA := now.AddDate(0, 0, 21).Format("2006-01-02")
@@ -448,8 +448,8 @@ func TestPersona_FreshStart_AllNewProjects(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, resultC.WorkItemCount)
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 
 	// === Phase 1: First-ever query — zero sessions everywhere ===
 	req := contract.NewWhatNowRequest(90)
@@ -518,7 +518,7 @@ func TestPersona_FreshStart_AllNewProjects(t *testing.T) {
 // projects. Tests: work-remaining < min_session blocking, graceful degradation
 // as projects complete, eventual NoCandidates.
 func TestPersona_NearlyDone_WindingDown(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -570,7 +570,7 @@ func TestPersona_NearlyDone_WindingDown(t *testing.T) {
 	sessC := testutil.NewTestSession(wiC.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sessC))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 
 	// === Phase 1: Initial query ===
 	req := contract.NewWhatNowRequest(60)
@@ -628,7 +628,7 @@ func TestPersona_NearlyDone_WindingDown(t *testing.T) {
 // projects, testing that the spacing bonus/penalty drives alternation across
 // simulated days.
 func TestPersona_SpacingEffect_AcrossDays(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -655,7 +655,7 @@ func TestPersona_SpacingEffect_AcrossDays(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wiB))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 
 	// === Day 0: Log session on A, query ===
 	day0 := now
@@ -715,7 +715,7 @@ func TestPersona_SpacingEffect_AcrossDays(t *testing.T) {
 // that progressively improves as work is logged, tracking the transition from
 // critical to balanced mode across multiple logging steps.
 func TestPersona_ProgressiveModeTransition(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -746,8 +746,8 @@ func TestPersona_ProgressiveModeTransition(t *testing.T) {
 	sessB := testutil.NewTestSession(wiB.ID, 30, testutil.WithStartedAt(now.Add(-48*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sessB))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 
 	// === Step 1: Initial query — should be critical (A has no sessions, due in 3 days) ===
 	req := contract.NewWhatNowRequest(60)
@@ -778,10 +778,10 @@ func TestPersona_ProgressiveModeTransition(t *testing.T) {
 
 	// === Track risk progression ===
 	type riskStep struct {
-		mode     domain.PlanMode
-		riskA    domain.RiskLevel
-		loggedA  int
-		bInRecs  bool
+		mode    domain.PlanMode
+		riskA   domain.RiskLevel
+		loggedA int
+		bInRecs bool
 	}
 	var steps []riskStep
 

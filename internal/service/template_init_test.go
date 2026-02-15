@@ -12,13 +12,13 @@ import (
 )
 
 func TestTemplateInit_PersistsFullStructure(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	// Use real templates directory
 	templateDir := findTemplatesDir(t)
 
-	svc := NewTemplateService(templateDir, projects, nodes, workItems, deps)
+	svc := NewTemplateService(templateDir, projects, nodes, workItems, deps, uow)
 
 	// Use weeks=3, assignment_count=2 for a small but realistic test
 	due := "2026-06-01"
@@ -54,11 +54,11 @@ func TestTemplateInit_PersistsFullStructure(t *testing.T) {
 }
 
 func TestTemplateInit_WithVariableOverride(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	templateDir := findTemplatesDir(t)
-	svc := NewTemplateService(templateDir, projects, nodes, workItems, deps)
+	svc := NewTemplateService(templateDir, projects, nodes, workItems, deps, uow)
 
 	// Override weeks=2 (minimal)
 	proj, err := svc.InitProject(ctx, "course_weekly_generic", "Mini Module", "MIN01", "2026-02-10", nil, map[string]string{
@@ -79,11 +79,11 @@ func TestTemplateInit_WithVariableOverride(t *testing.T) {
 }
 
 func TestTemplateInit_WithDueDate(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
 	templateDir := findTemplatesDir(t)
-	svc := NewTemplateService(templateDir, projects, nodes, workItems, deps)
+	svc := NewTemplateService(templateDir, projects, nodes, workItems, deps, uow)
 
 	due := "2026-12-01"
 	proj, err := svc.InitProject(ctx, "course_weekly_generic", "Deadline Module", "DED01", "2026-02-10", &due, map[string]string{

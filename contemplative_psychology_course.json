@@ -1,0 +1,679 @@
+{
+    "project": {
+        "short_id": "APPC-6M",
+        "name": "Applied Phenomenological Psychology with Contemplative Methods",
+        "domain": "education",
+        "start_date": "2026-07-01"
+    },
+    "defaults": {
+        "duration_mode": "estimate",
+        "session_policy": {
+            "min_session_min": 15,
+            "max_session_min": 90,
+            "default_session_min": 45,
+            "splittable": true
+        }
+    },
+    "nodes": [
+        {
+            "ref": "phase1",
+            "title": "Phase 1: Foundations of Observation",
+            "kind": "stage",
+            "order": 1
+        },
+        {
+            "ref": "p1b1",
+            "title": "Block 1A: Stabilizing Attention (Weeks 1-3)",
+            "kind": "module",
+            "parent_ref": "phase1",
+            "order": 1
+        },
+        {
+            "ref": "p1b2",
+            "title": "Block 1B: Categories of Experience (Weeks 4-6)",
+            "kind": "module",
+            "parent_ref": "phase1",
+            "order": 2
+        },
+        {
+            "ref": "phase2",
+            "title": "Phase 2: Temporal Structure of Experience",
+            "kind": "stage",
+            "order": 2
+        },
+        {
+            "ref": "p2b1",
+            "title": "Block 2A: Microgenesis - How Experiences Form (Weeks 7-9)",
+            "kind": "module",
+            "parent_ref": "phase2",
+            "order": 3
+        },
+        {
+            "ref": "p2b2",
+            "title": "Block 2B: Focusing - Pre-Conceptual Experience (Weeks 10-12)",
+            "kind": "module",
+            "parent_ref": "phase2",
+            "order": 4
+        },
+        {
+            "ref": "phase3",
+            "title": "Phase 3: Cultural Conditioning",
+            "kind": "stage",
+            "order": 3
+        },
+        {
+            "ref": "p3b1",
+            "title": "Block 3A: Recognizing Saṃskāra (Weeks 13-15)",
+            "kind": "module",
+            "parent_ref": "phase3",
+            "order": 5
+        },
+        {
+            "ref": "p3b2",
+            "title": "Block 3B: Comparative Phenomenology of Emotion (Weeks 16-18)",
+            "kind": "module",
+            "parent_ref": "phase3",
+            "order": 6
+        },
+        {
+            "ref": "phase4",
+            "title": "Phase 4: Relational Awareness & Therapeutic Presence",
+            "kind": "stage",
+            "order": 4
+        },
+        {
+            "ref": "p4b1",
+            "title": "Block 4A: Empathy vs. Projection (Weeks 19-21)",
+            "kind": "module",
+            "parent_ref": "phase4",
+            "order": 7
+        },
+        {
+            "ref": "p4b2",
+            "title": "Block 4B: Therapeutic Presence & Integration (Weeks 22-24)",
+            "kind": "module",
+            "parent_ref": "phase4",
+            "order": 8
+        }
+    ],
+    "work_items": [
+        {
+            "ref": "daily_practice_all",
+            "node_ref": "phase1",
+            "title": "Daily meditation practice (20-30 min) - ongoing throughout course",
+            "type": "practice",
+            "planned_min": 10080,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 30,
+                "splittable": true
+            }
+        },
+        {
+            "ref": "daily_log_all",
+            "node_ref": "phase1",
+            "title": "Daily phenomenological logs (10 min) - ongoing throughout course",
+            "type": "practice",
+            "planned_min": 4032,
+            "session_policy": {
+                "min_session_min": 10,
+                "max_session_min": 15,
+                "splittable": true
+            }
+        },
+        {
+            "ref": "p1b1_read_joy",
+            "node_ref": "p1b1",
+            "title": "Mingyur Rinpoche: The Joy of Living (Ch. 1-8)",
+            "type": "reading",
+            "planned_min": 240
+        },
+        {
+            "ref": "p1b1_read_james",
+            "node_ref": "p1b1",
+            "title": "William James: Principles of Psychology (Ch. 9 - Stream of Thought)",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p1b1_read_yates",
+            "node_ref": "p1b1",
+            "title": "Culadasa: The Mind Illuminated (Stages 1-3)",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p1b1_read_dreyfus",
+            "node_ref": "p1b1",
+            "title": "Dreyfus & Thompson: The Myth of the Mental",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "p1b1_practice_shamatha",
+            "node_ref": "p1b1",
+            "title": "Shamatha practice: breath, body, sound (Tergar 1-2)",
+            "type": "practice",
+            "planned_min": 1260,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 30,
+                "splittable": true
+            }
+        },
+        {
+            "ref": "p1b1_log_stability",
+            "node_ref": "p1b1",
+            "title": "Stability/vividness tracking logs",
+            "type": "practice",
+            "planned_min": 210,
+            "session_policy": {
+                "min_session_min": 10,
+                "max_session_min": 15,
+                "splittable": true
+            }
+        },
+        {
+            "ref": "p1b1_weekly_synthesis",
+            "node_ref": "p1b1",
+            "title": "Weekly pattern analysis (3 syntheses)",
+            "type": "review",
+            "planned_min": 90
+        },
+        {
+            "ref": "p1b1_assignment",
+            "node_ref": "p1b1",
+            "title": "Assignment 1: Attention stability analysis (1,500 words)",
+            "type": "assignment",
+            "planned_min": 240
+        },
+        {
+            "ref": "p1b2_read_joy",
+            "node_ref": "p1b2",
+            "title": "Mingyur Rinpoche: The Joy of Living (Ch. 9-11)",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "p1b2_read_analayo",
+            "node_ref": "p1b2",
+            "title": "Analayo: Satipatthana (Ch. 3-6)",
+            "type": "reading",
+            "planned_min": 240
+        },
+        {
+            "ref": "p1b2_read_husserl",
+            "node_ref": "p1b2",
+            "title": "Husserl: Ideas I (§§36-38, 85-96)",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p1b2_read_lutz",
+            "node_ref": "p1b2",
+            "title": "Lutz & Thompson: Neurophenomenology",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "p1b2_practice_noting",
+            "node_ref": "p1b2",
+            "title": "Noting practice daily (20 min)",
+            "type": "practice",
+            "planned_min": 1260,
+            "session_policy": {
+                "min_session_min": 20,
+                "max_session_min": 30,
+                "splittable": true
+            }
+        },
+        {
+            "ref": "p1b2_practice_extended",
+            "node_ref": "p1b2",
+            "title": "Extended sits on weekends (45 min x 6)",
+            "type": "practice",
+            "planned_min": 270
+        },
+        {
+            "ref": "p1b2_practice_daily_life",
+            "node_ref": "p1b2",
+            "title": "Daily life noting (5 min, 3x/day)",
+            "type": "practice",
+            "planned_min": 630
+        },
+        {
+            "ref": "p1b2_log_categories",
+            "node_ref": "p1b2",
+            "title": "Category tallies and anomaly tracking",
+            "type": "practice",
+            "planned_min": 210
+        },
+        {
+            "ref": "p1b2_weekly_synthesis",
+            "node_ref": "p1b2",
+            "title": "Weekly pattern summaries (3 syntheses)",
+            "type": "review",
+            "planned_min": 90
+        },
+        {
+            "ref": "p1b2_assignment",
+            "node_ref": "p1b2",
+            "title": "Assignment 2: Categories of experience (2,000 words)",
+            "type": "assignment",
+            "planned_min": 300
+        },
+        {
+            "ref": "p2b1_read_joy",
+            "node_ref": "p2b1",
+            "title": "Mingyur Rinpoche: The Joy of Living (Ch. 12-14)",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "p2b1_read_gendlin_exp",
+            "node_ref": "p2b1",
+            "title": "Gendlin: Experiencing and the Creation of Meaning (Ch. 1-3)",
+            "type": "reading",
+            "planned_min": 240
+        },
+        {
+            "ref": "p2b1_read_varela_embodied",
+            "node_ref": "p2b1",
+            "title": "Varela et al: The Embodied Mind (Ch. 5)",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p2b1_read_varela_time",
+            "node_ref": "p2b1",
+            "title": "Varela: The Specious Present",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "p2b1_read_olendzki",
+            "node_ref": "p2b1",
+            "title": "Olendzki: The Construction of Mindfulness",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "p2b1_practice_thought",
+            "node_ref": "p2b1",
+            "title": "Thought-watching meditation (20 min daily)",
+            "type": "practice",
+            "planned_min": 1260
+        },
+        {
+            "ref": "p2b1_practice_event_tracking",
+            "node_ref": "p2b1",
+            "title": "Single-event microgenetic tracking (weekly)",
+            "type": "practice",
+            "planned_min": 180
+        },
+        {
+            "ref": "p2b1_log_temporal",
+            "node_ref": "p2b1",
+            "title": "Temporal diagrams and pattern notes",
+            "type": "practice",
+            "planned_min": 180
+        },
+        {
+            "ref": "p2b1_assignment",
+            "node_ref": "p2b1",
+            "title": "Assignment 3: Microgenesis process analysis (2,000 words)",
+            "type": "assignment",
+            "planned_min": 300
+        },
+        {
+            "ref": "p2b2_read_gendlin_focusing",
+            "node_ref": "p2b2",
+            "title": "Gendlin: Focusing (complete)",
+            "type": "reading",
+            "planned_min": 240
+        },
+        {
+            "ref": "p2b2_read_gendlin_exp2",
+            "node_ref": "p2b2",
+            "title": "Gendlin: Experiencing and the Creation of Meaning (Ch. 4-6)",
+            "type": "reading",
+            "planned_min": 240
+        },
+        {
+            "ref": "p2b2_read_petitmengin",
+            "node_ref": "p2b2",
+            "title": "Petitmengin: Validity of First-Person Descriptions",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "p2b2_read_ratcliffe",
+            "node_ref": "p2b2",
+            "title": "Ratcliffe: Phenomenology as a Form of Empathy",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "p2b2_practice_focusing",
+            "node_ref": "p2b2",
+            "title": "Focusing sessions (30 min, 3x/week)",
+            "type": "practice",
+            "planned_min": 1080
+        },
+        {
+            "ref": "p2b2_practice_body_scan",
+            "node_ref": "p2b2",
+            "title": "Body-scan with questioning (15 min daily)",
+            "type": "practice",
+            "planned_min": 945
+        },
+        {
+            "ref": "p2b2_practice_felt_sense_diary",
+            "node_ref": "p2b2",
+            "title": "Felt-sense diary (10 min evening)",
+            "type": "practice",
+            "planned_min": 630
+        },
+        {
+            "ref": "p2b2_log_transcripts",
+            "node_ref": "p2b2",
+            "title": "Focusing transcripts and meta-observation logs",
+            "type": "practice",
+            "planned_min": 270
+        },
+        {
+            "ref": "p2b2_assignment",
+            "node_ref": "p2b2",
+            "title": "Assignment 4: Felt sense and conceptual understanding (2,500 words)",
+            "type": "assignment",
+            "planned_min": 360
+        },
+        {
+            "ref": "p3b1_read_joy",
+            "node_ref": "p3b1",
+            "title": "Mingyur Rinpoche: The Joy of Living (Ch. 15-17)",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "p3b1_read_gethin",
+            "node_ref": "p3b1",
+            "title": "Gethin: The Buddhist Path to Awakening (Ch. 4 - Saṃskāra)",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p3b1_read_nisbett",
+            "node_ref": "p3b1",
+            "title": "Nisbett: The Geography of Thought (Ch. 1-4)",
+            "type": "reading",
+            "planned_min": 240
+        },
+        {
+            "ref": "p3b1_read_mesquita",
+            "node_ref": "p3b1",
+            "title": "Mesquita & Frijda: Cultural Variations in Emotions",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "p3b1_read_shweder",
+            "node_ref": "p3b1",
+            "title": "Shweder et al: Cultural Psychology of the Emotions",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p3b1_practice_trigger_journal",
+            "node_ref": "p3b1",
+            "title": "Daily trigger journal (minimum 7 entries/week)",
+            "type": "practice",
+            "planned_min": 630
+        },
+        {
+            "ref": "p3b1_practice_metta",
+            "node_ref": "p3b1",
+            "title": "Metta practice (15 min, 4x/week)",
+            "type": "practice",
+            "planned_min": 720
+        },
+        {
+            "ref": "p3b1_log_patterns",
+            "node_ref": "p3b1",
+            "title": "Cultural pattern identification and resistance logs",
+            "type": "practice",
+            "planned_min": 180
+        },
+        {
+            "ref": "p3b1_assignment",
+            "node_ref": "p3b1",
+            "title": "Assignment 5: Cultural conditioning patterns (2,000 words)",
+            "type": "assignment",
+            "planned_min": 300
+        },
+        {
+            "ref": "p3b2_read_mingyur_love",
+            "node_ref": "p3b2",
+            "title": "Mingyur Rinpoche: In Love with the World (fear chapters)",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p3b2_read_lutz_white",
+            "node_ref": "p3b2",
+            "title": "Lutz & White: The Anthropology of Emotions",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p3b2_read_mesquita_book",
+            "node_ref": "p3b2",
+            "title": "Mesquita: Between Us (Ch. 1-4)",
+            "type": "reading",
+            "planned_min": 240
+        },
+        {
+            "ref": "p3b2_read_ratcliffe_feelings",
+            "node_ref": "p3b2",
+            "title": "Ratcliffe: Feelings of Being (Ch. 3-5)",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p3b2_read_epstein",
+            "node_ref": "p3b2",
+            "title": "Epstein: Thoughts Without a Thinker (Ch. 3-5)",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p3b2_practice_emotion_tracking",
+            "node_ref": "p3b2",
+            "title": "4-framework emotion analysis (3 episodes/week)",
+            "type": "practice",
+            "planned_min": 540
+        },
+        {
+            "ref": "p3b2_practice_tonglen",
+            "node_ref": "p3b2",
+            "title": "Tonglen practice (20 min, 3x/week)",
+            "type": "practice",
+            "planned_min": 1080
+        },
+        {
+            "ref": "p3b2_log_comparative",
+            "node_ref": "p3b2",
+            "title": "Comparative framework logs and meta-analysis",
+            "type": "practice",
+            "planned_min": 270
+        },
+        {
+            "ref": "p3b2_assignment",
+            "node_ref": "p3b2",
+            "title": "Assignment 6: Comparative phenomenology of emotion (3,000 words)",
+            "type": "assignment",
+            "planned_min": 420
+        },
+        {
+            "ref": "p4b1_read_joy_integration",
+            "node_ref": "p4b1",
+            "title": "Mingyur Rinpoche: The Joy of Living (Ch. 18-19)",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "p4b1_read_zahavi",
+            "node_ref": "p4b1",
+            "title": "Zahavi: Self and Other (Ch. 4-5)",
+            "type": "reading",
+            "planned_min": 240
+        },
+        {
+            "ref": "p4b1_read_stern",
+            "node_ref": "p4b1",
+            "title": "Stern: The Present Moment in Psychotherapy (Ch. 1-5)",
+            "type": "reading",
+            "planned_min": 300
+        },
+        {
+            "ref": "p4b1_read_rogers",
+            "node_ref": "p4b1",
+            "title": "Rogers: On Becoming a Person (Ch. 3-4)",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p4b1_read_makransky",
+            "node_ref": "p4b1",
+            "title": "Makransky: Awakening Through Love (Ch. 4-6)",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p4b1_read_epstein_trauma",
+            "node_ref": "p4b1",
+            "title": "Epstein: The Trauma of Everyday Life (relationship chapters)",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p4b1_practice_conversations",
+            "node_ref": "p4b1",
+            "title": "Conversational awareness practice (3/week)",
+            "type": "practice",
+            "planned_min": 270
+        },
+        {
+            "ref": "p4b1_practice_listening",
+            "node_ref": "p4b1",
+            "title": "Listening meditation with partner (20 min, 2x/week)",
+            "type": "practice",
+            "planned_min": 360
+        },
+        {
+            "ref": "p4b1_practice_metta_specific",
+            "node_ref": "p4b1",
+            "title": "Metta for specific individuals (15 min, 4x/week)",
+            "type": "practice",
+            "planned_min": 720
+        },
+        {
+            "ref": "p4b1_log_relational",
+            "node_ref": "p4b1",
+            "title": "Conversation analyses and relational pattern tracking",
+            "type": "practice",
+            "planned_min": 360
+        },
+        {
+            "ref": "p4b1_assignment",
+            "node_ref": "p4b1",
+            "title": "Assignment 7: Empathy vs. projection (2,500 words)",
+            "type": "assignment",
+            "planned_min": 360
+        },
+        {
+            "ref": "p4b2_read_joy_final",
+            "node_ref": "p4b2",
+            "title": "Mingyur Rinpoche: The Joy of Living (Ch. 20)",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "p4b2_read_stern_now",
+            "node_ref": "p4b2",
+            "title": "Stern: The Present Moment (Ch. 6-9 - Now moments)",
+            "type": "reading",
+            "planned_min": 240
+        },
+        {
+            "ref": "p4b2_read_rogers_conditions",
+            "node_ref": "p4b2",
+            "title": "Rogers: Necessary and Sufficient Conditions",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "p4b2_read_kornfield",
+            "node_ref": "p4b2",
+            "title": "Kornfield: A Path with Heart (psychological work chapters)",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "p4b2_read_epstein_pieces",
+            "node_ref": "p4b2",
+            "title": "Epstein: Going to Pieces Without Falling Apart",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p4b2_read_welwood",
+            "node_ref": "p4b2",
+            "title": "Welwood: Toward a Psychology of Awakening (Ch. 12-15)",
+            "type": "reading",
+            "planned_min": 180
+        },
+        {
+            "ref": "p4b2_practice_all_day",
+            "node_ref": "p4b2",
+            "title": "All-day awareness practice (2 days)",
+            "type": "practice",
+            "planned_min": 840
+        },
+        {
+            "ref": "p4b2_practice_roleplay",
+            "node_ref": "p4b2",
+            "title": "Therapeutic role-play sessions (3 x 30 min + transcription)",
+            "type": "practice",
+            "planned_min": 360
+        },
+        {
+            "ref": "p4b2_practice_daily_presence",
+            "node_ref": "p4b2",
+            "title": "Presence in routine activities (3 activities daily)",
+            "type": "practice",
+            "planned_min": 630
+        },
+        {
+            "ref": "p4b2_log_integration",
+            "node_ref": "p4b2",
+            "title": "All-day reports, session transcripts, weekly integration reflections",
+            "type": "practice",
+            "planned_min": 450
+        },
+        {
+            "ref": "p4b2_review_full_course",
+            "node_ref": "p4b2",
+            "title": "Review all logs from Weeks 1-24",
+            "type": "review",
+            "planned_min": 360
+        },
+        {
+            "ref": "p4b2_assignment",
+            "node_ref": "p4b2",
+            "title": "Final Assignment 8: Therapeutic presence case study (4,000 words)",
+            "type": "assignment",
+            "planned_min": 600
+        }
+    ]
+}

@@ -31,7 +31,7 @@ func (m *pipelineMockLLMClient) Available(_ context.Context) bool {
 }
 
 func TestDraftImportSchedulePipeline(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	draftSvc := intelligence.NewProjectDraftService(&pipelineMockLLMClient{
@@ -71,8 +71,8 @@ func TestDraftImportSchedulePipeline(t *testing.T) {
 		}`,
 	}, llm.NoopObserver{})
 
-	importSvc := NewImportService(projects, nodes, workItems, deps)
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	importSvc := NewImportService(projects, nodes, workItems, deps, uow)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 
 	conv, err := draftSvc.Start(ctx, "Build a study plan for an upcoming exam.")
 	require.NoError(t, err)
@@ -101,7 +101,7 @@ func TestDraftImportSchedulePipeline(t *testing.T) {
 }
 
 func TestDraftImportSchedulePipeline_HTTPBoundary(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	// Real HTTP boundary: httptest server -> OllamaClient -> ProjectDraftService.
@@ -172,8 +172,8 @@ func TestDraftImportSchedulePipeline_HTTPBoundary(t *testing.T) {
 	cfg.MaxRetries = 0
 
 	draftSvc := intelligence.NewProjectDraftService(llm.NewOllamaClient(cfg, llm.NoopObserver{}), llm.NoopObserver{})
-	importSvc := NewImportService(projects, nodes, workItems, deps)
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	importSvc := NewImportService(projects, nodes, workItems, deps, uow)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 
 	conv, err := draftSvc.Start(ctx, "Build a study plan for an upcoming exam.")
 	require.NoError(t, err)
@@ -198,12 +198,12 @@ func TestDraftImportSchedulePipeline_HTTPBoundary(t *testing.T) {
 }
 
 func TestTemplateInitSchedulePipeline(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	templateDir := findTemplatesDir(t)
-	templateSvc := NewTemplateService(templateDir, projects, nodes, workItems, deps)
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	templateSvc := NewTemplateService(templateDir, projects, nodes, workItems, deps, uow)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 
 	due := time.Now().UTC().AddDate(0, 2, 0).Format("2006-01-02")
 	proj, err := templateSvc.InitProject(ctx, "course_weekly_generic", "Template Pipeline", "TPL02", "2026-01-15", &due, map[string]string{

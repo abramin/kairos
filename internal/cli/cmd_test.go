@@ -21,6 +21,7 @@ import (
 func testApp(t *testing.T) *App {
 	t.Helper()
 	db := testutil.NewTestDB(t)
+	uow := testutil.NewTestUoW(db)
 
 	projRepo := repository.NewSQLiteProjectRepo(db)
 	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
@@ -33,8 +34,8 @@ func testApp(t *testing.T) *App {
 		Projects:  service.NewProjectService(projRepo),
 		Nodes:     service.NewNodeService(nodeRepo),
 		WorkItems: service.NewWorkItemService(wiRepo, nodeRepo),
-		Sessions:  service.NewSessionService(sessRepo, wiRepo),
-		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo),
+		Sessions:  service.NewSessionService(sessRepo, wiRepo, uow),
+		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo),
 		Status:    service.NewStatusService(projRepo, wiRepo, sessRepo, profRepo),
 		Replan:    service.NewReplanService(projRepo, wiRepo, sessRepo, profRepo),
 		// Templates and Import left nil — not tested here.
@@ -264,6 +265,7 @@ func TestReviewWeeklyCmd_DeterministicFallback(t *testing.T) {
 func testAppFull(t *testing.T) *App {
 	t.Helper()
 	db := testutil.NewTestDB(t)
+	uow := testutil.NewTestUoW(db)
 
 	projRepo := repository.NewSQLiteProjectRepo(db)
 	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
@@ -278,12 +280,12 @@ func testAppFull(t *testing.T) *App {
 		Projects:  service.NewProjectService(projRepo),
 		Nodes:     service.NewNodeService(nodeRepo),
 		WorkItems: service.NewWorkItemService(wiRepo, nodeRepo),
-		Sessions:  service.NewSessionService(sessRepo, wiRepo),
-		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, projRepo, depRepo, profRepo),
+		Sessions:  service.NewSessionService(sessRepo, wiRepo, uow),
+		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo),
 		Status:    service.NewStatusService(projRepo, wiRepo, sessRepo, profRepo),
 		Replan:    service.NewReplanService(projRepo, wiRepo, sessRepo, profRepo),
-		Templates: service.NewTemplateService(templateDir, projRepo, nodeRepo, wiRepo, depRepo),
-		Import:    service.NewImportService(projRepo, nodeRepo, wiRepo, depRepo),
+		Templates: service.NewTemplateService(templateDir, projRepo, nodeRepo, wiRepo, depRepo, uow),
+		Import:    service.NewImportService(projRepo, nodeRepo, wiRepo, depRepo, uow),
 	}
 }
 

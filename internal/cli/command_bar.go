@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
-	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -171,44 +170,52 @@ func (c *commandBar) updateSuggestions() {
 	}
 
 	parts := strings.Fields(text)
+	if len(parts) == 0 {
+		c.input.SetSuggestions(nil)
+		return
+	}
 	trailingSpace := strings.HasSuffix(text, " ")
 
-	if len(parts) <= 1 && !trailingSpace {
-		c.input.SetSuggestions(filterSuggestions(allCommandNames(), parts[0]))
+	if len(parts) == 1 && !trailingSpace {
+		c.input.SetSuggestions(pruneExactSuggestions(filterSuggestions(allCommandNames(), parts[0]), text))
 		return
 	}
 
-	cmd := strings.ToLower(parts[0])
+	typedCmd := parts[0]
+	cmd := strings.ToLower(typedCmd)
 
-	if len(parts) <= 2 && (!trailingSpace || len(parts) == 1) {
+	// Suggest second-token completions when the user is typing:
+	//   "<cmd> "  or  "<cmd> <prefix>"
+	if len(parts) <= 2 && (len(parts) == 1 || !trailingSpace) {
 		prefix := ""
 		if len(parts) == 2 {
 			prefix = parts[1]
 		}
+		var tokenSuggestions []string
 
 		switch cmd {
 		case "use", "inspect":
-			c.input.SetSuggestions(c.projectSuggestions(prefix))
-			return
+			tokenSuggestions = c.projectSuggestions(prefix)
 		case "context":
-			c.input.SetSuggestions(filterSuggestions([]string{"clear", "project", "item"}, prefix))
-			return
+			tokenSuggestions = filterSuggestions([]string{"clear", "project", "item"}, prefix)
 		case "what-now", "log":
-			c.input.SetSuggestions(filterSuggestions([]string{"30", "45", "60", "90", "120"}, prefix))
-			return
+			tokenSuggestions = filterSuggestions([]string{"30", "45", "60", "90", "120"}, prefix)
 		case "explain":
-			c.input.SetSuggestions(filterSuggestions([]string{"now", "why-not"}, prefix))
-			return
+			tokenSuggestions = filterSuggestions([]string{"now", "why-not"}, prefix)
 		case "review":
-			c.input.SetSuggestions(filterSuggestions([]string{"weekly"}, prefix))
-			return
+			tokenSuggestions = filterSuggestions([]string{"weekly"}, prefix)
 		case "help":
-			c.input.SetSuggestions(filterSuggestions([]string{"chat"}, prefix))
-			return
+			tokenSuggestions = filterSuggestions([]string{"chat"}, prefix)
 		}
 
-		if subs, ok := subcommandNames()[cmd]; ok {
-			c.input.SetSuggestions(filterSuggestions(subs, prefix))
+		if len(tokenSuggestions) == 0 {
+			if subs, ok := subcommandNames()[cmd]; ok {
+				tokenSuggestions = filterSuggestions(subs, prefix)
+			}
+		}
+		if len(tokenSuggestions) > 0 {
+			fullSuggestions := qualifySuggestions(typedCmd, tokenSuggestions)
+			c.input.SetSuggestions(pruneExactSuggestions(fullSuggestions, text))
 			return
 		}
 	}
@@ -216,11 +223,37 @@ func (c *commandBar) updateSuggestions() {
 	c.input.SetSuggestions(nil)
 }
 
+// qualifySuggestions expands token candidates to full command-line suggestions.
+func qualifySuggestions(cmd string, suggestions []string) []string {
+	full := make([]string, 0, len(suggestions))
+	for _, s := range suggestions {
+		full = append(full, cmd+" "+s)
+	}
+	return full
+}
+
+// pruneExactSuggestions removes exact (case-insensitive) matches of the
+// current input so the cursor remains visible after completion.
+func pruneExactSuggestions(suggestions []string, input string) []string {
+	target := strings.ToLower(strings.TrimSpace(input))
+	if target == "" {
+		return suggestions
+	}
+	filtered := make([]string, 0, len(suggestions))
+	for _, s := range suggestions {
+		if strings.ToLower(strings.TrimSpace(s)) == target {
+			continue
+		}
+		filtered = append(filtered, s)
+	}
+	return filtered
+}
+
 func (c *commandBar) projectSuggestions(prefix string) []string {
 	projects := c.state.Cache.get(c.state.App)
 	var suggestions []string
 	for _, p := range projects {
-		id := domain.DisplayID(p.ShortID, p.ID)
+		id := p.DisplayID()
 		if prefix == "" || strings.HasPrefix(strings.ToLower(id), strings.ToLower(prefix)) {
 			suggestions = append(suggestions, id)
 		}

@@ -1,7 +1,7 @@
 package scheduler
 
 import (
-	"github.com/alexanderramin/kairos/internal/contract"
+	"github.com/alexanderramin/kairos/internal/app"
 )
 
 // AllocateSlices takes sorted scored candidates and available time,
@@ -11,9 +11,9 @@ func AllocateSlices(
 	availableMin int,
 	maxSlices int,
 	enforceVariation bool,
-) ([]contract.WorkSlice, []contract.ConstraintBlocker) {
-	var slices []contract.WorkSlice
-	var blockers []contract.ConstraintBlocker
+) ([]app.WorkSlice, []app.ConstraintBlocker) {
+	var slices []app.WorkSlice
+	var blockers []app.ConstraintBlocker
 	var pass1Candidates []ScoredCandidate // parallel to slices — tracks pass-1 origins for extension
 	remaining := availableMin
 	projectsUsed := make(map[string]bool)
@@ -88,17 +88,17 @@ func AllocateSlices(
 	return slices, blockers
 }
 
-func tryAllocate(c ScoredCandidate, remaining int) (*contract.WorkSlice, *contract.ConstraintBlocker) {
+func tryAllocate(c ScoredCandidate, remaining int) (*app.WorkSlice, *app.ConstraintBlocker) {
 	minS := c.Input.MinSessionMin
 	maxS := c.Input.MaxSessionMin
 	defS := c.Input.DefaultSessionMin
 
 	// Can't fit minimum session
 	if remaining < minS {
-		return nil, &contract.ConstraintBlocker{
+		return nil, &app.ConstraintBlocker{
 			EntityType: "work_item",
 			EntityID:   c.Input.WorkItemID,
-			Code:       contract.BlockerSessionMinExceedsAvail,
+			Code:       app.BlockerSessionMinExceedsAvail,
 			Message:    "Not enough time for minimum session",
 		}
 	}
@@ -110,10 +110,10 @@ func tryAllocate(c ScoredCandidate, remaining int) (*contract.WorkSlice, *contra
 	// No remaining work — item is fully logged
 	workRemaining := c.Input.PlannedMin - c.Input.LoggedMin
 	if c.Input.PlannedMin > 0 && workRemaining <= 0 {
-		return nil, &contract.ConstraintBlocker{
+		return nil, &app.ConstraintBlocker{
 			EntityType: "work_item",
 			EntityID:   c.Input.WorkItemID,
-			Code:       contract.BlockerWorkComplete,
+			Code:       app.BlockerWorkComplete,
 			Message:    "No remaining work to allocate",
 		}
 	}
@@ -123,12 +123,12 @@ func tryAllocate(c ScoredCandidate, remaining int) (*contract.WorkSlice, *contra
 		allocated = clamp(workRemaining, minS, upper)
 	}
 
-	reasons := make([]contract.RecommendationReason, len(c.Reasons))
+	reasons := make([]app.RecommendationReason, len(c.Reasons))
 	copy(reasons, c.Reasons)
 	if allocated != defS {
 		delta := 0.0
-		reasons = append(reasons, contract.RecommendationReason{
-			Code:        contract.ReasonBoundsApplied,
+		reasons = append(reasons, app.RecommendationReason{
+			Code:        app.ReasonBoundsApplied,
 			Message:     "Session duration adjusted to fit constraints",
 			WeightDelta: &delta,
 		})
@@ -140,7 +140,7 @@ func tryAllocate(c ScoredCandidate, remaining int) (*contract.WorkSlice, *contra
 		dueDateStr = &s
 	}
 
-	slice := &contract.WorkSlice{
+	slice := &app.WorkSlice{
 		WorkItemID:        c.Input.WorkItemID,
 		WorkItemSeq:       c.Input.WorkItemSeq,
 		ProjectID:         c.Input.ProjectID,

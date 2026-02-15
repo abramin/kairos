@@ -171,6 +171,12 @@ func WithDurationMode(m domain.DurationMode) WorkItemOption {
 	}
 }
 
+func WithWorkItemType(t string) WorkItemOption {
+	return func(w *domain.WorkItem) {
+		w.Type = t
+	}
+}
+
 func NewTestWorkItem(nodeID, title string, opts ...WorkItemOption) *domain.WorkItem {
 	now := time.Now().UTC()
 	w := &domain.WorkItem{

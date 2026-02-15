@@ -33,7 +33,11 @@ func execLogSession(ctx context.Context, app *App, state *SharedState, in LogSes
 		Note:           in.Note,
 		CreatedAt:      time.Now(),
 	}
-	if err := app.Sessions.LogSession(ctx, s); err != nil {
+	logSession := app.logSessionUseCase()
+	if logSession == nil {
+		return "", fmt.Errorf("log-session use case is not configured")
+	}
+	if err := logSession.LogSession(ctx, s); err != nil {
 		return "", err
 	}
 

@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -26,10 +28,10 @@ func (v *stubView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return v, v.updateCmd
 }
 
-func (v *stubView) View() string               { return v.viewText }
-func (v *stubView) ID() ViewID                 { return v.id }
-func (v *stubView) ShortHelp() []key.Binding   { return v.shortHelp }
-func (v *stubView) Title() string              { return v.title }
+func (v *stubView) View() string             { return v.viewText }
+func (v *stubView) ID() ViewID               { return v.id }
+func (v *stubView) ShortHelp() []key.Binding { return v.shortHelp }
+func (v *stubView) Title() string            { return v.title }
 func newStubView(id ViewID, title, text string) *stubView {
 	return &stubView{id: id, title: title, viewText: text}
 }
@@ -124,12 +126,14 @@ func TestAppModel_KeyHandling_GlobalAndCaptured(t *testing.T) {
 			newStubView(ViewProjectList, "Projects", "projects"),
 		}
 		m.lastOutput = "stale output"
+		m.outputActive = true
 
 		model, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 		m = model.(appModel)
 		require.Nil(t, cmd)
 		require.Len(t, m.viewStack, 1)
 		assert.Empty(t, m.lastOutput)
+		assert.False(t, m.outputActive)
 	})
 }
 
@@ -199,4 +203,74 @@ func TestViewCapturesInput(t *testing.T) {
 	assert.False(t, viewCapturesInput(newStubView(ViewDashboard, "Dash", "")))
 }
 
+func TestAppModel_OutputViewportScroll(t *testing.T) {
+	m := newAppModel(testApp(t))
+	m.viewStack = []View{newStubView(ViewDashboard, "Dashboard", "dashboard")}
 
+	// Set terminal size (height 10 → content height = 5).
+	model, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
+	m = model.(appModel)
+
+	// Generate output that exceeds viewport height.
+	lines := make([]string, 50)
+	for i := range lines {
+		lines[i] = fmt.Sprintf("line %d", i+1)
+	}
+	content := strings.Join(lines, "\n")
+
+	model, _ = m.Update(cmdOutputMsg{output: content})
+	m = model.(appModel)
+	assert.True(t, m.outputActive)
+
+	// View should start at top — first line visible.
+	view := m.View()
+	assert.Contains(t, view, "line 1")
+
+	// Scroll down: output stays active.
+	model, _ = m.Update(tea.KeyMsg{Type: tea.KeyDown})
+	m = model.(appModel)
+	assert.True(t, m.outputActive)
+
+	// Non-scroll key dismisses.
+	model, _ = m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	m = model.(appModel)
+	assert.False(t, m.outputActive)
+	assert.Empty(t, m.lastOutput)
+}
+
+func TestAppModel_OutputShortContentNoScroll(t *testing.T) {
+	m := newAppModel(testApp(t))
+	m.viewStack = []View{newStubView(ViewDashboard, "Dashboard", "dashboard")}
+
+	model, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 40})
+	m = model.(appModel)
+
+	model, _ = m.Update(cmdOutputMsg{output: "short output"})
+	m = model.(appModel)
+	assert.True(t, m.outputActive)
+
+	view := m.View()
+	assert.Contains(t, view, "short output")
+	// Status bar should NOT show scroll hints for short content.
+	assert.NotContains(t, view, "pgup/pgdn")
+}
+
+func TestIsOutputScrollKey(t *testing.T) {
+	scrollKeys := []tea.KeyType{
+		tea.KeyUp, tea.KeyDown, tea.KeyPgUp, tea.KeyPgDown,
+		tea.KeyHome, tea.KeyEnd, tea.KeyCtrlU, tea.KeyCtrlD,
+	}
+	for _, k := range scrollKeys {
+		assert.True(t, isOutputScrollKey(tea.KeyMsg{Type: k}), "expected scroll key: %v", k)
+	}
+
+	nonScrollKeys := []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune{'q'}},
+		{Type: tea.KeyRunes, Runes: []rune{':'}},
+		{Type: tea.KeyEsc},
+		{Type: tea.KeyEnter},
+	}
+	for _, k := range nonScrollKeys {
+		assert.False(t, isOutputScrollKey(k), "expected non-scroll key: %v", k)
+	}
+}

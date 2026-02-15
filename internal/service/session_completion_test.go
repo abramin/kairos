@@ -16,7 +16,7 @@ import (
 // completing a work item (done status) causes it to be excluded from future
 // what-now recommendations.
 func TestSessionCompletion_ExcludesFromWhatNow(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -41,8 +41,8 @@ func TestSessionCompletion_ExcludesFromWhatNow(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wiRemaining))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 
 	// Step 1: Both items should be schedulable.
 	req := contract.NewWhatNowRequest(120)
@@ -102,7 +102,7 @@ func TestSessionCompletion_ExcludesFromWhatNow(t *testing.T) {
 // TestSessionCompletion_FullLifecycle exercises the complete status transition
 // chain: todo → in_progress → done, verifying each transition's effect on scheduling.
 func TestSessionCompletion_FullLifecycle(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -122,8 +122,8 @@ func TestSessionCompletion_FullLifecycle(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wi))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 	req.ProjectScope = []string{proj.ID}

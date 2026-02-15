@@ -8,6 +8,7 @@ import (
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/huh"
 )
 
 // ── entity group commands (node/work/session/project) ────────────────────────
@@ -37,6 +38,14 @@ func (c *commandBar) cmdEntityGroup(parts []string) tea.Cmd {
 	// Destructive commands → confirmation.
 	if subs, ok := destructiveCommands[group]; ok && subs[sub] {
 		return c.cmdDestructive(parts, group, sub)
+	}
+
+	// Some non-destructive commands mutate project data and need a dashboard refresh.
+	if group == "project" && sub == "import" {
+		return tea.Batch(
+			outputCmd(c.cobraCapture(parts)),
+			func() tea.Msg { return refreshViewMsg{} },
+		)
 	}
 
 	return outputCmd(c.cobraCapture(parts))
@@ -107,6 +116,22 @@ func (c *commandBar) workAddGetMinutes(nodeID, title, wiType string) tea.Cmd {
 	var minutes string
 	form := wizardInputDuration(60, &minutes)
 	return startWizardCmd(c.state, "Duration", form, func() tea.Cmd {
+		return c.workAddGetDueDate(nodeID, title, wiType, minutes)
+	})
+}
+
+func (c *commandBar) workAddGetDueDate(nodeID, title, wiType, minutes string) tea.Cmd {
+	var dueDate string
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Due Date (YYYY-MM-DD, blank for none)").
+				Placeholder("2025-06-30").
+				Value(&dueDate).
+				Validate(validateOptionalDate),
+		),
+	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
+	return startWizardCmd(c.state, "Due Date", form, func() tea.Cmd {
 		args := []string{"work", "add",
 			"--node", nodeID,
 			"--title", title,
@@ -114,6 +139,9 @@ func (c *commandBar) workAddGetMinutes(nodeID, title, wiType string) tea.Cmd {
 		}
 		if v, err := strconv.Atoi(minutes); err == nil && v > 0 {
 			args = append(args, "--planned-min", minutes)
+		}
+		if dueDate != "" {
+			args = append(args, "--due-date", dueDate)
 		}
 		output := c.cobraCapture(args)
 		return outputCmd(output)

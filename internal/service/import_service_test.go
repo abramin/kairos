@@ -29,10 +29,10 @@ func ptrFloat(f float64) *float64 { return &f }
 func ptrBool(b bool) *bool        { return &b }
 
 func TestImportProject_FullStructure(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps)
+	svc := NewImportService(projects, nodes, workItems, deps, uow)
 
 	schema := &importer.ImportSchema{
 		Project: importer.ProjectImport{
@@ -115,10 +115,10 @@ func TestImportProject_FullStructure(t *testing.T) {
 }
 
 func TestImportProject_MinimalWithDefaults(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps)
+	svc := NewImportService(projects, nodes, workItems, deps, uow)
 
 	schema := &importer.ImportSchema{
 		Project: importer.ProjectImport{
@@ -160,10 +160,10 @@ func TestImportProject_MinimalWithDefaults(t *testing.T) {
 }
 
 func TestImportProject_InferSequentialDependenciesWhenOmitted(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps)
+	svc := NewImportService(projects, nodes, workItems, deps, uow)
 
 	schema := &importer.ImportSchema{
 		Project: importer.ProjectImport{
@@ -191,10 +191,10 @@ func TestImportProject_InferSequentialDependenciesWhenOmitted(t *testing.T) {
 }
 
 func TestImportProject_ValidationFailure(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps)
+	svc := NewImportService(projects, nodes, workItems, deps, uow)
 
 	schema := &importer.ImportSchema{
 		Project: importer.ProjectImport{
@@ -223,10 +223,10 @@ func TestImportProject_ValidationFailure(t *testing.T) {
 }
 
 func TestImportProject_MalformedJSON(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps)
+	svc := NewImportService(projects, nodes, workItems, deps, uow)
 
 	dir := t.TempDir()
 	path := filepath.Join(dir, "bad.json")
@@ -238,10 +238,10 @@ func TestImportProject_MalformedJSON(t *testing.T) {
 }
 
 func TestImportProject_FileNotFound(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps)
+	svc := NewImportService(projects, nodes, workItems, deps, uow)
 
 	_, err := svc.ImportProject(ctx, "/nonexistent/path/import.json")
 	assert.Error(t, err)
@@ -249,10 +249,10 @@ func TestImportProject_FileNotFound(t *testing.T) {
 }
 
 func TestImportProject_SchemaDefaults(t *testing.T) {
-	projects, nodes, workItems, deps, _, _ := setupRepos(t)
+	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps)
+	svc := NewImportService(projects, nodes, workItems, deps, uow)
 
 	schema := &importer.ImportSchema{
 		Project: importer.ProjectImport{

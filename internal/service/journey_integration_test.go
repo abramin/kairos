@@ -15,7 +15,7 @@ import (
 // TestFullUserJourney_CreatePopulateScheduleLogReplan exercises the core value loop:
 // create project → add nodes → add work items → what-now → log session → replan → verify re-estimation.
 func TestFullUserJourney_CreatePopulateScheduleLogReplan(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -53,7 +53,7 @@ func TestFullUserJourney_CreatePopulateScheduleLogReplan(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wiRead2))
 
 	// === Step 4: What-now recommendation ===
-	whatNowSvc := NewWhatNowService(workItems, sessions, projects, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -70,7 +70,7 @@ func TestFullUserJourney_CreatePopulateScheduleLogReplan(t *testing.T) {
 	}
 
 	// === Step 5: Log a session (simulates user doing work) ===
-	sessionSvc := NewSessionService(sessions, workItems)
+	sessionSvc := NewSessionService(sessions, workItems, uow)
 	sess := &domain.WorkSessionLog{
 		WorkItemID:     wiRead.ID,
 		StartedAt:      now.Add(-time.Hour),
@@ -120,7 +120,7 @@ func TestFullUserJourney_CreatePopulateScheduleLogReplan(t *testing.T) {
 // TestReplan_Idempotent_UnchangedInput verifies the documented invariant:
 // "Replan is idempotent over unchanged input."
 func TestReplan_Idempotent_UnchangedInput(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -176,7 +176,7 @@ func TestReplan_Idempotent_UnchangedInput(t *testing.T) {
 // TestReplan_Idempotent_WithUnitsTracking verifies idempotency when
 // re-estimation converges (running replan twice produces no further changes).
 func TestReplan_Idempotent_WithUnitsTracking(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()

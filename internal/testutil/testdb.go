@@ -20,3 +20,8 @@ func NewTestDB(t *testing.T) *sql.DB {
 	})
 	return database
 }
+
+// NewTestUoW creates a UnitOfWork backed by the given test database.
+func NewTestUoW(database *sql.DB) db.UnitOfWork {
+	return db.NewSQLiteUnitOfWork(database)
+}

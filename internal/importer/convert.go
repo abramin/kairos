@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/domain"
+	"github.com/alexanderramin/kairos/internal/generation"
 	tmpl "github.com/alexanderramin/kairos/internal/template"
 	"github.com/google/uuid"
 )
@@ -21,14 +22,17 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 	}
 
 	refMap := make(map[string]string) // ref -> UUID
-	nodes := convertNodes(schema.Nodes, project.ID, refMap, now)
+	nodes, err := convertNodes(schema.Nodes, project.ID, refMap, now)
+	if err != nil {
+		return nil, err
+	}
 
 	workItems, err := convertWorkItems(schema, refMap, now)
 	if err != nil {
 		return nil, err
 	}
 
-	assignSequentialIDs(nodes, workItems)
+	generation.AssignSequentialIDs(nodes, workItems)
 
 	deps, err := convertDependencies(schema, refMap)
 	if err != nil {
@@ -45,18 +49,14 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 
 // convertProject parses dates and builds the domain.Project.
 func convertProject(schema *ImportSchema, now time.Time) (*domain.Project, error) {
-	startDate, err := time.Parse("2006-01-02", schema.Project.StartDate)
+	startDate, err := generation.ParseRequiredDate(schema.Project.StartDate, "project.start_date")
 	if err != nil {
-		return nil, fmt.Errorf("parsing start_date: %w", err)
+		return nil, err
 	}
 
-	var targetDate *time.Time
-	if schema.Project.TargetDate != nil {
-		t, err := time.Parse("2006-01-02", *schema.Project.TargetDate)
-		if err != nil {
-			return nil, fmt.Errorf("parsing target_date: %w", err)
-		}
-		targetDate = &t
+	targetDate, err := generation.ParseOptionalDate(schema.Project.TargetDate, "project.target_date")
+	if err != nil {
+		return nil, err
 	}
 
 	return &domain.Project{
@@ -73,9 +73,9 @@ func convertProject(schema *ImportSchema, now time.Time) (*domain.Project, error
 }
 
 // convertNodes builds domain.PlanNode objects from schema nodes, populating refMap.
-func convertNodes(schemaNodes []NodeImport, projectID string, refMap map[string]string, now time.Time) []*domain.PlanNode {
+func convertNodes(schemaNodes []NodeImport, projectID string, refMap map[string]string, now time.Time) ([]*domain.PlanNode, error) {
 	nodes := make([]*domain.PlanNode, 0, len(schemaNodes))
-	for _, n := range schemaNodes {
+	for i, n := range schemaNodes {
 		realID := uuid.New().String()
 		refMap[n.Ref] = realID
 
@@ -91,6 +91,19 @@ func convertNodes(schemaNodes []NodeImport, projectID string, refMap map[string]
 			kind = string(domain.NodeGeneric)
 		}
 
+		dueDate, err := generation.ParseOptionalDate(n.DueDate, fmt.Sprintf("nodes[%d].due_date", i))
+		if err != nil {
+			return nil, err
+		}
+		notBefore, err := generation.ParseOptionalDate(n.NotBefore, fmt.Sprintf("nodes[%d].not_before", i))
+		if err != nil {
+			return nil, err
+		}
+		notAfter, err := generation.ParseOptionalDate(n.NotAfter, fmt.Sprintf("nodes[%d].not_after", i))
+		if err != nil {
+			return nil, err
+		}
+
 		node := &domain.PlanNode{
 			ID:               realID,
 			ProjectID:        projectID,
@@ -98,22 +111,27 @@ func convertNodes(schemaNodes []NodeImport, projectID string, refMap map[string]
 			Title:            n.Title,
 			Kind:             domain.NodeKind(kind),
 			OrderIndex:       n.Order,
-			DueDate:          parseOptionalDate(n.DueDate),
-			NotBefore:        parseOptionalDate(n.NotBefore),
-			NotAfter:         parseOptionalDate(n.NotAfter),
+			DueDate:          dueDate,
+			NotBefore:        notBefore,
+			NotAfter:         notAfter,
 			PlannedMinBudget: n.PlannedMinBudget,
 			CreatedAt:        now,
 			UpdatedAt:        now,
 		}
 		nodes = append(nodes, node)
 	}
-	return nodes
+	return nodes, nil
 }
 
 // convertWorkItems builds domain.WorkItem objects from schema work items, applying defaults cascade.
 func convertWorkItems(schema *ImportSchema, refMap map[string]string, now time.Time) ([]*domain.WorkItem, error) {
 	workItems := make([]*domain.WorkItem, 0, len(schema.WorkItems))
-	for _, wi := range schema.WorkItems {
+	defaults := generation.WorkItemDefaultsInput{}
+	if schema.Defaults != nil {
+		defaults.DurationMode = schema.Defaults.DurationMode
+		defaults.SessionPolicy = schema.Defaults.SessionPolicy
+	}
+	for i, wi := range schema.WorkItems {
 		realID := uuid.New().String()
 		refMap[wi.Ref] = realID
 
@@ -123,27 +141,19 @@ func convertWorkItems(schema *ImportSchema, refMap map[string]string, now time.T
 		}
 
 		// Apply defaults cascade: work item field > schema defaults > hardcoded
-		durationMode := domain.CoalesceStr(wi.DurationMode, defaultDurationMode(schema.Defaults), "estimate")
+		resolved := generation.ResolveWorkItemDefaults(
+			generation.WorkItemDefaultsInput{
+				DurationMode:       wi.DurationMode,
+				SessionPolicy:      wi.SessionPolicy,
+				PlannedMin:         wi.PlannedMin,
+				EstimateConfidence: wi.EstimateConfidence,
+			},
+			defaults,
+		)
 		status := wi.Status
 		if status == "" {
 			status = "todo"
 		}
-
-		minSession := domain.IntFromPtrWithDefault(15,
-			tmpl.SessionPolicyField(wi.SessionPolicy, "min"),
-			tmpl.SessionPolicyField(defaultSessionPolicy(schema.Defaults), "min"))
-		maxSession := domain.IntFromPtrWithDefault(60,
-			tmpl.SessionPolicyField(wi.SessionPolicy, "max"),
-			tmpl.SessionPolicyField(defaultSessionPolicy(schema.Defaults), "max"))
-		defSession := domain.IntFromPtrWithDefault(30,
-			tmpl.SessionPolicyField(wi.SessionPolicy, "default"),
-			tmpl.SessionPolicyField(defaultSessionPolicy(schema.Defaults), "default"))
-		splittable := domain.BoolFromPtrWithDefault(true,
-			tmpl.SessionPolicySplittable(wi.SessionPolicy),
-			tmpl.SessionPolicySplittable(defaultSessionPolicy(schema.Defaults)))
-
-		plannedMin := domain.IntFromPtrWithDefault(0, wi.PlannedMin)
-		estimateConf := domain.Float64FromPtrWithDefault(0.5, wi.EstimateConfidence)
 
 		var unitsKind string
 		var unitsTotal int
@@ -156,8 +166,17 @@ func convertWorkItems(schema *ImportSchema, refMap map[string]string, now time.T
 		loggedMin := 0
 		if wi.LoggedMin != nil {
 			loggedMin = *wi.LoggedMin
-		} else if status == "done" && plannedMin > 0 {
-			loggedMin = plannedMin
+		} else if status == "done" && resolved.PlannedMin > 0 {
+			loggedMin = resolved.PlannedMin
+		}
+
+		dueDate, err := generation.ParseOptionalDate(wi.DueDate, fmt.Sprintf("work_items[%d].due_date", i))
+		if err != nil {
+			return nil, err
+		}
+		notBefore, err := generation.ParseOptionalDate(wi.NotBefore, fmt.Sprintf("work_items[%d].not_before", i))
+		if err != nil {
+			return nil, err
 		}
 
 		item := &domain.WorkItem{
@@ -166,42 +185,25 @@ func convertWorkItems(schema *ImportSchema, refMap map[string]string, now time.T
 			Title:              wi.Title,
 			Type:               wi.Type,
 			Status:             domain.WorkItemStatus(status),
-			DurationMode:       domain.DurationMode(durationMode),
-			PlannedMin:         plannedMin,
+			DurationMode:       domain.DurationMode(resolved.DurationMode),
+			PlannedMin:         resolved.PlannedMin,
 			LoggedMin:          loggedMin,
 			DurationSource:     domain.SourceManual,
-			EstimateConfidence: estimateConf,
-			MinSessionMin:      minSession,
-			MaxSessionMin:      maxSession,
-			DefaultSessionMin:  defSession,
-			Splittable:         splittable,
+			EstimateConfidence: resolved.EstimateConfidence,
+			MinSessionMin:      resolved.MinSessionMin,
+			MaxSessionMin:      resolved.MaxSessionMin,
+			DefaultSessionMin:  resolved.DefaultSessionMin,
+			Splittable:         resolved.Splittable,
 			UnitsKind:          unitsKind,
 			UnitsTotal:         unitsTotal,
-			DueDate:            parseOptionalDate(wi.DueDate),
-			NotBefore:          parseOptionalDate(wi.NotBefore),
+			DueDate:            dueDate,
+			NotBefore:          notBefore,
 			CreatedAt:          now,
 			UpdatedAt:          now,
 		}
 		workItems = append(workItems, item)
 	}
 	return workItems, nil
-}
-
-// assignSequentialIDs assigns Seq values in tree order: node, then its work items, then next node.
-func assignSequentialIDs(nodes []*domain.PlanNode, workItems []*domain.WorkItem) {
-	wiByNode := make(map[string][]*domain.WorkItem, len(nodes))
-	for _, wi := range workItems {
-		wiByNode[wi.NodeID] = append(wiByNode[wi.NodeID], wi)
-	}
-	seq := 1
-	for _, node := range nodes {
-		node.Seq = seq
-		seq++
-		for _, wi := range wiByNode[node.ID] {
-			wi.Seq = seq
-			seq++
-		}
-	}
 }
 
 // convertDependencies builds explicit dependencies or infers a default linear chain.
@@ -228,31 +230,6 @@ func convertDependencies(schema *ImportSchema, refMap map[string]string) ([]doma
 	return deps, nil
 }
 
-func parseOptionalDate(s *string) *time.Time {
-	if s == nil || *s == "" {
-		return nil
-	}
-	t, err := time.Parse("2006-01-02", *s)
-	if err != nil {
-		return nil
-	}
-	return &t
-}
-
-func defaultDurationMode(d *DefaultsImport) string {
-	if d != nil {
-		return d.DurationMode
-	}
-	return ""
-}
-
-func defaultSessionPolicy(d *DefaultsImport) *SessionPolicyImport {
-	if d != nil {
-		return d.SessionPolicy
-	}
-	return nil
-}
-
 // inferImportDeps builds DependencyCandidate entries from import schema types
 // and delegates to the shared InferLinearDependencies algorithm.
 func inferImportDeps(nodes []NodeImport, workItems []WorkItemImport, refMap map[string]string) []domain.Dependency {
@@ -263,9 +240,9 @@ func inferImportDeps(nodes []NodeImport, workItems []WorkItemImport, refMap map[
 		nodeOrder[n.Ref] = n.Order
 	}
 
-	candidates := make([]tmpl.DependencyCandidate, 0, len(workItems))
+	candidates := make([]generation.DependencyCandidate, 0, len(workItems))
 	for i, wi := range workItems {
-		candidates = append(candidates, tmpl.DependencyCandidate{
+		candidates = append(candidates, generation.DependencyCandidate{
 			ID:        refMap[wi.Ref],
 			NodeOrder: nodeOrder[wi.NodeRef],
 			NodePos:   nodePos[wi.NodeRef],
@@ -273,5 +250,5 @@ func inferImportDeps(nodes []NodeImport, workItems []WorkItemImport, refMap map[
 		})
 	}
 
-	return tmpl.InferLinearDependencies(candidates)
+	return generation.InferLinearDependencies(candidates)
 }

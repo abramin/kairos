@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	"github.com/alexanderramin/kairos/internal/contract"
+	"github.com/alexanderramin/kairos/internal/app"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/importer"
 )
@@ -52,15 +52,15 @@ type SessionService interface {
 }
 
 type WhatNowService interface {
-	Recommend(ctx context.Context, req contract.WhatNowRequest) (*contract.WhatNowResponse, error)
+	Recommend(ctx context.Context, req app.WhatNowRequest) (*app.WhatNowResponse, error)
 }
 
 type StatusService interface {
-	GetStatus(ctx context.Context, req contract.StatusRequest) (*contract.StatusResponse, error)
+	GetStatus(ctx context.Context, req app.StatusRequest) (*app.StatusResponse, error)
 }
 
 type ReplanService interface {
-	Replan(ctx context.Context, req contract.ReplanRequest) (*contract.ReplanResponse, error)
+	Replan(ctx context.Context, req app.ReplanRequest) (*app.ReplanResponse, error)
 }
 
 type TemplateService interface {
@@ -69,13 +69,7 @@ type TemplateService interface {
 	InitProject(ctx context.Context, templateName string, projectName string, shortID string, startDate string, dueDate *string, vars map[string]string) (*domain.Project, error)
 }
 
-// ImportResult holds the outcome of a project import.
-type ImportResult struct {
-	Project         *domain.Project
-	NodeCount       int
-	WorkItemCount   int
-	DependencyCount int
-}
+type ImportResult = app.ImportResult
 
 type ImportService interface {
 	ImportProject(ctx context.Context, filePath string) (*ImportResult, error)
