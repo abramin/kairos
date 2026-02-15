@@ -70,7 +70,7 @@ func TestFullUserJourney_CreatePopulateScheduleLogReplan(t *testing.T) {
 	}
 
 	// === Step 5: Log a session (simulates user doing work) ===
-	sessionSvc := NewSessionService(sessions, workItems, uow)
+	sessionSvc := NewSessionService(sessions, uow)
 	sess := &domain.WorkSessionLog{
 		WorkItemID:     wiRead.ID,
 		StartedAt:      now.Add(-time.Hour),
@@ -92,7 +92,7 @@ func TestFullUserJourney_CreatePopulateScheduleLogReplan(t *testing.T) {
 	assert.NotEqual(t, 100, updatedWI.PlannedMin, "planned_min should be re-estimated after session with units")
 
 	// === Step 6: Replan ===
-	replanSvc := NewReplanService(projects, workItems, sessions, profiles)
+	replanSvc := NewReplanService(projects, workItems, sessions, profiles, uow)
 	replanReq := contract.NewReplanRequest(domain.TriggerManual)
 	replanReq.Now = &now
 
@@ -120,7 +120,7 @@ func TestFullUserJourney_CreatePopulateScheduleLogReplan(t *testing.T) {
 // TestReplan_Idempotent_UnchangedInput verifies the documented invariant:
 // "Replan is idempotent over unchanged input."
 func TestReplan_Idempotent_UnchangedInput(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -143,7 +143,7 @@ func TestReplan_Idempotent_UnchangedInput(t *testing.T) {
 	sess := testutil.NewTestSession(wi.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sess))
 
-	svc := NewReplanService(projects, workItems, sessions, profiles)
+	svc := NewReplanService(projects, workItems, sessions, profiles, uow)
 	req := contract.NewReplanRequest(domain.TriggerManual)
 	req.Now = &now
 
@@ -176,7 +176,7 @@ func TestReplan_Idempotent_UnchangedInput(t *testing.T) {
 // TestReplan_Idempotent_WithUnitsTracking verifies idempotency when
 // re-estimation converges (running replan twice produces no further changes).
 func TestReplan_Idempotent_WithUnitsTracking(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -200,7 +200,7 @@ func TestReplan_Idempotent_WithUnitsTracking(t *testing.T) {
 	sess := testutil.NewTestSession(wi.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sess))
 
-	svc := NewReplanService(projects, workItems, sessions, profiles)
+	svc := NewReplanService(projects, workItems, sessions, profiles, uow)
 	req := contract.NewReplanRequest(domain.TriggerManual)
 	req.Now = &now
 

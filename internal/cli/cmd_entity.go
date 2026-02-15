@@ -10,7 +10,6 @@ import (
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/domain"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/huh"
 	"github.com/google/uuid"
 )
 
@@ -127,16 +126,7 @@ func (c *commandBar) workAddGetMinutes(nodeID, title, wiType string) tea.Cmd {
 
 func (c *commandBar) workAddGetDueDate(nodeID, title, wiType, minutes string) tea.Cmd {
 	var dueDate string
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Due Date (YYYY-MM-DD, blank for none)").
-				Placeholder("2025-06-30").
-				Value(&dueDate).
-				Validate(validateOptionalDate),
-		),
-	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
-	return startWizardCmd(c.state, "Due Date", form, func() tea.Cmd {
+	return startWizardCmd(c.state, "Due Date", dueDateForm(&dueDate), func() tea.Cmd {
 		ctx := context.Background()
 		w := &domain.WorkItem{
 			ID:        uuid.New().String(),

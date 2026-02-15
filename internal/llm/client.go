@@ -233,14 +233,14 @@ func errorCode(err error) string {
 	switch {
 	case err == nil:
 		return ""
-	case isTimeoutError(err):
+	case isTimeoutError(err) || errors.Is(err, ErrTimeout):
 		return "TIMEOUT"
-	case errors.Is(err, ErrTimeout):
-		return "TIMEOUT"
-	case errors.Is(err, ErrOllamaUnavailable):
+	case isConnectionError(err) || errors.Is(err, ErrOllamaUnavailable):
 		return "UNAVAILABLE"
 	case errors.Is(err, ErrInvalidOutput):
 		return "INVALID_OUTPUT"
+	case errors.Is(err, ErrRetryExhausted):
+		return "RETRY_EXHAUSTED"
 	default:
 		return "UNKNOWN"
 	}

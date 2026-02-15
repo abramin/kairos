@@ -14,6 +14,7 @@ import (
 type whatNowService struct {
 	loader   *ContextLoader
 	resolver *BlockResolver
+	observer UseCaseObserver
 }
 
 func NewWhatNowService(
@@ -21,6 +22,7 @@ func NewWhatNowService(
 	sessions repository.SessionRepo,
 	deps repository.DependencyRepo,
 	profiles repository.UserProfileRepo,
+	observers ...UseCaseObserver,
 ) WhatNowService {
 	return &whatNowService{
 		loader: &ContextLoader{
@@ -29,16 +31,40 @@ func NewWhatNowService(
 			profiles:  profiles,
 		},
 		resolver: &BlockResolver{deps: deps},
+		observer: useCaseObserverOrNoop(observers),
 	}
 }
 
-func (s *whatNowService) Recommend(ctx context.Context, req app.WhatNowRequest) (*app.WhatNowResponse, error) {
+func (s *whatNowService) Recommend(ctx context.Context, req app.WhatNowRequest) (resp *app.WhatNowResponse, err error) {
+	startedAt := time.Now().UTC()
+	fields := map[string]any{
+		"available_min":     req.AvailableMin,
+		"enforce_variation": req.EnforceVariation,
+	}
+	defer func() {
+		if resp != nil {
+			fields["recommendation_count"] = len(resp.Recommendations)
+			fields["blocker_count"] = len(resp.Blockers)
+			fields["mode"] = string(resp.Mode)
+		}
+		s.observer.ObserveUseCase(ctx, UseCaseEvent{
+			Name:      "what-now",
+			StartedAt: startedAt,
+			Duration:  time.Since(startedAt),
+			Success:   err == nil,
+			Err:       err,
+			Fields:    fields,
+		})
+	}()
+
 	maxSlices := req.MaxSlices
 	if maxSlices <= 0 {
 		maxSlices = 3
 	}
+	fields["max_slices"] = maxSlices
 
-	rctx, err := s.loader.Load(ctx, req)
+	var rctx *RecommendationContext
+	rctx, err = s.loader.Load(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +72,9 @@ func (s *whatNowService) Recommend(ctx context.Context, req app.WhatNowRequest) 
 	agg := ComputeAggregates(rctx)
 	mode := DetermineMode(agg)
 
-	unblocked, blockers, err := s.resolver.Resolve(ctx, rctx.Candidates, rctx.Now)
+	var unblocked []repository.SchedulableCandidate
+	var blockers []app.ConstraintBlocker
+	unblocked, blockers, err = s.resolver.Resolve(ctx, rctx.Candidates, rctx.Now)
 	if err != nil {
 		return nil, err
 	}
@@ -57,7 +85,8 @@ func (s *whatNowService) Recommend(ctx context.Context, req app.WhatNowRequest) 
 	slices, allocBlockers := scheduler.AllocateSlices(scored, req.AvailableMin, maxSlices, req.EnforceVariation)
 	blockers = append(blockers, allocBlockers...)
 
-	return AssembleResponse(rctx.Now, mode, req.AvailableMin, slices, blockers, agg), nil
+	resp = AssembleResponse(rctx.Now, mode, req.AvailableMin, slices, blockers, agg)
+	return resp, nil
 }
 
 // --- Internal types and helpers used by ComputeAggregates ---

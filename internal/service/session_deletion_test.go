@@ -29,7 +29,7 @@ func TestSessionDelete_DoesNotRollBackLoggedMin(t *testing.T) {
 		testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo, uow)
+	svc := NewSessionService(sessRepo, uow)
 
 	// Log a session — logged_min should increase.
 	sess := testutil.NewTestSession(wi.ID, 45)
@@ -68,7 +68,7 @@ func TestSessionDelete_DoesNotAffectReEstimation(t *testing.T) {
 		testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo, uow)
+	svc := NewSessionService(sessRepo, uow)
 
 	// Log session: 60 min for 3 chapters → pace = 20 min/ch → implied = 200
 	// Smooth: round(0.7*100 + 0.3*200) = 130
@@ -106,7 +106,7 @@ func TestSessionDelete_SessionNoLongerListed(t *testing.T) {
 		testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo, uow)
+	svc := NewSessionService(sessRepo, uow)
 
 	// Log two sessions.
 	sess1 := testutil.NewTestSession(wi.ID, 30)
@@ -153,7 +153,7 @@ func TestSessionDelete_WorkItemStatusPreserved(t *testing.T) {
 		testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	svc := NewSessionService(sessRepo, wiRepo, uow)
+	svc := NewSessionService(sessRepo, uow)
 
 	// Log session → auto-transitions to in_progress.
 	sess := testutil.NewTestSession(wi.ID, 20)
@@ -197,8 +197,8 @@ func TestSessionDelete_ReplanConvergesAfterDeletion(t *testing.T) {
 	)
 	require.NoError(t, wiRepo.Create(ctx, wi))
 
-	sessSvc := NewSessionService(sessRepo, wiRepo, uow)
-	replanSvc := NewReplanService(projRepo, wiRepo, sessRepo, profRepo)
+	sessSvc := NewSessionService(sessRepo, uow)
+	replanSvc := NewReplanService(projRepo, wiRepo, sessRepo, profRepo, uow)
 	whatNowSvc := NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo)
 
 	// Log two sessions with units (triggers re-estimation each time).

@@ -33,10 +33,10 @@ func testApp(t *testing.T) *App {
 		Projects:  service.NewProjectService(projRepo),
 		Nodes:     service.NewNodeService(nodeRepo, uow),
 		WorkItems: service.NewWorkItemService(wiRepo, nodeRepo, uow),
-		Sessions:  service.NewSessionService(sessRepo, wiRepo, uow),
+		Sessions:  service.NewSessionService(sessRepo, uow),
 		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo),
 		Status:    service.NewStatusService(projRepo, wiRepo, sessRepo, profRepo),
-		Replan:    service.NewReplanService(projRepo, wiRepo, sessRepo, profRepo),
+		Replan:    service.NewReplanService(projRepo, wiRepo, sessRepo, profRepo, uow),
 		// Templates and Import left nil — not tested here.
 		// Intelligence services left nil — LLM disabled.
 	}
@@ -104,9 +104,9 @@ func testAppFull(t *testing.T) *App {
 	profRepo := repository.NewSQLiteUserProfileRepo(db)
 
 	templateDir := findTemplatesDir(t)
-	sessionSvc := service.NewSessionService(sessRepo, wiRepo, uow)
-	templateSvc := service.NewTemplateService(templateDir, projRepo, nodeRepo, wiRepo, depRepo, uow)
-	importSvc := service.NewImportService(projRepo, nodeRepo, wiRepo, depRepo, uow)
+	sessionSvc := service.NewSessionService(sessRepo, uow)
+	templateSvc := service.NewTemplateService(templateDir, uow)
+	importSvc := service.NewImportService(uow)
 
 	return &App{
 		Projects:      service.NewProjectService(projRepo),
@@ -115,7 +115,7 @@ func testAppFull(t *testing.T) *App {
 		Sessions:      sessionSvc,
 		WhatNow:       service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo),
 		Status:        service.NewStatusService(projRepo, wiRepo, sessRepo, profRepo),
-		Replan:        service.NewReplanService(projRepo, wiRepo, sessRepo, profRepo),
+		Replan:        service.NewReplanService(projRepo, wiRepo, sessRepo, profRepo, uow),
 		Templates:     templateSvc,
 		Import:        importSvc,
 		LogSession:    sessionSvc,

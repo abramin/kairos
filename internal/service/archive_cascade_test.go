@@ -196,7 +196,7 @@ func TestE2E_ArchiveProject_FullWorkflow(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wi3))
 
 	// Create session logs
-	sessionSvc := NewSessionService(sessions, workItems, uow)
+	sessionSvc := NewSessionService(sessions, uow)
 	session1 := &domain.WorkSessionLog{
 		WorkItemID: wi1.ID,
 		StartedAt:  now.Add(-2 * time.Hour),

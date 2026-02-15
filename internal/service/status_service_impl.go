@@ -56,33 +56,40 @@ func (s *statusService) GetStatus(ctx context.Context, req app.StatusRequest) (*
 
 	projects = filterProjectsByScope(projects, req.ProjectScope)
 
-	var views []app.ProjectStatusView
-	countOnTrack, countAtRisk, countCritical := 0, 0, 0
-	hasCritical := false
+	views, err := s.buildProjectViews(ctx, projects, profile, days, now)
+	if err != nil {
+		return nil, err
+	}
 
+	sortStatusViews(views)
+
+	return &app.StatusResponse{
+		Summary: buildStatusSummary(views, now),
+		Projects: views,
+	}, nil
+}
+
+func (s *statusService) buildProjectViews(
+	ctx context.Context,
+	projects []*domain.Project,
+	profile *domain.UserProfile,
+	days int,
+	now time.Time,
+) ([]app.ProjectStatusView, error) {
+	var views []app.ProjectStatusView
 	for _, p := range projects {
 		if p.Status != domain.ProjectActive {
 			continue
 		}
 
-		items, err := s.workItems.ListByProject(ctx, p.ID)
+		snap, _, err := computeProjectRiskSnapshot(ctx, p, s.workItems, s.sessions, profile, days, now)
 		if err != nil {
-			return nil, fmt.Errorf("loading work items for project %s: %w", p.ID, err)
+			return nil, err
 		}
-
-		m := aggregateProjectMetrics(items, p, now)
-
-		recentSessions, err := s.sessions.ListRecentByProject(ctx, p.ID, days)
-		if err != nil {
-			return nil, fmt.Errorf("loading recent sessions for project %s: %w", p.ID, err)
-		}
-		recentDailyMin, effectiveDailyMin := recentDailyPace(recentSessions, days, profile.BaselineDailyMin)
-
-		riskResult := scheduler.ComputeRisk(buildRiskInput(m, p.TargetDate, profile.BufferPct, effectiveDailyMin, now))
 
 		var structuralPct float64
-		if m.TotalCount > 0 {
-			structuralPct = float64(m.DoneCount) / float64(m.TotalCount) * 100
+		if snap.Metrics.TotalCount > 0 {
+			structuralPct = float64(snap.Metrics.DoneCount) / float64(snap.Metrics.TotalCount) * 100
 		}
 
 		var dueDateStr *string
@@ -91,45 +98,34 @@ func (s *statusService) GetStatus(ctx context.Context, req app.StatusRequest) (*
 			dueDateStr = &ds
 		}
 
-		view := app.ProjectStatusView{
+		views = append(views, app.ProjectStatusView{
 			ProjectID:             p.ID,
 			ProjectName:           p.Name,
 			Status:                p.Status,
-			RiskLevel:             riskResult.Level,
+			RiskLevel:             snap.Risk.Level,
 			DueDate:               dueDateStr,
-			DaysLeft:              riskResult.DaysLeft,
-			ProgressTimePct:       riskResult.ProgressTimePct,
+			DaysLeft:              snap.Risk.DaysLeft,
+			ProgressTimePct:       snap.Risk.ProgressTimePct,
 			ProgressStructuralPct: structuralPct,
-			PlannedMinTotal:       m.PlannedMin,
-			LoggedMinTotal:        m.LoggedMin,
-			RemainingMinTotal:     riskResult.RemainingMin,
-			RequiredDailyMin:      riskResult.RequiredDailyMin,
-			RecentDailyMin:        recentDailyMin,
-			SlackMinPerDay:        riskResult.SlackMinPerDay,
-			SafeForSecondaryWork:  riskResult.Level == domain.RiskOnTrack,
-		}
-
-		views = append(views, view)
-
-		switch riskResult.Level {
-		case domain.RiskOnTrack:
-			countOnTrack++
-		case domain.RiskAtRisk:
-			countAtRisk++
-		case domain.RiskCritical:
-			countCritical++
-			hasCritical = true
-		}
+			PlannedMinTotal:       snap.Metrics.PlannedMin,
+			LoggedMinTotal:        snap.Metrics.LoggedMin,
+			RemainingMinTotal:     snap.Risk.RemainingMin,
+			RequiredDailyMin:      snap.Risk.RequiredDailyMin,
+			RecentDailyMin:        snap.RecentDailyMin,
+			SlackMinPerDay:        snap.Risk.SlackMinPerDay,
+			SafeForSecondaryWork:  snap.Risk.Level == domain.RiskOnTrack,
+		})
 	}
+	return views, nil
+}
 
-	// Sort views by canonical order
+func sortStatusViews(views []app.ProjectStatusView) {
 	sort.Slice(views, func(i, j int) bool {
 		ri := scheduler.RiskPriority(views[i].RiskLevel)
 		rj := scheduler.RiskPriority(views[j].RiskLevel)
 		if ri != rj {
 			return ri < rj
 		}
-		// Earliest due date first, nil last
 		if (views[i].DueDate == nil) != (views[j].DueDate == nil) {
 			return views[i].DueDate != nil
 		}
@@ -138,29 +134,40 @@ func (s *statusService) GetStatus(ctx context.Context, req app.StatusRequest) (*
 		}
 		return views[i].ProjectName < views[j].ProjectName
 	})
+}
+
+func buildStatusSummary(views []app.ProjectStatusView, now time.Time) app.GlobalStatusSummary {
+	var countOnTrack, countAtRisk, countCritical int
+	for _, v := range views {
+		switch v.RiskLevel {
+		case domain.RiskOnTrack:
+			countOnTrack++
+		case domain.RiskAtRisk:
+			countAtRisk++
+		case domain.RiskCritical:
+			countCritical++
+		}
+	}
 
 	globalMode := domain.ModeBalanced
-	if hasCritical {
+	if countCritical > 0 {
 		globalMode = domain.ModeCritical
 	}
 
 	policyMsg := "All projects on track"
-	if hasCritical {
+	if countCritical > 0 {
 		policyMsg = "Critical work requires attention"
 	} else if countAtRisk > 0 {
 		policyMsg = "Some projects at risk, monitor closely"
 	}
 
-	return &app.StatusResponse{
-		Summary: app.GlobalStatusSummary{
-			GeneratedAt:     now,
-			CountsTotal:     countOnTrack + countAtRisk + countCritical,
-			CountsOnTrack:   countOnTrack,
-			CountsAtRisk:    countAtRisk,
-			CountsCritical:  countCritical,
-			GlobalModeIfNow: globalMode,
-			PolicyMessage:   policyMsg,
-		},
-		Projects: views,
-	}, nil
+	return app.GlobalStatusSummary{
+		GeneratedAt:     now,
+		CountsTotal:     countOnTrack + countAtRisk + countCritical,
+		CountsOnTrack:   countOnTrack,
+		CountsAtRisk:    countAtRisk,
+		CountsCritical:  countCritical,
+		GlobalModeIfNow: globalMode,
+		PolicyMessage:   policyMsg,
+	}
 }

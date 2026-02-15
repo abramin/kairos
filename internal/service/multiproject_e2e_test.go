@@ -19,11 +19,11 @@ import (
 // correct recommendations: critical-first ordering, session bounds, variation, and
 // allocation invariants.
 func TestE2E_MultiProjectWhatNow_FullPipeline(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
+	projects, _, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
-	importSvc := NewImportService(projects, nodes, workItems, deps, uow)
+	importSvc := NewImportService(uow)
 
 	// === Import 3 projects via ImportSchema (same path as JSON import) ===
 

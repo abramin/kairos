@@ -38,7 +38,7 @@ func TestLogSession_RollbackOnSessionCreateFailure(t *testing.T) {
 		Err:    fmt.Errorf("injected session create failure"),
 	}
 
-	svc := NewSessionService(sessRepo, wiRepo, failUoW)
+	svc := NewSessionService(sessRepo, failUoW)
 
 	session := testutil.NewTestSession(item.ID, 30)
 	err := svc.LogSession(ctx, session)
@@ -81,7 +81,7 @@ func TestLogSession_RollbackOnWorkItemUpdateFailure(t *testing.T) {
 		Err:    fmt.Errorf("injected update failure"),
 	}
 
-	svc := NewSessionService(sessRepo, wiRepo, failUoW)
+	svc := NewSessionService(sessRepo, failUoW)
 
 	session := testutil.NewTestSession(item.ID, 30)
 	err := svc.LogSession(ctx, session)

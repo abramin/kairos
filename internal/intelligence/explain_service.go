@@ -58,7 +58,7 @@ func (s *explainService) WeeklyReview(ctx context.Context, trace WeeklyReviewTra
 }
 
 // generateExplanation is the shared pipeline: marshal → LLM call → extract JSON → validate evidence.
-// On any failure, it falls back to the deterministic function.
+// On any failure, it falls back to the deterministic function with Source="deterministic".
 func (s *explainService) generateExplanation(
 	ctx context.Context,
 	systemPrompt string,
@@ -66,9 +66,15 @@ func (s *explainService) generateExplanation(
 	validKeys map[string]bool,
 	fallback func() *LLMExplanation,
 ) (*LLMExplanation, error) {
+	useFallback := func() (*LLMExplanation, error) {
+		result := fallback()
+		result.Source = "deterministic"
+		return result, nil
+	}
+
 	dataJSON, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
-		return fallback(), nil
+		return useFallback()
 	}
 
 	resp, err := s.client.Generate(ctx, llm.GenerateRequest{
@@ -77,17 +83,18 @@ func (s *explainService) generateExplanation(
 		UserPrompt:   string(dataJSON),
 	})
 	if err != nil {
-		return fallback(), nil
+		return useFallback()
 	}
 
 	explanation, err := llm.ExtractJSON[LLMExplanation](resp.Text, nil)
 	if err != nil {
-		return fallback(), nil
+		return useFallback()
 	}
 
 	if valErr := ValidateEvidenceBindings(explanation.Factors, validKeys); valErr != nil {
-		return fallback(), nil
+		return useFallback()
 	}
 
+	explanation.Source = "llm"
 	return &explanation, nil
 }

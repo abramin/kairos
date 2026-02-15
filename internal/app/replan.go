@@ -13,6 +13,7 @@ type ReplanRequest struct {
 	Strategy                    string // "rebalance" or "deadline_first"
 	PreserveExistingAssignments bool
 	IncludeArchived             bool
+	IncludeRecentSessionDays    int // lookback window for pace calculation; 0 defaults to 7
 	Explain                     bool
 }
 
@@ -21,6 +22,7 @@ func NewReplanRequest(trigger domain.ReplanTrigger) ReplanRequest {
 		Trigger:                     trigger,
 		Strategy:                    "rebalance",
 		PreserveExistingAssignments: true,
+		IncludeRecentSessionDays:    7,
 		Explain:                     true,
 	}
 }

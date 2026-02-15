@@ -36,7 +36,7 @@ func TestTemplateServiceList_SkipsInvalidTemplates(t *testing.T) {
 		t.Fatalf("write broken template: %v", err)
 	}
 
-	svc := NewTemplateService(templateDir, nil, nil, nil, nil, nil)
+	svc := NewTemplateService(templateDir, nil)
 	list, err := svc.List(context.Background())
 	if err != nil {
 		t.Fatalf("List() error: %v", err)
@@ -66,7 +66,7 @@ func TestTemplateServiceGet_ResolvesByStemIDAndName(t *testing.T) {
 		t.Fatalf("write template: %v", err)
 	}
 
-	svc := NewTemplateService(templateDir, nil, nil, nil, nil, nil)
+	svc := NewTemplateService(templateDir, nil)
 
 	tests := []string{
 		"ou_module_weekly",
@@ -94,7 +94,7 @@ func TestTemplateServiceGet_ResolvesByStemIDAndName(t *testing.T) {
 func TestTemplateServiceGet_NotFound(t *testing.T) {
 	t.Parallel()
 
-	svc := NewTemplateService(t.TempDir(), nil, nil, nil, nil, nil)
+	svc := NewTemplateService(t.TempDir(), nil)
 	if _, err := svc.Get(context.Background(), "missing"); err == nil {
 		t.Fatal("expected error for missing template")
 	}
@@ -130,7 +130,7 @@ func TestTemplateServiceGet_ResolvesByNumericID(t *testing.T) {
 		t.Fatalf("write invalid template: %v", err)
 	}
 
-	svc := NewTemplateService(templateDir, nil, nil, nil, nil, nil)
+	svc := NewTemplateService(templateDir, nil)
 
 	first, err := svc.Get(context.Background(), "1")
 	if err != nil {

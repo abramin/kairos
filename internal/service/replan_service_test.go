@@ -13,7 +13,7 @@ import (
 )
 
 func TestReplan_SmoothReEstimation_UpdatesDB(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -41,7 +41,7 @@ func TestReplan_SmoothReEstimation_UpdatesDB(t *testing.T) {
 	sess := testutil.NewTestSession(wi.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sess))
 
-	svc := NewReplanService(projects, workItems, sessions, profiles)
+	svc := NewReplanService(projects, workItems, sessions, profiles, uow)
 	req := contract.NewReplanRequest(domain.TriggerManual)
 	req.Now = &now
 
@@ -59,7 +59,7 @@ func TestReplan_SmoothReEstimation_UpdatesDB(t *testing.T) {
 }
 
 func TestReplan_Converges_WithRepeatedRuns(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -86,7 +86,7 @@ func TestReplan_Converges_WithRepeatedRuns(t *testing.T) {
 	sess := testutil.NewTestSession(wi.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sess))
 
-	svc := NewReplanService(projects, workItems, sessions, profiles)
+	svc := NewReplanService(projects, workItems, sessions, profiles, uow)
 	req := contract.NewReplanRequest(domain.TriggerManual)
 	req.Now = &now
 
@@ -113,7 +113,7 @@ func TestReplan_Converges_WithRepeatedRuns(t *testing.T) {
 }
 
 func TestReplan_NoActiveProjects_ReturnsError(t *testing.T) {
-	projects, _, _, _, sessions, profiles, _ := setupRepos(t)
+	projects, _, _, _, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -123,7 +123,7 @@ func TestReplan_NoActiveProjects_ReturnsError(t *testing.T) {
 	require.NoError(t, projects.Create(ctx, proj))
 	require.NoError(t, projects.Archive(ctx, proj.ID))
 
-	svc := NewReplanService(projects, nil, sessions, profiles)
+	svc := NewReplanService(projects, nil, sessions, profiles, uow)
 	req := contract.NewReplanRequest(domain.TriggerManual)
 	req.Now = &now
 
@@ -136,7 +136,7 @@ func TestReplan_NoActiveProjects_ReturnsError(t *testing.T) {
 }
 
 func TestReplan_RiskDeltaCalculated(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -158,7 +158,7 @@ func TestReplan_RiskDeltaCalculated(t *testing.T) {
 	sess := testutil.NewTestSession(wi.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sess))
 
-	svc := NewReplanService(projects, workItems, sessions, profiles)
+	svc := NewReplanService(projects, workItems, sessions, profiles, uow)
 	req := contract.NewReplanRequest(domain.TriggerManual)
 	req.Now = &now
 
@@ -175,7 +175,7 @@ func TestReplan_RiskDeltaCalculated(t *testing.T) {
 }
 
 func TestReplan_Idempotency_UnchangedInputProducesZeroChanges(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -202,7 +202,7 @@ func TestReplan_Idempotency_UnchangedInputProducesZeroChanges(t *testing.T) {
 	sess := testutil.NewTestSession(wi.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sess))
 
-	svc := NewReplanService(projects, workItems, sessions, profiles)
+	svc := NewReplanService(projects, workItems, sessions, profiles, uow)
 	req := contract.NewReplanRequest(domain.TriggerManual)
 	req.Now = &now
 
@@ -238,7 +238,7 @@ func TestReplan_Idempotency_UnchangedInputProducesZeroChanges(t *testing.T) {
 }
 
 func TestReplan_Idempotency_MultipleCallsConvergeThenStabilize(t *testing.T) {
-	projects, nodes, workItems, _, sessions, profiles, _ := setupRepos(t)
+	projects, nodes, workItems, _, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
@@ -263,7 +263,7 @@ func TestReplan_Idempotency_MultipleCallsConvergeThenStabilize(t *testing.T) {
 	sess := testutil.NewTestSession(wi.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sess))
 
-	svc := NewReplanService(projects, workItems, sessions, profiles)
+	svc := NewReplanService(projects, workItems, sessions, profiles, uow)
 	req := contract.NewReplanRequest(domain.TriggerManual)
 	req.Now = &now
 

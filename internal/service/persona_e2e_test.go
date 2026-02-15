@@ -73,7 +73,7 @@ func TestPersona_GradStudent_MixedCompletion(t *testing.T) {
 	// No sessions for C — zero activity.
 
 	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems, uow)
+	sessionSvc := NewSessionService(sessions, uow)
 
 	// === Phase 1: Initial query — C should trigger critical mode ===
 	req := contract.NewWhatNowRequest(60)
@@ -244,7 +244,7 @@ func TestPersona_Freelancer_DeadlineCrunch(t *testing.T) {
 	require.NoError(t, sessions.Create(ctx, sessD))
 
 	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems, uow)
+	sessionSvc := NewSessionService(sessions, uow)
 
 	// === Phase 1: Initial query — A and B are urgent, should drive mode ===
 	req := contract.NewWhatNowRequest(120)
@@ -352,11 +352,11 @@ func TestPersona_Freelancer_DeadlineCrunch(t *testing.T) {
 // with zero session history. Tests the import->schedule pipeline, baseline_daily_min
 // floor, zero-session bootstrap, and first-session spacing effects.
 func TestPersona_FreshStart_AllNewProjects(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
+	projects, _, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	now := time.Now().UTC()
-	importSvc := NewImportService(projects, nodes, workItems, deps, uow)
+	importSvc := NewImportService(uow)
 
 	// === Import Project A: due in 21 days, 300 min total ===
 	targetA := now.AddDate(0, 0, 21).Format("2006-01-02")
@@ -449,7 +449,7 @@ func TestPersona_FreshStart_AllNewProjects(t *testing.T) {
 	assert.Equal(t, 2, resultC.WorkItemCount)
 
 	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems, uow)
+	sessionSvc := NewSessionService(sessions, uow)
 
 	// === Phase 1: First-ever query — zero sessions everywhere ===
 	req := contract.NewWhatNowRequest(90)
@@ -500,7 +500,7 @@ func TestPersona_FreshStart_AllNewProjects(t *testing.T) {
 	}
 
 	// === Phase 4: Replan — verify risk deltas ===
-	replanSvc := NewReplanService(projects, workItems, sessions, profiles)
+	replanSvc := NewReplanService(projects, workItems, sessions, profiles, uow)
 	replanReq := contract.NewReplanRequest(domain.TriggerManual)
 	replanReq.Now = &now
 
@@ -747,7 +747,7 @@ func TestPersona_ProgressiveModeTransition(t *testing.T) {
 	require.NoError(t, sessions.Create(ctx, sessB))
 
 	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems, uow)
+	sessionSvc := NewSessionService(sessions, uow)
 
 	// === Step 1: Initial query — should be critical (A has no sessions, due in 3 days) ===
 	req := contract.NewWhatNowRequest(60)

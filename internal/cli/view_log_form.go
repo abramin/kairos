@@ -47,11 +47,7 @@ func newLogFormView(state *SharedState, itemID, title string) View {
 
 	form := huh.NewForm(
 		huh.NewGroup(
-			huh.NewInput().
-				Title("Duration (minutes)").
-				Placeholder(strconv.Itoa(defaultMin)).
-				Value(&duration).
-				Validate(validatePositiveInt),
+			durationInput("Duration (minutes)", strconv.Itoa(defaultMin), &duration),
 		),
 		huh.NewGroup(
 			huh.NewInput().
@@ -262,27 +258,15 @@ func newEditWorkItemView(state *SharedState, itemID, title string) View {
 				Title("Description").
 				Placeholder("optional").
 				Value(&f.desc),
-			huh.NewInput().
-				Title(fmt.Sprintf("Planned Minutes (currently %s)", formatter.FormatMinutes(item.PlannedMin))).
-				Placeholder(strconv.Itoa(item.PlannedMin)).
-				Value(&f.plannedMin).
-				Validate(validatePositiveInt),
+			durationInput(fmt.Sprintf("Planned Minutes (currently %s)", formatter.FormatMinutes(item.PlannedMin)), strconv.Itoa(item.PlannedMin), &f.plannedMin),
 			huh.NewSelect[string]().
 				Title("Type").
 				Options(typeOptions...).
 				Value(&f.itemType),
 		),
 		huh.NewGroup(
-			huh.NewInput().
-				Title("Due Date (YYYY-MM-DD, blank to clear)").
-				Placeholder("2025-06-30").
-				Value(&f.dueDate).
-				Validate(validateOptionalDate),
-			huh.NewInput().
-				Title("Not Before (YYYY-MM-DD, blank to clear)").
-				Placeholder("2025-01-15").
-				Value(&f.notBefore).
-				Validate(validateOptionalDate),
+			dateInput("Due Date (YYYY-MM-DD, blank to clear)", "", &f.dueDate),
+			dateInput("Not Before (YYYY-MM-DD, blank to clear)", "2025-01-15", &f.notBefore),
 			huh.NewInput().
 				Title("Min Session Minutes (blank for default)").
 				Placeholder("15").
@@ -345,16 +329,8 @@ func newAddWorkItemView(state *SharedState, nodeID string) View {
 				Value(&itemType),
 		),
 		huh.NewGroup(
-			huh.NewInput().
-				Title("Planned Minutes").
-				Placeholder("60").
-				Value(&newDuration).
-				Validate(validatePositiveInt),
-			huh.NewInput().
-				Title("Due Date (YYYY-MM-DD, blank for none)").
-				Placeholder("2025-06-30").
-				Value(&dueDate).
-				Validate(validateOptionalDate),
+			durationInput("", "", &newDuration),
+			dateInput("Due Date (YYYY-MM-DD, blank for none)", "", &dueDate),
 		),
 	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
 

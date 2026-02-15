@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/alexanderramin/kairos/internal/cli"
 	"github.com/alexanderramin/kairos/internal/db"
@@ -66,19 +67,24 @@ func run() error {
 	// Wire unit of work for transactional operations
 	uow := db.NewSQLiteUnitOfWork(database)
 
+	var useCaseObserver service.UseCaseObserver = service.NoopUseCaseObserver{}
+	if envEnabled("KAIROS_LOG_USECASES") {
+		useCaseObserver = service.NewLogUseCaseObserver(os.Stderr)
+	}
+
 	// Wire services
-	sessionSvc := service.NewSessionService(sessionRepo, workItemRepo, uow)
-	templateSvc := service.NewTemplateService(templateDir, projectRepo, nodeRepo, workItemRepo, depRepo, uow)
-	importSvc := service.NewImportService(projectRepo, nodeRepo, workItemRepo, depRepo, uow)
+	sessionSvc := service.NewSessionService(sessionRepo, uow, useCaseObserver)
+	templateSvc := service.NewTemplateService(templateDir, uow, useCaseObserver)
+	importSvc := service.NewImportService(uow, useCaseObserver)
 
 	app := &cli.App{
 		Projects:  service.NewProjectService(projectRepo),
 		Nodes:     service.NewNodeService(nodeRepo, uow),
 		WorkItems: service.NewWorkItemService(workItemRepo, nodeRepo, uow),
 		Sessions:  sessionSvc,
-		WhatNow:   service.NewWhatNowService(workItemRepo, sessionRepo, depRepo, profileRepo),
+		WhatNow:   service.NewWhatNowService(workItemRepo, sessionRepo, depRepo, profileRepo, useCaseObserver),
 		Status:    service.NewStatusService(projectRepo, workItemRepo, sessionRepo, profileRepo),
-		Replan:    service.NewReplanService(projectRepo, workItemRepo, sessionRepo, profileRepo),
+		Replan:    service.NewReplanService(projectRepo, workItemRepo, sessionRepo, profileRepo, uow, useCaseObserver),
 		Templates: templateSvc,
 		Import:    importSvc,
 
@@ -114,4 +120,13 @@ func run() error {
 		return fmt.Errorf("kairos requires an interactive terminal")
 	}
 	return cli.RunShell(app)
+}
+
+func envEnabled(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }

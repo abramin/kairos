@@ -222,6 +222,7 @@ Key design patterns:
 | `KAIROS_LLM_MAX_RETRIES` | `1` | LLM retry count |
 | `KAIROS_LLM_CONFIDENCE_THRESHOLD` | `0.85` | Auto-execute threshold for read-only intents |
 | `KAIROS_LLM_LOG_CALLS` | `false` | Enable verbose LLM call logging to stderr |
+| `KAIROS_LOG_USECASES` | `false` | Enable lightweight use-case execution logs (what-now, replan, log-session, init/import) to stderr |
 
 ## Key Dependencies
 

@@ -30,7 +30,7 @@ func NewIntentService(client llm.LLMClient, observer llm.Observer, policy Confir
 func (s *intentService) Parse(ctx context.Context, text string) (*AskResolution, error) {
 	resp, err := s.client.Generate(ctx, llm.GenerateRequest{
 		Task:         llm.TaskParse,
-		SystemPrompt: parseSystemPrompt,
+		SystemPrompt: buildParseSystemPrompt(),
 		UserPrompt:   text,
 	})
 	if err != nil {

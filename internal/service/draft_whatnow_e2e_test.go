@@ -14,7 +14,7 @@ import (
 // producing an ImportSchema, importing it, and then running what-now to verify
 // the drafted project is schedulable. This is the primary onboarding flow.
 func TestDraftWizard_ImportSchema_ThenWhatNow_E2E(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
+	_, _, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	// Simulate what buildSchemaFromWizard() produces: a multi-node project
@@ -60,7 +60,7 @@ func TestDraftWizard_ImportSchema_ThenWhatNow_E2E(t *testing.T) {
 	require.Empty(t, errs, "wizard-produced schema should be valid: %v", errs)
 
 	// Import.
-	importSvc := NewImportService(projects, nodes, workItems, deps, uow)
+	importSvc := NewImportService(uow)
 	result, err := importSvc.ImportProjectFromSchema(ctx, schema)
 	require.NoError(t, err)
 	assert.Equal(t, "DW01", result.Project.ShortID)
@@ -94,7 +94,7 @@ func TestDraftWizard_ImportSchema_ThenWhatNow_E2E(t *testing.T) {
 // that includes a special assessment node (mimicking the wizard's special
 // node phase) and verifies status reporting works correctly.
 func TestDraftWizard_WithSpecialNode_ThenStatus_E2E(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
+	projects, _, workItems, _, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	targetDate := "2026-12-01"
@@ -132,7 +132,7 @@ func TestDraftWizard_WithSpecialNode_ThenStatus_E2E(t *testing.T) {
 	errs := importer.ValidateImportSchema(schema)
 	require.Empty(t, errs)
 
-	importSvc := NewImportService(projects, nodes, workItems, deps, uow)
+	importSvc := NewImportService(uow)
 	result, err := importSvc.ImportProjectFromSchema(ctx, schema)
 	require.NoError(t, err)
 

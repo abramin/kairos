@@ -12,20 +12,46 @@ import (
 )
 
 type sessionService struct {
-	sessions  repository.SessionRepo
-	workItems repository.WorkItemRepo
-	uow       db.UnitOfWork
+	sessions repository.SessionRepo
+	uow      db.UnitOfWork
+	observer UseCaseObserver
 }
 
-func NewSessionService(sessions repository.SessionRepo, workItems repository.WorkItemRepo, uow db.UnitOfWork) SessionService {
-	return &sessionService{sessions: sessions, workItems: workItems, uow: uow}
+func NewSessionService(
+	sessions repository.SessionRepo,
+	uow db.UnitOfWork,
+	observers ...UseCaseObserver,
+) SessionService {
+	return &sessionService{
+		sessions: sessions,
+		uow:      uow,
+		observer: useCaseObserverOrNoop(observers),
+	}
 }
 
-func (s *sessionService) LogSession(ctx context.Context, session *domain.WorkSessionLog) error {
+func (s *sessionService) LogSession(ctx context.Context, session *domain.WorkSessionLog) (err error) {
+	startedAt := time.Now().UTC()
+	fields := map[string]any{
+		"work_item_id": session.WorkItemID,
+		"minutes":      session.Minutes,
+		"units_delta":  session.UnitsDoneDelta,
+	}
+	defer func() {
+		s.observer.ObserveUseCase(ctx, UseCaseEvent{
+			Name:      "log-session",
+			StartedAt: startedAt,
+			Duration:  time.Since(startedAt),
+			Success:   err == nil,
+			Err:       err,
+			Fields:    fields,
+		})
+	}()
+
 	if session.ID == "" {
 		session.ID = uuid.New().String()
 	}
 	session.CreatedAt = time.Now().UTC()
+	fields["session_id"] = session.ID
 
 	return s.uow.WithinTx(ctx, func(ctx context.Context, tx db.DBTX) error {
 		txWorkItems := repository.NewSQLiteWorkItemRepo(tx)

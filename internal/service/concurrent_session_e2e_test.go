@@ -83,7 +83,7 @@ func TestE2E_ConcurrentSessionLogging_NoDataLoss(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, item))
 
 	// Create session service
-	sessionSvc := NewSessionService(sessions, workItems, uow)
+	sessionSvc := NewSessionService(sessions, uow)
 
 	// Simulate 10 concurrent log commands from different terminals/processes
 	// Each logs a different number of minutes (1, 2, 3, ..., 10)
@@ -218,7 +218,7 @@ func TestE2E_ConcurrentSessionLogging_DifferentWorkItems(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, item2))
 	require.NoError(t, workItems.Create(ctx, item3))
 
-	sessionSvc := NewSessionService(sessions, workItems, uow)
+	sessionSvc := NewSessionService(sessions, uow)
 
 	// Helper to retry on SQLITE_BUSY errors
 	retryLogSession := func(ctx context.Context, svc SessionService, session *domain.WorkSessionLog) error {

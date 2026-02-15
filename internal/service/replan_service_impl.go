@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/app"
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/alexanderramin/kairos/internal/scheduler"
@@ -16,6 +17,8 @@ type replanService struct {
 	workItems repository.WorkItemRepo
 	sessions  repository.SessionRepo
 	profiles  repository.UserProfileRepo
+	uow       db.UnitOfWork
+	observer  UseCaseObserver
 }
 
 func NewReplanService(
@@ -23,32 +26,64 @@ func NewReplanService(
 	workItems repository.WorkItemRepo,
 	sessions repository.SessionRepo,
 	profiles repository.UserProfileRepo,
+	uow db.UnitOfWork,
+	observers ...UseCaseObserver,
 ) ReplanService {
 	return &replanService{
 		projects:  projects,
 		workItems: workItems,
 		sessions:  sessions,
 		profiles:  profiles,
+		uow:       uow,
+		observer:  useCaseObserverOrNoop(observers),
 	}
 }
 
-func (s *replanService) Replan(ctx context.Context, req app.ReplanRequest) (*app.ReplanResponse, error) {
+func (s *replanService) Replan(ctx context.Context, req app.ReplanRequest) (resp *app.ReplanResponse, err error) {
+	startedAt := time.Now().UTC()
 	now := time.Now().UTC()
 	if req.Now != nil {
 		now = *req.Now
 	}
+	fields := map[string]any{
+		"trigger":          req.Trigger,
+		"include_archived": req.IncludeArchived,
+		"project_scope":    len(req.ProjectScope),
+	}
+	defer func() {
+		if resp != nil {
+			fields["recomputed_projects"] = resp.RecomputedProjects
+			fields["global_mode_after"] = string(resp.GlobalModeAfter)
+		}
+		s.observer.ObserveUseCase(ctx, UseCaseEvent{
+			Name:      "replan",
+			StartedAt: startedAt,
+			Duration:  time.Since(startedAt),
+			Success:   err == nil,
+			Err:       err,
+			Fields:    fields,
+		})
+	}()
 
 	strategy := req.Strategy
 	if strategy == "" {
 		strategy = "rebalance"
 	}
+	fields["strategy"] = strategy
 
-	profile, err := s.profiles.Get(ctx)
+	days := req.IncludeRecentSessionDays
+	if days <= 0 {
+		days = 7
+	}
+
+	var profile *domain.UserProfile
+	profile, err = s.profiles.Get(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("loading profile: %w", err)
 	}
 
-	projects, err := s.projects.List(ctx, req.IncludeArchived)
+	var projects []*domain.Project
+	projects, err = s.projects.List(ctx, req.IncludeArchived)
 	if err != nil {
 		return nil, fmt.Errorf("loading projects: %w", err)
 	}
@@ -73,45 +108,28 @@ func (s *replanService) Replan(ctx context.Context, req app.ReplanRequest) (*app
 	hasCritical := false
 
 	for _, p := range activeProjects {
-		items, err := s.workItems.ListByProject(ctx, p.ID)
+		snap, items, err := computeProjectRiskSnapshot(ctx, p, s.workItems, s.sessions, profile, days, now)
 		if err != nil {
-			return nil, fmt.Errorf("loading items for project %s: %w", p.ID, err)
+			return nil, err
 		}
 
-		metricsBefore := aggregateProjectMetrics(items, p, now)
+		riskBefore := snap.Risk
 
-		recentSessions, err := s.sessions.ListRecentByProject(ctx, p.ID, 7)
+		// Re-estimate work items within a transaction
+		changedCount, err := s.reestimateItems(ctx, items, now)
 		if err != nil {
-			return nil, fmt.Errorf("loading recent sessions for project %s: %w", p.ID, err)
-		}
-		_, effectiveDailyMin := recentDailyPace(recentSessions, 7, profile.BaselineDailyMin)
-
-		riskBefore := scheduler.ComputeRisk(buildRiskInput(metricsBefore, p.TargetDate, profile.BufferPct, effectiveDailyMin, now))
-
-		// Re-estimate work items with units tracking
-		changedCount := 0
-		for _, item := range items {
-			if !item.EligibleForReestimate() {
-				continue
-			}
-			newPlanned := scheduler.SmoothReEstimate(item.PlannedMin, item.LoggedMin, item.UnitsTotal, item.UnitsDone)
-			if item.ApplyReestimate(newPlanned, now) {
-				if err := s.workItems.Update(ctx, item); err != nil {
-					return nil, fmt.Errorf("updating work item %s: %w", item.ID, err)
-				}
-				changedCount++
-			}
+			return nil, err
 		}
 
-		// Recompute metrics after re-estimation
+		// Recompute risk after re-estimation
 		metricsAfter := aggregateProjectMetrics(items, p, now)
-		riskAfter := scheduler.ComputeRisk(buildRiskInput(metricsAfter, p.TargetDate, profile.BufferPct, effectiveDailyMin, now))
+		riskAfter := scheduler.ComputeRisk(buildRiskInput(metricsAfter, p.TargetDate, profile.BufferPct, snap.EffectiveDailyMin, now))
 
 		if riskAfter.Level == domain.RiskCritical {
 			hasCritical = true
 		}
 
-		delta := app.ProjectReplanDelta{
+		deltas = append(deltas, app.ProjectReplanDelta{
 			ProjectID:              p.ID,
 			ProjectName:            p.Name,
 			RiskBefore:             riskBefore.Level,
@@ -121,9 +139,7 @@ func (s *replanService) Replan(ctx context.Context, req app.ReplanRequest) (*app
 			RemainingMinBefore:     riskBefore.RemainingMin,
 			RemainingMinAfter:      riskAfter.RemainingMin,
 			ChangedItemsCount:      changedCount,
-		}
-
-		deltas = append(deltas, delta)
+		})
 	}
 
 	globalMode := domain.ModeBalanced
@@ -131,7 +147,7 @@ func (s *replanService) Replan(ctx context.Context, req app.ReplanRequest) (*app
 		globalMode = domain.ModeCritical
 	}
 
-	resp := &app.ReplanResponse{
+	resp = &app.ReplanResponse{
 		GeneratedAt:        now,
 		Trigger:            req.Trigger,
 		Strategy:           strategy,
@@ -141,4 +157,42 @@ func (s *replanService) Replan(ctx context.Context, req app.ReplanRequest) (*app
 	}
 
 	return resp, nil
+}
+
+// reestimateItems applies smooth re-estimation to eligible items within a transaction.
+func (s *replanService) reestimateItems(ctx context.Context, items []*domain.WorkItem, now time.Time) (int, error) {
+	// Collect items that need re-estimation first.
+	type reestimate struct {
+		item       *domain.WorkItem
+		newPlanned int
+	}
+	var updates []reestimate
+	for _, item := range items {
+		if !item.EligibleForReestimate() {
+			continue
+		}
+		newPlanned := scheduler.SmoothReEstimate(item.PlannedMin, item.LoggedMin, item.UnitsTotal, item.UnitsDone)
+		if item.ApplyReestimate(newPlanned, now) {
+			updates = append(updates, reestimate{item: item, newPlanned: newPlanned})
+		}
+	}
+
+	if len(updates) == 0 {
+		return 0, nil
+	}
+
+	err := s.uow.WithinTx(ctx, func(ctx context.Context, tx db.DBTX) error {
+		txWorkItems := repository.NewSQLiteWorkItemRepo(tx)
+		for _, u := range updates {
+			if err := txWorkItems.Update(ctx, u.item); err != nil {
+				return fmt.Errorf("updating work item %s: %w", u.item.ID, err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return 0, err
+	}
+
+	return len(updates), nil
 }

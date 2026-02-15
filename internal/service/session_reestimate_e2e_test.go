@@ -16,11 +16,11 @@ import (
 // import project → what-now → log session with units → verify re-estimation → replan → verify convergence.
 // This catches integration issues between session logging, re-estimation smoothing, and replan.
 func TestSessionLogReEstimation_E2E(t *testing.T) {
-	projects, nodes, workItems, deps, sessions, profiles, uow := setupRepos(t)
+	projects, _, workItems, deps, sessions, profiles, uow := setupRepos(t)
 	ctx := context.Background()
 
 	// === Step 1: Import a project with units tracking ===
-	importSvc := NewImportService(projects, nodes, workItems, deps, uow)
+	importSvc := NewImportService(uow)
 	targetDate := "2026-06-01"
 	pm120 := 120
 	pm90 := 90
@@ -101,7 +101,7 @@ func TestSessionLogReEstimation_E2E(t *testing.T) {
 	// === Step 3: Log session with units on the reading item ===
 	// 30 min for 2 chapters → implied pace = 15 min/chapter → 150 min for 10 chapters
 	// Smooth: round(0.7*120 + 0.3*150) = round(84 + 45) = 129
-	sessionSvc := NewSessionService(sessions, workItems, uow)
+	sessionSvc := NewSessionService(sessions, uow)
 	sess := &domain.WorkSessionLog{
 		WorkItemID:     readingItem.ID,
 		StartedAt:      now.Add(-time.Hour),
@@ -158,7 +158,7 @@ func TestSessionLogReEstimation_E2E(t *testing.T) {
 		"planned_min should NOT change for items without units tracking")
 
 	// === Step 6: Replan — verify convergence ===
-	replanSvc := NewReplanService(projects, workItems, sessions, profiles)
+	replanSvc := NewReplanService(projects, workItems, sessions, profiles, uow)
 	replanReq := contract.NewReplanRequest(domain.TriggerManual)
 	replanReq.Now = &now
 

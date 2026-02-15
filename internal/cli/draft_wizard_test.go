@@ -421,14 +421,12 @@ func TestDraftWizard_FullPipeline(t *testing.T) {
 	// Step 4: Import into a real in-memory DB.
 	db := testutil.NewTestDB(t)
 	uow := testutil.NewTestUoW(db)
-	projRepo := repository.NewSQLiteProjectRepo(db)
-	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
 	wiRepo := repository.NewSQLiteWorkItemRepo(db)
 	depRepo := repository.NewSQLiteDependencyRepo(db)
 	sessRepo := repository.NewSQLiteSessionRepo(db)
 	profRepo := repository.NewSQLiteUserProfileRepo(db)
 
-	importSvc := service.NewImportService(projRepo, nodeRepo, wiRepo, depRepo, uow)
+	importSvc := service.NewImportService(uow)
 	ctx := context.Background()
 
 	importResult, err := importSvc.ImportProjectFromSchema(ctx, schema)

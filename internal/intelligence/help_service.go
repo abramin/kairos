@@ -111,8 +111,9 @@ func (s *helpService) resolveWithFallback(ctx context.Context, conv *HelpConvers
 		return DeterministicHelp(question, commandInfos)
 	}
 
-	answer, _ = ValidateHelpGrounding(answer, validCmds, validFlags)
-	if len(answer.Examples) == 0 && len(answer.NextCommands) == 0 {
+	answer, groundingStripped := ValidateHelpGrounding(answer, validCmds, validFlags)
+	if groundingStripped && len(answer.Examples) == 0 && len(answer.NextCommands) == 0 {
+		// LLM produced only hallucinated commands; fall back to deterministic.
 		fallback := DeterministicHelp(question, commandInfos)
 		if strings.TrimSpace(answer.Answer) == "" {
 			answer.Answer = fallback.Answer

@@ -45,11 +45,7 @@ func (s *templateDraftService) Draft(ctx context.Context, prompt string) (*Templ
 	// Re-marshal and unmarshal into TemplateSchema for validation.
 	schemaJSON, err := json.Marshal(rawTemplate)
 	if err != nil {
-		return &TemplateDraft{
-			TemplateJSON: rawTemplate,
-			Validation:   TemplateDraftValidation{IsValid: false, Errors: []string{"failed to marshal template"}},
-			Confidence:   0.3,
-		}, nil
+		return nil, fmt.Errorf("marshaling extracted template: %w", err)
 	}
 
 	var schema template.TemplateSchema

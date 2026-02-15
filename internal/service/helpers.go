@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -95,40 +97,73 @@ func recentDailyPace(sessions []*domain.WorkSessionLog, days int, baselineDailyM
 	return
 }
 
-// filterProjectsByScope returns only projects whose ID is in scope.
-// If scope is empty, all projects are returned unchanged.
-func filterProjectsByScope(projects []*domain.Project, scope []string) []*domain.Project {
+// projectRiskSnapshot holds the computed risk and metrics for a single project.
+type projectRiskSnapshot struct {
+	Metrics           projectMetrics
+	Risk              scheduler.RiskResult
+	RecentDailyMin    float64
+	EffectiveDailyMin float64
+}
+
+// computeProjectRiskSnapshot loads items and sessions, then computes risk for a single project.
+// This is the shared core used by both GetStatus and Replan.
+func computeProjectRiskSnapshot(
+	ctx context.Context,
+	p *domain.Project,
+	workItems repository.WorkItemRepo,
+	sessions repository.SessionRepo,
+	profile *domain.UserProfile,
+	days int,
+	now time.Time,
+) (*projectRiskSnapshot, []*domain.WorkItem, error) {
+	items, err := workItems.ListByProject(ctx, p.ID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("loading work items for project %s: %w", p.ID, err)
+	}
+
+	m := aggregateProjectMetrics(items, p, now)
+
+	recentSessions, err := sessions.ListRecentByProject(ctx, p.ID, days)
+	if err != nil {
+		return nil, nil, fmt.Errorf("loading recent sessions for project %s: %w", p.ID, err)
+	}
+	recentDailyMin, effectiveDailyMin := recentDailyPace(recentSessions, days, profile.BaselineDailyMin)
+
+	risk := scheduler.ComputeRisk(buildRiskInput(m, p.TargetDate, profile.BufferPct, effectiveDailyMin, now))
+
+	return &projectRiskSnapshot{
+		Metrics:           m,
+		Risk:              risk,
+		RecentDailyMin:    recentDailyMin,
+		EffectiveDailyMin: effectiveDailyMin,
+	}, items, nil
+}
+
+// filterByScope returns only items whose ID (extracted by getID) is in scope.
+// If scope is empty, all items are returned unchanged.
+func filterByScope[T any](items []T, scope []string, getID func(T) string) []T {
 	if len(scope) == 0 {
-		return projects
+		return items
 	}
 	scopeSet := make(map[string]bool, len(scope))
 	for _, id := range scope {
 		scopeSet[id] = true
 	}
-	var filtered []*domain.Project
-	for _, p := range projects {
-		if scopeSet[p.ID] {
-			filtered = append(filtered, p)
+	var filtered []T
+	for _, item := range items {
+		if scopeSet[getID(item)] {
+			filtered = append(filtered, item)
 		}
 	}
 	return filtered
 }
 
+// filterProjectsByScope returns only projects whose ID is in scope.
+func filterProjectsByScope(projects []*domain.Project, scope []string) []*domain.Project {
+	return filterByScope(projects, scope, func(p *domain.Project) string { return p.ID })
+}
+
 // filterCandidatesByScope returns only candidates whose ProjectID is in scope.
-// If scope is empty, all candidates are returned unchanged.
 func filterCandidatesByScope(candidates []repository.SchedulableCandidate, scope []string) []repository.SchedulableCandidate {
-	if len(scope) == 0 {
-		return candidates
-	}
-	scopeSet := make(map[string]bool, len(scope))
-	for _, id := range scope {
-		scopeSet[id] = true
-	}
-	var filtered []repository.SchedulableCandidate
-	for _, c := range candidates {
-		if scopeSet[c.ProjectID] {
-			filtered = append(filtered, c)
-		}
-	}
-	return filtered
+	return filterByScope(candidates, scope, func(c repository.SchedulableCandidate) string { return c.ProjectID })
 }

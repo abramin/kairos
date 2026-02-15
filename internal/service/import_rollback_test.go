@@ -35,9 +35,6 @@ func validImportSchema() *importer.ImportSchema {
 func TestImportProject_RollbackOnNodeCreateFailure(t *testing.T) {
 	database := testutil.NewTestDB(t)
 	projRepo := repository.NewSQLiteProjectRepo(database)
-	nodeRepo := repository.NewSQLitePlanNodeRepo(database)
-	wiRepo := repository.NewSQLiteWorkItemRepo(database)
-	depRepo := repository.NewSQLiteDependencyRepo(database)
 	ctx := context.Background()
 
 	// ExecContext calls in importSchema:
@@ -49,7 +46,7 @@ func TestImportProject_RollbackOnNodeCreateFailure(t *testing.T) {
 		Err:    fmt.Errorf("injected node create failure"),
 	}
 
-	svc := NewImportService(projRepo, nodeRepo, wiRepo, depRepo, failUoW)
+	svc := NewImportService(failUoW)
 
 	schema := validImportSchema()
 	_, err := svc.ImportProjectFromSchema(ctx, schema)
@@ -65,9 +62,6 @@ func TestImportProject_RollbackOnNodeCreateFailure(t *testing.T) {
 func TestImportProject_RollbackOnWorkItemCreateFailure(t *testing.T) {
 	database := testutil.NewTestDB(t)
 	projRepo := repository.NewSQLiteProjectRepo(database)
-	nodeRepo := repository.NewSQLitePlanNodeRepo(database)
-	wiRepo := repository.NewSQLiteWorkItemRepo(database)
-	depRepo := repository.NewSQLiteDependencyRepo(database)
 	ctx := context.Background()
 
 	// Exec calls: #1 = project, #2 = node A, #3 = node B, #4 = work item 1, #5 = work item 2
@@ -78,7 +72,7 @@ func TestImportProject_RollbackOnWorkItemCreateFailure(t *testing.T) {
 		Err:    fmt.Errorf("injected work item create failure"),
 	}
 
-	svc := NewImportService(projRepo, nodeRepo, wiRepo, depRepo, failUoW)
+	svc := NewImportService(failUoW)
 
 	schema := validImportSchema()
 	_, err := svc.ImportProjectFromSchema(ctx, schema)
@@ -97,10 +91,9 @@ func TestImportProject_SuccessPath(t *testing.T) {
 	projRepo := repository.NewSQLiteProjectRepo(database)
 	nodeRepo := repository.NewSQLitePlanNodeRepo(database)
 	wiRepo := repository.NewSQLiteWorkItemRepo(database)
-	depRepo := repository.NewSQLiteDependencyRepo(database)
 	ctx := context.Background()
 
-	svc := NewImportService(projRepo, nodeRepo, wiRepo, depRepo, uow)
+	svc := NewImportService(uow)
 
 	schema := validImportSchema()
 	result, err := svc.ImportProjectFromSchema(ctx, schema)

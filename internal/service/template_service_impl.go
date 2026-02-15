@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
@@ -16,11 +17,8 @@ import (
 
 type templateService struct {
 	templateDir string
-	projects    repository.ProjectRepo
-	nodes       repository.PlanNodeRepo
-	workItems   repository.WorkItemRepo
-	deps        repository.DependencyRepo
 	uow         db.UnitOfWork
+	observer    UseCaseObserver
 }
 
 type templateEntry struct {
@@ -31,19 +29,13 @@ type templateEntry struct {
 
 func NewTemplateService(
 	templateDir string,
-	projects repository.ProjectRepo,
-	nodes repository.PlanNodeRepo,
-	workItems repository.WorkItemRepo,
-	deps repository.DependencyRepo,
 	uow db.UnitOfWork,
+	observers ...UseCaseObserver,
 ) TemplateService {
 	return &templateService{
 		templateDir: templateDir,
-		projects:    projects,
-		nodes:       nodes,
-		workItems:   workItems,
-		deps:        deps,
 		uow:         uow,
+		observer:    useCaseObserverOrNoop(observers),
 	}
 }
 
@@ -87,16 +79,37 @@ func (s *templateService) Get(ctx context.Context, name string) (*domain.Templat
 	}, nil
 }
 
-func (s *templateService) InitProject(ctx context.Context, templateName, projectName, shortID, startDate string, dueDate *string, vars map[string]string) (*domain.Project, error) {
-	entry, err := s.resolveTemplate(templateName)
+func (s *templateService) InitProject(ctx context.Context, templateName, projectName, shortID, startDate string, dueDate *string, vars map[string]string) (project *domain.Project, err error) {
+	startedAt := time.Now().UTC()
+	fields := map[string]any{
+		"template": templateName,
+		"project":  projectName,
+	}
+	defer func() {
+		s.observer.ObserveUseCase(ctx, UseCaseEvent{
+			Name:      "init-project",
+			StartedAt: startedAt,
+			Duration:  time.Since(startedAt),
+			Success:   err == nil,
+			Err:       err,
+			Fields:    fields,
+		})
+	}()
+
+	var entry *templateEntry
+	entry, err = s.resolveTemplate(templateName)
 	if err != nil {
 		return nil, err
 	}
 
-	generated, err := tmpl.Execute(entry.Schema, projectName, startDate, dueDate, vars)
+	var generated *tmpl.GeneratedProject
+	generated, err = tmpl.Execute(entry.Schema, projectName, startDate, dueDate, vars)
 	if err != nil {
 		return nil, fmt.Errorf("executing template: %w", err)
 	}
+	fields["node_count"] = len(generated.Nodes)
+	fields["work_item_count"] = len(generated.WorkItems)
+	fields["dependency_count"] = len(generated.Dependencies)
 
 	// Set short ID on generated project
 	generated.Project.ShortID = shortID
@@ -151,7 +164,8 @@ func (s *templateService) InitProject(ctx context.Context, templateName, project
 		return nil, err
 	}
 
-	return generated.Project, nil
+	project = generated.Project
+	return project, nil
 }
 
 func (s *templateService) resolveTemplate(name string) (*templateEntry, error) {

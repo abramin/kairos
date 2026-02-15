@@ -159,8 +159,8 @@ func assertSchemaContractHolds(
 	}
 
 	// Contract 4: Schema must import into the DB via ImportService.
-	projRepo, nodeRepo, wiRepo, depRepo, sessRepo, profRepo, uow := setupRepos(t)
-	importSvc := NewImportService(projRepo, nodeRepo, wiRepo, depRepo, uow)
+	projRepo, _, wiRepo, depRepo, sessRepo, profRepo, uow := setupRepos(t)
+	importSvc := NewImportService(uow)
 	result, err := importSvc.ImportProjectFromSchema(ctx, schema)
 	require.NoError(t, err, "%s: import failed", producer)
 	require.NotNil(t, result.Project, "%s: import returned nil project", producer)

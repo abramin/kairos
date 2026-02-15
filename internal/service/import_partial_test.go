@@ -13,10 +13,10 @@ import (
 // with a ShortID that already exists fails at the project creation step,
 // leaving no partial state from the second import while preserving the first.
 func TestImport_DuplicateShortID_FailsCleanly(t *testing.T) {
-	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
+	projects, nodes, workItems, _, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps, uow)
+	svc := NewImportService(uow)
 
 	pm60 := 60
 
@@ -80,10 +80,10 @@ func TestImport_DuplicateShortID_FailsCleanly(t *testing.T) {
 // when the dependency creation step fails after project/nodes/items are created.
 // This documents the current non-transactional behavior: partial state remains.
 func TestImport_PartialState_ProjectCreatedButDependencyFails(t *testing.T) {
-	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
+	_, _, workItems, deps, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps, uow)
+	svc := NewImportService(uow)
 
 	pm60 := 60
 
@@ -129,10 +129,10 @@ func TestImport_PartialState_ProjectCreatedButDependencyFails(t *testing.T) {
 // TestImport_ValidationBlocksBeforeAnyDBWrite verifies that schema validation
 // errors prevent any database writes — the "safe path" that avoids partial state.
 func TestImport_ValidationBlocksBeforeAnyDBWrite(t *testing.T) {
-	projects, nodes, workItems, deps, _, _, uow := setupRepos(t)
+	projects, _, _, _, _, _, uow := setupRepos(t)
 	ctx := context.Background()
 
-	svc := NewImportService(projects, nodes, workItems, deps, uow)
+	svc := NewImportService(uow)
 
 	// Schema with multiple validation errors
 	schema := &importer.ImportSchema{

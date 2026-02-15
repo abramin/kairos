@@ -199,6 +199,11 @@ func ScoreCandidates(
 	for _, c := range candidates {
 		effectiveDue := earliestDueDate(c.WorkItem.DueDate, c.NodeDueDate, c.ProjectTargetDate)
 
+		var lastSessionPtr *int
+		if d, ok := lastSessionDaysAgo[c.WorkItem.ID]; ok {
+			lastSessionPtr = &d
+		}
+
 		input := scheduler.ScoringInput{
 			WorkItemID:          c.WorkItem.ID,
 			WorkItemSeq:         c.WorkItem.Seq,
@@ -209,7 +214,7 @@ func ScoreCandidates(
 			DueDate:             effectiveDue,
 			ProjectRisk:         agg.Risks[c.ProjectID].Level,
 			Now:                 now,
-			LastSessionDaysAgo:  lastSessionDaysAgo[c.WorkItem.ID],
+			LastSessionDaysAgo:  lastSessionPtr,
 			ProjectSlicesInPlan: 0,
 			Weights:             weights,
 			Mode:                mode,
@@ -229,13 +234,13 @@ func ScoreCandidates(
 }
 
 // buildLastSessionIndex computes days-ago-since-last-session per work item.
-func buildLastSessionIndex(sessions []*domain.WorkSessionLog, now time.Time) map[string]*int {
-	lastSessionDaysAgo := make(map[string]*int)
+// Returns a map of work item ID → days ago (only entries for items with sessions).
+func buildLastSessionIndex(sessions []*domain.WorkSessionLog, now time.Time) map[string]int {
+	lastSessionDaysAgo := make(map[string]int)
 	for _, sess := range sessions {
 		daysAgo := int(now.Sub(sess.StartedAt).Hours() / 24)
-		if existing, ok := lastSessionDaysAgo[sess.WorkItemID]; !ok || (existing != nil && daysAgo < *existing) {
-			d := daysAgo
-			lastSessionDaysAgo[sess.WorkItemID] = &d
+		if existing, ok := lastSessionDaysAgo[sess.WorkItemID]; !ok || daysAgo < existing {
+			lastSessionDaysAgo[sess.WorkItemID] = daysAgo
 		}
 	}
 	return lastSessionDaysAgo

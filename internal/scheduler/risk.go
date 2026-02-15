@@ -77,12 +77,7 @@ func ComputeRisk(input RiskInput) RiskResult {
 		ProgressTimePct:  progressTimePct,
 	}
 
-	// Structural progress: the user is on pace if weighted progress >= expected progress.
-	// Two signals: (1) linear timeline elapsed, (2) due-date-aware expected progress.
-	// The second signal prevents false-critical for projects with correctly back-loaded work.
-	onPace := input.ProgressPct > 0 &&
-		((input.TimeElapsedPct > 0 && input.ProgressPct >= input.TimeElapsedPct) ||
-			(input.DueBasedExpectedPct > 0 && input.ProgressPct >= input.DueBasedExpectedPct))
+	onPace := isStructurallyOnPace(input)
 
 	// No recent activity and work remains => critical (unless structurally on pace)
 	if input.RecentDailyMin == 0 && remaining > 0 {
@@ -113,4 +108,16 @@ func ComputeRisk(input RiskInput) RiskResult {
 	}
 
 	return result
+}
+
+// isStructurallyOnPace returns true if weighted progress >= expected progress.
+// Two signals: (1) linear timeline elapsed, (2) due-date-aware expected progress.
+// The second signal prevents false-critical for projects with correctly back-loaded work.
+func isStructurallyOnPace(input RiskInput) bool {
+	if input.ProgressPct <= 0 {
+		return false
+	}
+	aheadOfTimeline := input.TimeElapsedPct > 0 && input.ProgressPct >= input.TimeElapsedPct
+	aheadOfDueDates := input.DueBasedExpectedPct > 0 && input.ProgressPct >= input.DueBasedExpectedPct
+	return aheadOfTimeline || aheadOfDueDates
 }

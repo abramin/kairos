@@ -1,11 +1,12 @@
 package intelligence
 
-// parseSystemPrompt instructs the LLM to convert natural language into a structured intent.
-const parseSystemPrompt = `You are a command parser for a CLI project planner called Kairos.
+// buildParseSystemPrompt generates the intent-parsing system prompt from the IntentRegistry.
+func buildParseSystemPrompt() string {
+	return `You are a command parser for a CLI project planner called Kairos.
 Your task is to convert natural language into a structured JSON intent.
 
 You must output ONLY a JSON object with these exact fields:
-- intent: one of [what_now, status, replan, project_add, project_import, project_update, project_archive, project_remove, node_add, node_update, node_remove, work_add, work_update, work_done, work_remove, session_log, session_remove, template_list, template_show, template_draft, template_validate, project_init_from_template, explain_now, explain_why_not, review_weekly, simulate]
+- intent: one of [` + IntentNamesCSV() + `]
 - risk: "read_only" or "write"
 - arguments: object with intent-specific fields (see below)
 - confidence: number 0 to 1 (how sure you are)
@@ -14,26 +15,9 @@ You must output ONLY a JSON object with these exact fields:
 - rationale: brief explanation of your parse decision
 
 Intent argument schemas:
-- what_now: { available_min: number (>0), project_scope?: string[], explain?: boolean }
-- status: { project_scope?: string[], recalc?: boolean }
-- replan: { trigger?: string, project_scope?: string[], strategy?: "rebalance"|"deadline_first" }
-- project_add: { name: string, domain?: string, start_date?: "YYYY-MM-DD", target_date?: "YYYY-MM-DD" }
-- project_import: { file_path: string }
-- project_update: { project_id: string, name?: string, target_date?: string|null, status?: "active"|"paused"|"done"|"archived" }
-- project_archive: { project_id: string }
-- project_remove: { project_id: string, hard_delete?: boolean }
-- session_log: { work_item_id: string, minutes: number (>0), units_done_delta?: number, note?: string }
-- explain_now: { minutes?: number }
-- explain_why_not: { project_id?: string, work_item_id?: string, candidate_title?: string }
-- review_weekly: {}
-- simulate: { scenario_text: string }
-- template_draft: { prompt: string }
-- template_list: {}
-- template_show: { template_id: string }
-
+` + IntentArgSchemas() + `
 Risk classification rules:
-- read_only: what_now, status, explain_now, explain_why_not, review_weekly, simulate, template_list, template_show
-- write: ALL other intents (add, import, update, remove, archive, replan, session_log, template_draft, template_validate, project_init_from_template)
+` + IntentRiskClassification() + `
 
 CRITICAL RULES:
 1. All write intents MUST have requires_confirmation=true
@@ -42,6 +26,7 @@ CRITICAL RULES:
 4. If unsure, set confidence low and provide 2-3 clarification_options
 5. Use strict JSON numeric literals (e.g., 0.85, never .85)
 6. Output ONLY the JSON object, no markdown, no explanation`
+}
 
 // explainNowSystemPrompt instructs the LLM to narrate scheduling recommendations.
 const explainNowSystemPrompt = `You are an explanation engine for a project planner called Kairos.

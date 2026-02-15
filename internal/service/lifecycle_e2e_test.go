@@ -38,8 +38,8 @@ func TestReplan_ThenRecommend_ReEstimationAffectsAllocation(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wi))
 
 	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
-	sessionSvc := NewSessionService(sessions, workItems, uow)
-	replanSvc := NewReplanService(projects, workItems, sessions, profiles)
+	sessionSvc := NewSessionService(sessions, uow)
+	replanSvc := NewReplanService(projects, workItems, sessions, profiles, uow)
 
 	// === Step 1: Initial recommendation (planned = 100) ===
 	req := contract.NewWhatNowRequest(60)
