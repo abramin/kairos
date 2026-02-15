@@ -44,7 +44,7 @@ func allCommandNames() []string {
 		"status", "what-now", "replan",
 		"log", "start", "finish", "add", "context",
 		"project", "node", "work", "session",
-		"draft", "template",
+		"draft", "import", "template",
 		"ask", "explain", "review",
 		"clear", "help", "exit", "quit",
 	}

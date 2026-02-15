@@ -31,7 +31,15 @@ func TestMigrate_Idempotent(t *testing.T) {
 func TestMigrate_CreatesAllTables(t *testing.T) {
 	db := openTestDB(t)
 
-	expected := []string{"projects", "plan_nodes", "work_items", "dependencies", "work_session_logs", "user_profile"}
+	expected := []string{
+		"projects",
+		"plan_nodes",
+		"project_sequences",
+		"work_items",
+		"dependencies",
+		"work_session_logs",
+		"user_profile",
+	}
 	for _, table := range expected {
 		var name string
 		err := db.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name=?`, table).Scan(&name)
@@ -228,6 +236,27 @@ func TestMigrate_ProjectsShortIDPartialUniqueIndex(t *testing.T) {
 	_, err = db.Exec(`INSERT INTO projects (id, name, domain, start_date, status, created_at, updated_at, short_id)
 		VALUES ('p4', 'Test 4', 'test', '2025-01-01', 'active', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z', 'DUP01')`)
 	assert.Error(t, err)
+}
+
+func TestMigrate_BackfillsProjectSequences(t *testing.T) {
+	db := openTestDB(t)
+
+	_, err := db.Exec(`INSERT INTO projects (id, name, domain, start_date, status, created_at, updated_at, short_id)
+		VALUES ('p1', 'Project 1', 'test', '2025-01-01', 'active', '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z', 'PSQ01')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO plan_nodes (id, project_id, title, kind, seq, created_at, updated_at)
+		VALUES ('n1', 'p1', 'Node 1', 'generic', 3, '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z')`)
+	require.NoError(t, err)
+	_, err = db.Exec(`INSERT INTO work_items (id, node_id, title, status, seq, created_at, updated_at)
+		VALUES ('w1', 'n1', 'Task 1', 'todo', 5, '2025-01-01T00:00:00Z', '2025-01-01T00:00:00Z')`)
+	require.NoError(t, err)
+
+	require.NoError(t, migrateBackfillProjectSequences(db))
+
+	var nextSeq int
+	err = db.QueryRow(`SELECT next_seq FROM project_sequences WHERE project_id = 'p1'`).Scan(&nextSeq)
+	require.NoError(t, err)
+	assert.Equal(t, 6, nextSeq)
 }
 
 func TestMigratePlanNodesAssessmentKind_UpgradesLegacySchema(t *testing.T) {

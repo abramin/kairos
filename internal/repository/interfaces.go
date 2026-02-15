@@ -52,6 +52,12 @@ type PlanNodeRepo interface {
 	Delete(ctx context.Context, id string) error
 }
 
+// ProjectSequenceRepo allocates project-scoped sequential IDs shared across
+// both plan_nodes and work_items.
+type ProjectSequenceRepo interface {
+	NextProjectSeq(ctx context.Context, projectID string) (int, error)
+}
+
 type WorkItemRepo interface {
 	Create(ctx context.Context, w *domain.WorkItem) error
 	GetByID(ctx context.Context, id string) (*domain.WorkItem, error)

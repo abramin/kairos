@@ -73,8 +73,8 @@ func run() error {
 
 	app := &cli.App{
 		Projects:  service.NewProjectService(projectRepo),
-		Nodes:     service.NewNodeService(nodeRepo),
-		WorkItems: service.NewWorkItemService(workItemRepo, nodeRepo),
+		Nodes:     service.NewNodeService(nodeRepo, uow),
+		WorkItems: service.NewWorkItemService(workItemRepo, nodeRepo, uow),
 		Sessions:  sessionSvc,
 		WhatNow:   service.NewWhatNowService(workItemRepo, sessionRepo, depRepo, profileRepo),
 		Status:    service.NewStatusService(projectRepo, workItemRepo, sessionRepo, profileRepo),
@@ -109,7 +109,9 @@ func run() error {
 		app.Help = intelligence.NewHelpService(llmClient, observer)
 	}
 
-	// Execute root command
-	rootCmd := cli.NewRootCmd(app)
-	return rootCmd.Execute()
+	// Launch interactive shell (only entry point).
+	if !app.IsInteractive() {
+		return fmt.Errorf("kairos requires an interactive terminal")
+	}
+	return cli.RunShell(app)
 }

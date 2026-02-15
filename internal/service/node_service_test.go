@@ -14,9 +14,10 @@ import (
 func setupNodeService(t *testing.T) (NodeService, repository.ProjectRepo, repository.PlanNodeRepo) {
 	t.Helper()
 	db := testutil.NewTestDB(t)
+	uow := testutil.NewTestUoW(db)
 	projRepo := repository.NewSQLiteProjectRepo(db)
 	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
-	return NewNodeService(nodeRepo), projRepo, nodeRepo
+	return NewNodeService(nodeRepo, uow), projRepo, nodeRepo
 }
 
 func TestNodeService_Create(t *testing.T) {
@@ -136,4 +137,25 @@ func TestNodeService_Delete(t *testing.T) {
 	require.NoError(t, svc.Delete(ctx, node.ID))
 	_, err := svc.GetByID(ctx, node.ID)
 	assert.Error(t, err)
+}
+
+func TestNodeService_Create_SeqNotConsumedOnInsertFailure(t *testing.T) {
+	svc, projRepo, _ := setupNodeService(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("NodeSvcSeq")
+	require.NoError(t, projRepo.Create(ctx, proj))
+
+	first := testutil.NewTestNode(proj.ID, "First")
+	require.NoError(t, svc.Create(ctx, first))
+	assert.Equal(t, 1, first.Seq)
+
+	dup := testutil.NewTestNode(proj.ID, "Duplicate ID")
+	dup.ID = first.ID // force PK violation after seq allocation
+	dup.Seq = 0
+	require.Error(t, svc.Create(ctx, dup))
+
+	second := testutil.NewTestNode(proj.ID, "Second")
+	require.NoError(t, svc.Create(ctx, second))
+	assert.Equal(t, 2, second.Seq, "failed insert should not consume a sequence number")
 }

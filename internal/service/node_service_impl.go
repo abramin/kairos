@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/google/uuid"
@@ -12,10 +13,14 @@ import (
 
 type nodeService struct {
 	nodes repository.PlanNodeRepo
+	uow   db.UnitOfWork
 }
 
-func NewNodeService(nodes repository.PlanNodeRepo) NodeService {
-	return &nodeService{nodes: nodes}
+func NewNodeService(nodes repository.PlanNodeRepo, uow db.UnitOfWork) NodeService {
+	return &nodeService{
+		nodes: nodes,
+		uow:   uow,
+	}
 }
 
 func (s *nodeService) Create(ctx context.Context, n *domain.PlanNode) error {
@@ -26,15 +31,20 @@ func (s *nodeService) Create(ctx context.Context, n *domain.PlanNode) error {
 	n.CreatedAt = now
 	n.UpdatedAt = now
 
-	if n.Seq == 0 {
-		seq, err := s.nodes.NextProjectSeq(ctx, n.ProjectID)
-		if err != nil {
-			return fmt.Errorf("assigning seq: %w", err)
-		}
-		n.Seq = seq
-	}
+	return s.uow.WithinTx(ctx, func(ctx context.Context, tx db.DBTX) error {
+		txNodes := repository.NewSQLitePlanNodeRepo(tx)
+		txSeqs := repository.NewSQLiteProjectSequenceRepo(tx)
 
-	return s.nodes.Create(ctx, n)
+		if n.Seq == 0 {
+			seq, err := txSeqs.NextProjectSeq(ctx, n.ProjectID)
+			if err != nil {
+				return fmt.Errorf("assigning seq: %w", err)
+			}
+			n.Seq = seq
+		}
+
+		return txNodes.Create(ctx, n)
+	})
 }
 
 func (s *nodeService) GetByID(ctx context.Context, id string) (*domain.PlanNode, error) {

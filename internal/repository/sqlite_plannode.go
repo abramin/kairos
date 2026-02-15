@@ -64,22 +64,9 @@ func (r *SQLitePlanNodeRepo) GetBySeq(ctx context.Context, projectID string, seq
 	return r.scanNode(row)
 }
 
-// NextProjectSeq returns the next available sequential ID for a project,
-// computed as MAX(seq) + 1 across both plan_nodes and work_items.
+// NextProjectSeq returns the next available sequential ID for a project.
 func (r *SQLitePlanNodeRepo) NextProjectSeq(ctx context.Context, projectID string) (int, error) {
-	query := `SELECT COALESCE(MAX(seq_val), 0) + 1 FROM (
-		SELECT seq AS seq_val FROM plan_nodes WHERE project_id = ? AND seq > 0
-		UNION ALL
-		SELECT w.seq AS seq_val FROM work_items w
-		JOIN plan_nodes n ON w.node_id = n.id
-		WHERE n.project_id = ? AND w.seq > 0
-	)`
-	var next int
-	err := r.db.QueryRowContext(ctx, query, projectID, projectID).Scan(&next)
-	if err != nil {
-		return 0, fmt.Errorf("computing next seq for project %s: %w", projectID, err)
-	}
-	return next, nil
+	return NewSQLiteProjectSequenceRepo(r.db).NextProjectSeq(ctx, projectID)
 }
 
 func (r *SQLitePlanNodeRepo) ListByProject(ctx context.Context, projectID string) ([]*domain.PlanNode, error) {

@@ -14,10 +14,11 @@ import (
 func setupWorkItemService(t *testing.T) (WorkItemService, repository.ProjectRepo, repository.PlanNodeRepo) {
 	t.Helper()
 	db := testutil.NewTestDB(t)
+	uow := testutil.NewTestUoW(db)
 	projRepo := repository.NewSQLiteProjectRepo(db)
 	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
 	wiRepo := repository.NewSQLiteWorkItemRepo(db)
-	return NewWorkItemService(wiRepo, nodeRepo), projRepo, nodeRepo
+	return NewWorkItemService(wiRepo, nodeRepo, uow), projRepo, nodeRepo
 }
 
 func setupWorkItemWithProject(t *testing.T, projRepo repository.ProjectRepo, nodeRepo repository.PlanNodeRepo) (string, string) {
@@ -171,4 +172,23 @@ func TestWorkItemService_Delete(t *testing.T) {
 
 	_, err := svc.GetByID(ctx, wi.ID)
 	assert.Error(t, err)
+}
+
+func TestWorkItemService_Create_SeqNotConsumedOnInsertFailure(t *testing.T) {
+	svc, projRepo, nodeRepo := setupWorkItemService(t)
+	_, nodeID := setupWorkItemWithProject(t, projRepo, nodeRepo)
+	ctx := context.Background()
+
+	first := testutil.NewTestWorkItem(nodeID, "Task A")
+	require.NoError(t, svc.Create(ctx, first))
+	assert.Equal(t, 1, first.Seq)
+
+	dup := testutil.NewTestWorkItem(nodeID, "Duplicate ID")
+	dup.ID = first.ID // force PK violation after seq allocation
+	dup.Seq = 0
+	require.Error(t, svc.Create(ctx, dup))
+
+	second := testutil.NewTestWorkItem(nodeID, "Task B")
+	require.NoError(t, svc.Create(ctx, second))
+	assert.Equal(t, 2, second.Seq, "failed insert should not consume a sequence number")
 }

@@ -5,17 +5,21 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
+	"github.com/alexanderramin/kairos/internal/domain"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+	"github.com/google/uuid"
 )
 
 // ── entity group commands (node/work/session/project) ────────────────────────
 
 func (c *commandBar) cmdEntityGroup(parts []string) tea.Cmd {
 	if len(parts) < 2 {
-		return outputCmd(c.cobraCapture(parts))
+		group := strings.ToLower(parts[0])
+		return outputCmd(entityGroupHelp(group))
 	}
 
 	group := strings.ToLower(parts[0])
@@ -40,15 +44,16 @@ func (c *commandBar) cmdEntityGroup(parts []string) tea.Cmd {
 		return c.cmdDestructive(parts, group, sub)
 	}
 
-	// Some non-destructive commands mutate project data and need a dashboard refresh.
-	if group == "project" && sub == "import" {
+	// Commands that mutate project data need a dashboard refresh.
+	mutating := map[string]bool{"import": true, "add": true, "update": true, "init": true, "archive": true, "unarchive": true}
+	if mutating[sub] {
 		return tea.Batch(
-			outputCmd(c.cobraCapture(parts)),
+			c.dispatchEntityCommand(group, sub, parts[2:]),
 			func() tea.Msg { return refreshViewMsg{} },
 		)
 	}
 
-	return outputCmd(c.cobraCapture(parts))
+	return c.dispatchEntityCommand(group, sub, parts[2:])
 }
 
 func (c *commandBar) shouldStartEntityWizard(group, sub string, parts []string) bool {
@@ -132,19 +137,29 @@ func (c *commandBar) workAddGetDueDate(nodeID, title, wiType, minutes string) te
 		),
 	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
 	return startWizardCmd(c.state, "Due Date", form, func() tea.Cmd {
-		args := []string{"work", "add",
-			"--node", nodeID,
-			"--title", title,
-			"--type", wiType,
+		ctx := context.Background()
+		w := &domain.WorkItem{
+			ID:        uuid.New().String(),
+			NodeID:    nodeID,
+			Title:     title,
+			Type:      wiType,
+			Status:    domain.WorkItemTodo,
 		}
 		if v, err := strconv.Atoi(minutes); err == nil && v > 0 {
-			args = append(args, "--planned-min", minutes)
+			w.PlannedMin = v
 		}
 		if dueDate != "" {
-			args = append(args, "--due-date", dueDate)
+			if t, err := time.Parse("2006-01-02", dueDate); err == nil {
+				w.DueDate = &t
+			}
 		}
-		output := c.cobraCapture(args)
-		return outputCmd(output)
+		if err := c.state.App.WorkItems.Create(ctx, w); err != nil {
+			return outputCmd(shellError(err))
+		}
+		return tea.Batch(
+			outputCmd(fmt.Sprintf("%s Created: %s", formatter.StyleGreen.Render("✔"), formatter.Bold(title))),
+			func() tea.Msg { return refreshViewMsg{} },
+		)
 	})
 }
 
@@ -166,13 +181,20 @@ func (c *commandBar) nodeAddGetKind(title string) tea.Cmd {
 	var kind string
 	form := wizardSelectNodeKind(&kind)
 	return startWizardCmd(c.state, "Kind", form, func() tea.Cmd {
-		args := []string{"node", "add",
-			"--project", c.state.ActiveProjectID,
-			"--title", title,
-			"--kind", kind,
+		ctx := context.Background()
+		n := &domain.PlanNode{
+			ID:        uuid.New().String(),
+			ProjectID: c.state.ActiveProjectID,
+			Title:     title,
+			Kind:      domain.NodeKind(kind),
 		}
-		output := c.cobraCapture(args)
-		return outputCmd(output)
+		if err := c.state.App.Nodes.Create(ctx, n); err != nil {
+			return outputCmd(shellError(err))
+		}
+		return tea.Batch(
+			outputCmd(fmt.Sprintf("%s Created node: %s", formatter.StyleGreen.Render("✔"), formatter.Bold(title))),
+			func() tea.Msg { return refreshViewMsg{} },
+		)
 	})
 }
 
@@ -182,7 +204,10 @@ func (c *commandBar) cmdDestructive(parts []string, group, sub string) tea.Cmd {
 	// If --yes or --force is present, skip confirmation.
 	for _, a := range parts[2:] {
 		if a == "--yes" || a == "-y" || a == "--force" {
-			return outputCmd(c.cobraCapture(parts))
+			return tea.Batch(
+				c.dispatchEntityCommand(group, sub, parts[2:]),
+				func() tea.Msg { return refreshViewMsg{} },
+			)
 		}
 	}
 
@@ -199,7 +224,10 @@ func (c *commandBar) cmdDestructive(parts []string, group, sub string) tea.Cmd {
 	form := wizardConfirm(desc+"?", &confirmed)
 	return startWizardCmd(c.state, "Confirm", form, func() tea.Cmd {
 		if confirmed {
-			return outputCmd(c.cobraCapture(parts))
+			return tea.Batch(
+				c.dispatchEntityCommand(group, sub, parts[2:]),
+				func() tea.Msg { return refreshViewMsg{} },
+			)
 		}
 		return outputCmd(formatter.Dim("Cancelled."))
 	})

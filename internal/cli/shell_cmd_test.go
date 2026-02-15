@@ -68,16 +68,3 @@ func TestSplitShellArgs(t *testing.T) {
 	}
 }
 
-func TestPrepareShellCobraArgs_PassthroughForAsk(t *testing.T) {
-	t.Parallel()
-
-	got := prepareShellCobraArgs([]string{"ask", "mark OU10 done"}, "")
-	assert.Equal(t, []string{"ask", "mark OU10 done"}, got)
-}
-
-func TestPrepareShellCobraArgs_DoesNotChangeNonAsk(t *testing.T) {
-	t.Parallel()
-
-	got := prepareShellCobraArgs([]string{"project", "list"}, "")
-	assert.Equal(t, []string{"project", "list"}, got)
-}

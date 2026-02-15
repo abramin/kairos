@@ -25,6 +25,9 @@ func Migrate(db *sql.DB) error {
 	if err := migrateBackfillSeq(db); err != nil {
 		return fmt.Errorf("backfilling seq values: %w", err)
 	}
+	if err := migrateBackfillProjectSequences(db); err != nil {
+		return fmt.Errorf("backfilling project sequence allocator state: %w", err)
+	}
 	return nil
 }
 
@@ -149,6 +152,11 @@ var migrations = []string{
 
 	`CREATE INDEX IF NOT EXISTS idx_plan_nodes_project ON plan_nodes(project_id)`,
 	`CREATE INDEX IF NOT EXISTS idx_plan_nodes_parent ON plan_nodes(parent_id)`,
+
+	`CREATE TABLE IF NOT EXISTS project_sequences (
+		project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+		next_seq   INTEGER NOT NULL CHECK(next_seq > 0)
+	)`,
 
 	`CREATE TABLE IF NOT EXISTS work_items (
 		id                   TEXT PRIMARY KEY,
@@ -331,5 +339,33 @@ func backfillProjectSeq(ctx context.Context, db *sql.DB, projectID string) error
 			seq++
 		}
 	}
+	return nil
+}
+
+func migrateBackfillProjectSequences(db *sql.DB) error {
+	ctx := context.Background()
+
+	// Populate (or raise) next_seq for every known project using the current
+	// max assigned seq across nodes and work items.
+	query := `INSERT INTO project_sequences (project_id, next_seq)
+		SELECT p.id, COALESCE(MAX(seq_val), 0) + 1
+		FROM projects p
+		LEFT JOIN (
+			SELECT project_id, seq AS seq_val
+			FROM plan_nodes
+			WHERE seq > 0
+			UNION ALL
+			SELECT n.project_id, w.seq AS seq_val
+			FROM work_items w
+			JOIN plan_nodes n ON n.id = w.node_id
+			WHERE w.seq > 0
+		) s ON s.project_id = p.id
+		GROUP BY p.id
+		ON CONFLICT(project_id) DO UPDATE
+		SET next_seq = MAX(project_sequences.next_seq, excluded.next_seq)`
+	if _, err := db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("upserting project sequence rows: %w", err)
+	}
+
 	return nil
 }

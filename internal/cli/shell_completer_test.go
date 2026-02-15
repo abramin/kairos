@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/alexanderramin/kairos/internal/testutil"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,13 +64,10 @@ func TestSubcommandNames_HasExpectedGroups(t *testing.T) {
 
 func TestShellProjectCache_ReturnsProjects(t *testing.T) {
 	app := testApp(t)
-	_, err := executeCmd(t, app, "project", "add",
-		"--id", "CMP01",
-		"--name", "Autocomplete Project",
-		"--domain", "education",
-		"--start", "2026-01-15",
-	)
-	require.NoError(t, err)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Autocomplete Project", testutil.WithShortID("CMP01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
 
 	cache := newShellProjectCache()
 	projects := cache.get(app)
@@ -79,19 +77,16 @@ func TestShellProjectCache_ReturnsProjects(t *testing.T) {
 
 func TestShellProjectCache_FallsBackToUUIDPrefix(t *testing.T) {
 	app := testApp(t)
-	_, err := executeCmd(t, app, "project", "add",
-		"--id", "CMP02",
-		"--name", "No ShortID Project",
-		"--domain", "education",
-		"--start", "2026-01-15",
-	)
-	require.NoError(t, err)
+	ctx := context.Background()
 
-	projects, err := app.Projects.List(context.Background(), false)
+	proj := testutil.NewTestProject("No ShortID Project", testutil.WithShortID("CMP02"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	projects, err := app.Projects.List(ctx, false)
 	require.NoError(t, err)
 	require.Len(t, projects, 1)
 	projects[0].ShortID = ""
-	require.NoError(t, app.Projects.Update(context.Background(), projects[0]))
+	require.NoError(t, app.Projects.Update(ctx, projects[0]))
 
 	// Test via commandBar projectSuggestions.
 	cb := testCommandBar(t, app)

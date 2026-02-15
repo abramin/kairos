@@ -37,9 +37,9 @@ export KAIROS_TEMPLATES="$PWD/templates"
 ### Package Dependency Graph
 
 ```
-cmd/kairos/main.go              (CLI entry point — wires all deps, runs Cobra root)
+cmd/kairos/main.go              (CLI entry point — wires all deps, runs interactive shell)
   ↓
-internal/cli/                    (Cobra command definitions + App struct + shell REPL)
+internal/cli/                    (Shell command dispatch + App struct + bubbletea TUI)
   ├→ internal/cli/formatter/     (terminal output: tables, trees, colors, progress bars)
   ├→ internal/app/               (use-case interfaces + domain-oriented request/response types)
   ├→ internal/service/           (orchestrates repos + scheduler, implements app/ interfaces)
@@ -74,11 +74,11 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 - `sorter.go` — `CanonicalSort()` deterministic ordering: risk level → due date → score → name → ID
 - `reestimate.go` — `SmoothReEstimate()` applies `0.7*old + 0.3*implied`, never below logged
 
-**`internal/repository`** — Six interfaces (`ProjectRepo`, `PlanNodeRepo`, `WorkItemRepo`, `DependencyRepo`, `SessionRepo`, `UserProfileRepo`) with SQLite implementations prefixed `SQLite*Repo`. Key query: `WorkItemRepo.ListSchedulable()` joins work_items + plan_nodes + projects for scoring input. `SessionRepo` also provides `ListRecentByProject()` and `ListRecentSummaryByType()` for review/replan features.
+**`internal/repository`** — Seven interfaces (`ProjectRepo`, `PlanNodeRepo`, `ProjectSequenceRepo`, `WorkItemRepo`, `DependencyRepo`, `SessionRepo`, `UserProfileRepo`) with SQLite implementations prefixed `SQLite*Repo`. `ProjectSequenceRepo` provides atomic project-scoped `seq` allocation backed by `project_sequences`. Key query: `WorkItemRepo.ListSchedulable()` joins work_items + plan_nodes + projects for scoring input. `SessionRepo` also provides `ListRecentByProject()` and `ListRecentSummaryByType()` for review/replan features.
 
 **`internal/service`** — Eight service interfaces wired via constructor injection (`NewWhatNowService(repos...)`). `ImportService` validates and converts JSON import files into domain objects. Core orchestration flow in `WhatNowService.Recommend()`: load candidates → compute risk per project → determine mode → score → sort → allocate. The pipeline is decomposed into reusable stages in `recommend_pipeline.go` (`ContextLoader`, `ComputeAggregates`, `BlockResolver`, `ScoreCandidates`, `AssembleResponse`) — these stages are shared by Status and Replan services.
 
-**`internal/db`** — `OpenDB(path)` opens SQLite (`:memory:` for tests), enables WAL mode + foreign keys, runs migrations. Schema has 6 tables with indexes, soft-delete via `archived_at`. Migrations include `short_id` column on `projects` (unique index) and `baseline_daily_min` on `user_profile`. `DBTX` interface abstracts over `*sql.DB` and `*sql.Tx` so repositories can operate within transactions. `UnitOfWork` (`SQLiteUnitOfWork`) provides `WithinTx()` for atomic multi-entity operations (e.g., import creates project + nodes + items + dependencies in one transaction).
+**`internal/db`** — `OpenDB(path)` opens SQLite (`:memory:` for tests), enables WAL mode + foreign keys, runs migrations. Schema has 7 tables with indexes, soft-delete via `archived_at`, plus `project_sequences` for atomic project-wide `seq` allocation across nodes/work items. Migrations include `short_id` column on `projects` (unique index), `baseline_daily_min` on `user_profile`, and sequence backfills for legacy rows. `DBTX` interface abstracts over `*sql.DB` and `*sql.Tx` so repositories can operate within transactions. `UnitOfWork` (`SQLiteUnitOfWork`) provides `WithinTx()` for atomic multi-entity operations (e.g., import creates project + nodes + items + dependencies in one transaction).
 
 **`internal/app`** — Use-case layer with domain-oriented request/response types and interface definitions. Provides `WhatNowUseCase`, `StatusUseCase`, `ReplanUseCase`, `LogSessionUseCase`, `InitProjectUseCase`, `ImportProjectUseCase` interfaces. Types (`WhatNowRequest`/`WhatNowResponse`, `StatusRequest`/`StatusResponse`, `ReplanRequest`/`ReplanResponse`) are the canonical API contracts; `internal/contract` re-exports them. Domain-aware error types (`WhatNowError`, `StatusError`, `ReplanError`) with structured codes.
 
@@ -101,7 +101,7 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 - `ProjectDraftService` — Multi-turn NL→project structure drafting. Interactive conversation produces `ImportSchema`, validated via `importer.ValidateImportSchema`, then imported via `ImportService`
 - `HelpService` — LLM-powered Q&A about using Kairos. Supports one-shot questions and multi-turn chat (`StartChat`/`NextTurn`). Uses grounding validation to filter hallucinated commands/flags and a domain glossary embedded in the system prompt. Falls back to `DeterministicHelp()` (fuzzy-matching against the command spec) when LLM is unavailable
 
-**`internal/cli`** — Bubbletea TUI with view-stack navigation + Cobra command tree (internal). `App` struct (`root.go`) holds all service interfaces; v2 intelligence fields (`Intent`, `Explain`, `TemplateDraft`, `ProjectDraft`, `Help`) are nil when LLM is disabled. **Shell-only**: `kairos` always launches the interactive shell. Cobra remains as an internal execution engine — unrecognized commands fall through to the Cobra tree via `captureCobraOutput()` (`cobra_capture.go`). Internal Cobra subcommands: `project` (incl. `init`, `import`, `draft`), `node`, `work`, `session`, `what-now`, `status`, `replan`, `template`, `ask`, `explain` (subcommands: `now`, `why-not`), `review` (subcommand: `weekly`), `help` (subcommand: `chat`).
+**`internal/cli`** — Bubbletea TUI with view-stack navigation and direct command dispatch. `App` struct (`root.go`) holds all service interfaces; v2 intelligence fields (`Intent`, `Explain`, `TemplateDraft`, `ProjectDraft`, `Help`) are nil when LLM is disabled. **Shell-only**: `kairos` always launches the interactive shell. All commands route through `command_dispatch.go` with inline implementations or delegates. Supported commands: built-in (`projects`, `use`, `inspect`, `status`, `what-now`, `log`, `start`, `finish`, `add`, `ask`, `explain`, `review`, `replan`, `context`, `draft`, `help`, `import`), entity groups (`project`, `node`, `work`, `session`, `template` with subcommands), and shell utilities (`clear`, `exit`/`quit`).
 
 **TUI Architecture** (view-stack pattern):
 - **`app_model.go`** — Root bubbletea `appModel`: owns a `viewStack []View`, a persistent `commandBar`, and `SharedState`. Handles `pushViewMsg`/`popViewMsg`/`replaceViewMsg` navigation messages and `wizardCompleteMsg` for multi-step flows. Wizard completion batches the follow-up command with `refreshViewMsg` so views reload after mutations.
@@ -109,7 +109,7 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 - **`shared_state.go`** — `SharedState` holds active project/item context, terminal dimensions, project cache, and transient recommendation state. Shared across all views via pointer.
 - **`command_bar.go`** — Persistent text input at the bottom of the TUI with autocomplete suggestions and history navigation.
 - **`navigate.go`** — Navigation message types (`pushViewMsg`, `popViewMsg`, `replaceViewMsg`, `cmdOutputMsg`, `wizardCompleteMsg`, `refreshViewMsg`) and helper constructors (`pushView()`, `popView()`, `replaceView()`). `refreshViewMsg` notifies views to reload data after state mutations.
-- **`command_dispatch.go`** — `commandBar.executeCommand()` dispatches text input to command handlers. Routes built-in commands (`projects`, `use`, `inspect`, `status`, `what-now`, `log`, `start`, `finish`, `add`, `ask`, `explain`, `review`, `context`, `draft`, `help`, `clear`, `exit`) and falls through to entity group commands and Cobra.
+- **`command_dispatch.go`** — `commandBar.executeCommand()` dispatches text input to command handlers. Routes built-in commands (`projects`, `use`, `inspect`, `status`, `what-now`, `log`, `start`, `finish`, `add`, `ask`, `explain`, `review`, `replan`, `context`, `draft`, `help`, `import`, `clear`, `exit`/`quit`) and delegates to `cmdEntityGroup()` for entity commands (`project`, `node`, `work`, `session`, `template`).
 
 **View files**:
 - `view_dashboard.go` — Split-pane home screen: left pane has selectable project list with cursor, right pane shows project detail (stats: total/done/in-progress/todo). Async detail loading via `dashboardDetailLoadedMsg`.
@@ -123,10 +123,13 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 - `view_help_chat.go` — Interactive help chat view
 
 **Command implementation files**:
-- `cmd_navigation.go` — `projects`, `use`, `inspect`, `status`, `what-now`, `replan` handlers
-- `cmd_work.go` — `log`, `start`, `finish` with wizard chaining for missing args
-- `cmd_entity.go` — Entity group commands (`node/work/session/project` subcommands), wizard launch for bare creation, confirmation for destructive ops
-- `cmd_intelligence.go` — `ask`, `explain`, `review` LLM command handlers
+- `command_dispatch.go` — Main command dispatcher (`executeCommand()`): routes built-in commands (`projects`, `use`, `inspect`, `status`, `what-now`, `log`, `start`, `finish`, `add`, `ask`, `explain`, `review`, `replan`, `context`, `draft`, `help`, `import`, `clear`, `exit`/`quit`) and entity groups. Most command handlers are implemented inline. Also includes `replan` command implementation.
+- `cmd_entity.go` — Entity group routing (`cmdEntityGroup`): handles `project`, `node`, `work`, `session`, `template` commands. Routes to wizard for bare creation, confirmation for destructive ops, and delegates to `cmd_entity_dispatch.go`.
+- `cmd_entity_dispatch.go` — Entity subcommand dispatch (`dispatchEntityCommand`, `dispatchProject`, `dispatchNode`, `dispatchWork`, `dispatchSession`, `dispatchTemplate`): direct service calls with flag parsing. Subcommands: project (list, inspect, add, update, archive, unarchive, remove, init, import), node (add, inspect, update, remove), work (add, inspect, update, done, archive, remove), session (log, list, remove), template (list, show).
+- `cmd_navigation.go` — Navigation commands: `projects`, `use`, `inspect`, `status`, `what-now` handlers
+- `cmd_work.go` — Work commands: `log`, `start`, `finish` with wizard chaining for missing args
+- `cmd_intelligence.go` — LLM command handlers: `ask`, `explain`, `review`
+- `intent_helpers.go` — Intent argument extraction helpers (`intArg`, `boolArg`, `stringArg`) for parsing LLM-generated intent arguments
 - `work_actions.go` — Extracted action handlers reused across command bar and action menu: `execLogSession()`, `execStartItem()`, `execMarkDone()`. Each takes `context`, `App`, `SharedState` and returns formatted output or error.
 
 **Supporting files**:
@@ -137,7 +140,7 @@ internal/teatest/                (synchronous bubbletea test driver — determin
 - `shell_cmd.go` — `runShell()` entrypoint, `destructiveCommands` map, utility functions.
 - `command_hint.go` — Maps `ParsedIntent` (from LLM intent parsing) to concrete CLI command strings.
 - `draft_wizard.go` — Interactive structure wizard for guided project creation without LLM. `generateShortID()` creates human-friendly IDs (e.g., `"PHYS01"`).
-- `cmdspec.go` — `CommandSpec` built from the Cobra tree for grounding validation.
+- `cmdspec.go` — `CommandSpec` describing available shell commands for help and grounding validation.
 
 **`internal/cli/formatter`** — Terminal output formatting with lipgloss: tables, tree views, progress bars, color helpers, animated spinner (`spinner.go`). Separate formatters for what-now, status, explain, ask, draft, review, and help output. `review_fmt.go` includes Zettelkasten backlog nudge (flags reading items not yet processed into notes).
 
@@ -157,7 +160,7 @@ WhatNowRequest
 
 ### CLI ↔ App Layer Adapters
 
-`app_ports.go` provides adapter methods on `App` that resolve to use-case interfaces (e.g., `a.logSessionUseCase()` returns `App.LogSession` if set, else falls back to `App.Sessions`). This enables dependency injection and gradual refactoring. `app_contract_mapper.go` maps between `app/` types and `contract/` types, currently near-identity but allows future divergence.
+`app_ports.go` provides adapter methods on `App` that resolve to use-case interfaces (e.g., `a.logSessionUseCase()` returns `App.LogSession` if set, else falls back to `App.Sessions`). This enables dependency injection and gradual refactoring.
 
 ### v2 Intelligence: LLM Integration Pattern
 
@@ -168,7 +171,7 @@ Key design patterns:
 - **Evidence binding validation**: LLM explanations must reference only valid `evidence_ref_key` values derived from the engine trace (`TraceKeys()` / `WeeklyTraceKeys()`). Invalid references trigger fallback
 - **Write safety enforcement**: `EnforceWriteSafety()` overrides LLM-classified risk for known write intents — the LLM cannot bypass confirmation for mutations
 - **Structured extraction**: `llm.ExtractJSON[T]()` handles markdown fences, brace matching, and schema validation generically
-- **Grounding validation**: `HelpService` filters LLM responses to remove hallucinated commands/flags not present in the actual Cobra command tree
+- **Grounding validation**: `HelpService` filters LLM responses to remove hallucinated commands/flags not present in the actual shell command spec
 - **Wizard-to-LLM handoff**: Draft wizard collects structure interactively, then optionally hands off to LLM for refinement — both paths produce the same `ImportSchema` type
 
 ## Naming Conventions

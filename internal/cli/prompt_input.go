@@ -2,40 +2,9 @@ package cli
 
 import (
 	"bufio"
-	"fmt"
 	"io"
-	"os"
 	"strings"
 )
-
-func promptYesNo(message string) bool {
-	return promptYesNoIO(os.Stdin, os.Stdout, message)
-}
-
-func promptYesNoIO(in io.Reader, out io.Writer, message string) bool {
-	return promptYesNoWithDefaultIO(in, out, message, false)
-}
-
-func promptYesNoWithDefault(message string, defaultYes bool) bool {
-	return promptYesNoWithDefaultIO(os.Stdin, os.Stdout, message, defaultYes)
-}
-
-func promptYesNoWithDefaultIO(in io.Reader, out io.Writer, message string, defaultYes bool) bool {
-	if out != nil {
-		fmt.Fprint(out, message)
-	}
-
-	text, err := readPromptLine(in)
-	if err != nil {
-		return false
-	}
-
-	text = strings.TrimSpace(strings.ToLower(text))
-	if text == "" {
-		return defaultYes
-	}
-	return text == "y" || text == "yes"
-}
 
 // readPromptLine reads until either LF or CR so Enter works in normal and raw terminal modes.
 // When the input is a *bufio.Reader, it correctly handles \r\n sequences by consuming the
@@ -76,4 +45,13 @@ func readPromptLine(in io.Reader) (string, error) {
 			return string(buf), err
 		}
 	}
+}
+
+// readDraftLine reads and trims a line from a reader.
+func readDraftLine(in io.Reader) (string, error) {
+	line, err := readPromptLine(in)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(line), nil
 }

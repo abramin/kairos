@@ -3,13 +3,10 @@ package cli
 import (
 	"encoding/json"
 	"strings"
-
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 )
 
-// CommandSpec is a structured representation of the full Cobra command tree,
-// generated at runtime for use as LLM grounding context.
+// CommandSpec is a structured representation of all shell commands,
+// used as LLM grounding context for help and intent parsing.
 type CommandSpec struct {
 	Commands []CommandEntry `json:"commands"`
 }
@@ -33,66 +30,60 @@ type FlagEntry struct {
 	Required    bool   `json:"required"`
 }
 
-// BuildCommandSpec walks the Cobra command tree and produces a CommandSpec.
-func BuildCommandSpec(root *cobra.Command) *CommandSpec {
-	spec := &CommandSpec{}
-	walkCommand(root, spec)
-	return spec
-}
-
-func walkCommand(cmd *cobra.Command, spec *CommandSpec) {
-	entry := CommandEntry{
-		FullPath: cmd.CommandPath(),
-		Short:    cmd.Short,
-		Examples: cmd.Example,
+// ShellCommandSpec returns a static CommandSpec describing all available
+// shell commands. This replaces the old Cobra tree walk.
+func ShellCommandSpec() *CommandSpec {
+	return &CommandSpec{
+		Commands: []CommandEntry{
+			{FullPath: "projects", Short: "List all projects"},
+			{FullPath: "use", Short: "Set active project context", Flags: []FlagEntry{{Name: "id", Type: "string", Description: "Project short ID or UUID"}}},
+			{FullPath: "inspect", Short: "Show project tree for active project"},
+			{FullPath: "status", Short: "Show status overview across all projects"},
+			{FullPath: "what-now", Short: "Get work recommendations for available time", Flags: []FlagEntry{{Name: "minutes", Type: "int", Default: "60", Description: "Available minutes"}}},
+			{FullPath: "log", Short: "Log a completed work session", Flags: []FlagEntry{{Name: "item", Type: "string", Description: "Work item ref (#N or ID)"}, {Name: "minutes", Type: "int", Description: "Duration in minutes"}}},
+			{FullPath: "start", Short: "Start working on an item (sets status to in-progress)"},
+			{FullPath: "finish", Short: "Mark a work item as done"},
+			{FullPath: "add", Short: "Quick-add a work item to active project"},
+			{FullPath: "replan", Short: "Rebalance project schedules", Flags: []FlagEntry{{Name: "strategy", Type: "string", Default: "rebalance", Description: "Replan strategy (rebalance|deadline_first)"}}},
+			{FullPath: "import", Short: "Import a project from a JSON file"},
+			{FullPath: "draft", Short: "Start interactive project drafting wizard"},
+			{FullPath: "context", Short: "Show or set active project/item context"},
+			{FullPath: "help", Short: "Show available commands"},
+			{FullPath: "help chat", Short: "Interactive LLM-powered help session"},
+			{FullPath: "ask", Short: "Ask a natural language question (LLM)", Flags: []FlagEntry{{Name: "question", Type: "string", Description: "Natural language question"}}},
+			{FullPath: "explain now", Short: "Explain current recommendations with LLM narrative"},
+			{FullPath: "explain why-not", Short: "Explain why a specific item was not recommended"},
+			{FullPath: "review weekly", Short: "Summarize the past 7 days with actionable insights"},
+			// Entity group commands
+			{FullPath: "project list", Short: "List all projects", Flags: []FlagEntry{{Name: "all", Type: "bool", Description: "Include archived projects"}}},
+			{FullPath: "project inspect", Short: "Show project tree"},
+			{FullPath: "project add", Short: "Create a new project", Flags: []FlagEntry{{Name: "id", Type: "string", Description: "Short ID", Required: true}, {Name: "name", Type: "string", Description: "Project name", Required: true}, {Name: "domain", Type: "string", Description: "Domain", Required: true}, {Name: "start", Type: "string", Description: "Start date (YYYY-MM-DD)", Required: true}, {Name: "due", Type: "string", Description: "Due date (YYYY-MM-DD)"}}},
+			{FullPath: "project update", Short: "Update project fields"},
+			{FullPath: "project archive", Short: "Archive a project"},
+			{FullPath: "project unarchive", Short: "Unarchive a project"},
+			{FullPath: "project remove", Short: "Delete a project"},
+			{FullPath: "project init", Short: "Initialize project from template", Flags: []FlagEntry{{Name: "template", Type: "string", Description: "Template reference", Required: true}, {Name: "id", Type: "string", Description: "Short ID", Required: true}, {Name: "name", Type: "string", Description: "Project name", Required: true}, {Name: "start", Type: "string", Description: "Start date", Required: true}}},
+			{FullPath: "project import", Short: "Import project from JSON file"},
+			{FullPath: "project draft", Short: "Start interactive project drafting"},
+			{FullPath: "node add", Short: "Create a new plan node", Flags: []FlagEntry{{Name: "project", Type: "string", Description: "Project ID"}, {Name: "title", Type: "string", Description: "Node title", Required: true}, {Name: "kind", Type: "string", Description: "Node kind (module|milestone|week)", Required: true}}},
+			{FullPath: "node inspect", Short: "Show node details"},
+			{FullPath: "node update", Short: "Update node fields"},
+			{FullPath: "node remove", Short: "Delete a plan node"},
+			{FullPath: "work add", Short: "Create a new work item", Flags: []FlagEntry{{Name: "node", Type: "string", Description: "Parent node ID", Required: true}, {Name: "title", Type: "string", Description: "Item title", Required: true}, {Name: "type", Type: "string", Description: "Item type (task|reading|exercise|zettel)", Required: true}, {Name: "planned-min", Type: "int", Description: "Planned minutes"}, {Name: "due-date", Type: "string", Description: "Due date (YYYY-MM-DD)"}}},
+			{FullPath: "work inspect", Short: "Show work item details"},
+			{FullPath: "work update", Short: "Update work item fields"},
+			{FullPath: "work done", Short: "Mark work item as done"},
+			{FullPath: "work archive", Short: "Archive a work item"},
+			{FullPath: "work remove", Short: "Delete a work item"},
+			{FullPath: "session log", Short: "Log a work session", Flags: []FlagEntry{{Name: "work-item", Type: "string", Description: "Work item ID", Required: true}, {Name: "minutes", Type: "int", Description: "Duration in minutes", Required: true}, {Name: "note", Type: "string", Description: "Session note"}, {Name: "units-done", Type: "int", Description: "Units completed"}}},
+			{FullPath: "session list", Short: "List recent sessions", Flags: []FlagEntry{{Name: "work-item", Type: "string", Description: "Filter by work item"}, {Name: "days", Type: "int", Default: "7", Description: "Number of days"}}},
+			{FullPath: "session remove", Short: "Delete a session"},
+			{FullPath: "template list", Short: "List available templates"},
+			{FullPath: "template show", Short: "Show template details"},
+			{FullPath: "clear", Short: "Clear the screen"},
+			{FullPath: "exit", Short: "Exit the shell"},
+		},
 	}
-
-	// Collect flags (local only, not inherited).
-	cmd.LocalFlags().VisitAll(func(f *pflag.Flag) {
-		if f.Hidden {
-			return
-		}
-		fe := FlagEntry{
-			Name:        f.Name,
-			Shorthand:   f.Shorthand,
-			Type:        f.Value.Type(),
-			Default:     f.DefValue,
-			Description: f.Usage,
-		}
-		if ann, ok := f.Annotations[cobra.BashCompOneRequiredFlag]; ok && len(ann) > 0 {
-			fe.Required = true
-		}
-		entry.Flags = append(entry.Flags, fe)
-	})
-
-	// Collect child command names.
-	for _, child := range cmd.Commands() {
-		if !shouldIncludeCommand(child) {
-			continue
-		}
-		entry.Subcommands = append(entry.Subcommands, child.CommandPath())
-	}
-
-	spec.Commands = append(spec.Commands, entry)
-
-	// Recurse into children.
-	for _, child := range cmd.Commands() {
-		if !shouldIncludeCommand(child) {
-			continue
-		}
-		walkCommand(child, spec)
-	}
-}
-
-func shouldIncludeCommand(cmd *cobra.Command) bool {
-	if cmd == nil {
-		return false
-	}
-	// Cobra may mark custom help commands hidden; keep them in the help spec.
-	if cmd.Name() == "help" {
-		return true
-	}
-	return !cmd.Hidden && cmd.IsAvailableCommand()
 }
 
 // ValidateCommandPath checks that a command path exists in the spec.

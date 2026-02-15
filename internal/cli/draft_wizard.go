@@ -423,3 +423,39 @@ func buildSchemaFromWizard(result *wizardResult) *importer.ImportSchema {
 
 func intPtr(v int) *int       { return &v }
 func boolPtr(v bool) *bool    { return &v }
+
+// buildLLMDescription converts wizard results into a natural language description
+// for seeding the LLM draft conversation.
+func buildLLMDescription(wizard *wizardResult) string {
+	var b strings.Builder
+	b.WriteString(wizard.Description)
+	b.WriteString("\nStart date: ")
+	b.WriteString(wizard.StartDate)
+	if wizard.Deadline != "" {
+		b.WriteString("\nDeadline: ")
+		b.WriteString(wizard.Deadline)
+	}
+	b.WriteString("\nStructure: ")
+	for i, g := range wizard.Groups {
+		if i > 0 {
+			b.WriteString(", ")
+		}
+		b.WriteString(fmt.Sprintf("%d %ss", g.Count, g.Label))
+		if g.DaysPer > 0 {
+			b.WriteString(fmt.Sprintf(" (%d days each)", g.DaysPer))
+		}
+	}
+	if len(wizard.WorkItems) > 0 {
+		b.WriteString(". Each node has: ")
+		for i, wi := range wizard.WorkItems {
+			if i > 0 {
+				b.WriteString(", ")
+			}
+			b.WriteString(wi.Title)
+			if wi.PlannedMin > 0 {
+				b.WriteString(fmt.Sprintf(" (%dmin)", wi.PlannedMin))
+			}
+		}
+	}
+	return b.String()
+}

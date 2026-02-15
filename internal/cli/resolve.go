@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 // resolveNodeID resolves a node identifier which can be:
@@ -45,6 +46,52 @@ func resolveWorkItemID(ctx context.Context, app *App, input string, projectID st
 		return wi.ID, nil
 	}
 	return input, nil
+}
+
+// resolveProjectID resolves a project identifier which can be:
+//   - A ShortID (case-insensitive exact match)
+//   - A full UUID
+//   - A UUID prefix (must be unambiguous)
+func resolveProjectID(ctx context.Context, app *App, input string) (string, error) {
+	if input == "" {
+		return "", fmt.Errorf("project ID is required")
+	}
+
+	projects, err := app.Projects.List(ctx, true)
+	if err != nil {
+		return "", err
+	}
+
+	// 1. Exact short ID match (case-insensitive)
+	for _, p := range projects {
+		if strings.EqualFold(p.ShortID, input) {
+			return p.ID, nil
+		}
+	}
+
+	// 2. Exact UUID match
+	for _, p := range projects {
+		if p.ID == input {
+			return p.ID, nil
+		}
+	}
+
+	// 3. UUID prefix match
+	var matches []string
+	for _, p := range projects {
+		if strings.HasPrefix(p.ID, input) {
+			matches = append(matches, p.ID)
+		}
+	}
+
+	switch len(matches) {
+	case 0:
+		return "", fmt.Errorf("project not found: %q", input)
+	case 1:
+		return matches[0], nil
+	default:
+		return "", fmt.Errorf("project ID prefix %q is ambiguous (%d matches)", input, len(matches))
+	}
 }
 
 // resolveProjectForFlag resolves a --project flag value to a project UUID.

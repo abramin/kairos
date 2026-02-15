@@ -17,7 +17,7 @@ var destructiveCommands = map[string]map[string]bool{
 	"session": {"remove": true},
 }
 
-func runShell(app *App) error {
+func RunShell(app *App) error {
 	m := newAppModel(app)
 	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithMouseCellMotion())
 	_, err := p.Run()
@@ -158,27 +158,3 @@ func splitShellArgs(input string) ([]string, error) {
 	return parts, nil
 }
 
-// prepareShellCobraArgs injects --project flags for scoped commands
-// when the user has an active project context.
-func prepareShellCobraArgs(args []string, activeProjectID string) []string {
-	if activeProjectID == "" || len(args) == 0 {
-		return args
-	}
-
-	group := strings.ToLower(args[0])
-	if group != "node" && group != "work" && group != "session" {
-		return args
-	}
-
-	if group == "work" && len(args) >= 2 && strings.ToLower(args[1]) == "add" {
-		return args
-	}
-
-	for _, a := range args {
-		if a == "--project" || strings.HasPrefix(a, "--project=") {
-			return args
-		}
-	}
-
-	return append(args, "--project", activeProjectID)
-}

@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/domain"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+	"github.com/google/uuid"
 )
 
 // resolveItemTitle fetches the work item title and seq, falling back to a truncated ID.
@@ -277,19 +279,21 @@ func (c *commandBar) addGetDueDate(nodeID, title string, minutes int) tea.Cmd {
 func (c *commandBar) addExecute(nodeID, title string, minutes int, dueDate string) tea.Cmd {
 	ctx := context.Background()
 
-	cobraArgs := []string{"work", "add",
-		"--node", nodeID,
-		"--title", title,
-		"--type", "task",
-		"--planned-min", strconv.Itoa(minutes),
+	w := &domain.WorkItem{
+		ID:        uuid.New().String(),
+		NodeID:    nodeID,
+		Title:     title,
+		Type:      "task",
+		Status:    domain.WorkItemTodo,
+		PlannedMin: minutes,
 	}
 	if dueDate != "" {
-		cobraArgs = append(cobraArgs, "--due-date", dueDate)
+		if t, err := time.Parse("2006-01-02", dueDate); err == nil {
+			w.DueDate = &t
+		}
 	}
-	output := c.cobraCapture(cobraArgs)
-
-	if strings.Contains(output, "Error") {
-		return outputCmd(output)
+	if err := c.state.App.WorkItems.Create(ctx, w); err != nil {
+		return outputCmd(shellError(err))
 	}
 
 	// Try to set the new item as active context.
@@ -311,5 +315,8 @@ func (c *commandBar) addExecute(nodeID, title string, minutes int, dueDate strin
 	if nodeTitle != "" {
 		msg += fmt.Sprintf(" to %s", formatter.Bold(nodeTitle))
 	}
-	return outputCmd(msg)
+	return tea.Batch(
+		outputCmd(msg),
+		func() tea.Msg { return refreshViewMsg{} },
+	)
 }

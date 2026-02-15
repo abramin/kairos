@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/repository"
 	"github.com/google/uuid"
@@ -13,10 +14,19 @@ import (
 type workItemService struct {
 	workItems repository.WorkItemRepo
 	nodes     repository.PlanNodeRepo
+	uow       db.UnitOfWork
 }
 
-func NewWorkItemService(workItems repository.WorkItemRepo, nodes repository.PlanNodeRepo) WorkItemService {
-	return &workItemService{workItems: workItems, nodes: nodes}
+func NewWorkItemService(
+	workItems repository.WorkItemRepo,
+	nodes repository.PlanNodeRepo,
+	uow db.UnitOfWork,
+) WorkItemService {
+	return &workItemService{
+		workItems: workItems,
+		nodes:     nodes,
+		uow:       uow,
+	}
 }
 
 func (s *workItemService) Create(ctx context.Context, w *domain.WorkItem) error {
@@ -36,19 +46,25 @@ func (s *workItemService) Create(ctx context.Context, w *domain.WorkItem) error 
 		w.DurationSource = domain.SourceManual
 	}
 
-	if w.Seq == 0 {
-		node, err := s.nodes.GetByID(ctx, w.NodeID)
-		if err != nil {
-			return fmt.Errorf("looking up node for seq: %w", err)
-		}
-		seq, err := s.nodes.NextProjectSeq(ctx, node.ProjectID)
-		if err != nil {
-			return fmt.Errorf("assigning seq: %w", err)
-		}
-		w.Seq = seq
-	}
+	return s.uow.WithinTx(ctx, func(ctx context.Context, tx db.DBTX) error {
+		txNodes := repository.NewSQLitePlanNodeRepo(tx)
+		txWorkItems := repository.NewSQLiteWorkItemRepo(tx)
+		txSeqs := repository.NewSQLiteProjectSequenceRepo(tx)
 
-	return s.workItems.Create(ctx, w)
+		if w.Seq == 0 {
+			node, err := txNodes.GetByID(ctx, w.NodeID)
+			if err != nil {
+				return fmt.Errorf("looking up node for seq: %w", err)
+			}
+			seq, err := txSeqs.NextProjectSeq(ctx, node.ProjectID)
+			if err != nil {
+				return fmt.Errorf("assigning seq: %w", err)
+			}
+			w.Seq = seq
+		}
+
+		return txWorkItems.Create(ctx, w)
+	})
 }
 
 func (s *workItemService) GetByID(ctx context.Context, id string) (*domain.WorkItem, error) {

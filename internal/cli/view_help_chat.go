@@ -34,8 +34,7 @@ func newHelpChatView(state *SharedState) *helpChatView {
 	ti.CharLimit = 500
 
 	// Build command spec for deterministic help.
-	root := NewRootCmd(state.App)
-	spec := state.App.getCommandSpec(root)
+	spec := state.App.getCommandSpec()
 	specJSON := SerializeCommandSpec(spec)
 	cmdInfos := buildHelpCommandInfos(spec)
 
@@ -159,4 +158,34 @@ func (v *helpChatView) handleInput(input string) (tea.Model, tea.Cmd) {
 	}
 
 	return v, nil
+}
+
+// resolveHelpAnswer gets a help answer using LLM with fallback to deterministic.
+func resolveHelpAnswer(app *App, question, specJSON string, cmdInfos []intelligence.HelpCommandInfo) *intelligence.HelpAnswer {
+	if app.Help == nil {
+		return intelligence.DeterministicHelp(question, cmdInfos)
+	}
+
+	ctx := context.Background()
+	stopSpinner := formatter.StartSpinner("Thinking...")
+	answer, err := app.Help.Ask(ctx, question, specJSON)
+	stopSpinner()
+	if err != nil {
+		return intelligence.DeterministicHelp(question, cmdInfos)
+	}
+
+	return answer
+}
+
+// buildHelpCommandInfos converts CommandSpec entries into HelpCommandInfo
+// for use by the intelligence layer (avoids import cycle).
+func buildHelpCommandInfos(spec *CommandSpec) []intelligence.HelpCommandInfo {
+	infos := make([]intelligence.HelpCommandInfo, len(spec.Commands))
+	for i, cmd := range spec.Commands {
+		infos[i] = intelligence.HelpCommandInfo{
+			FullPath: cmd.FullPath,
+			Short:    cmd.Short,
+		}
+	}
+	return infos
 }

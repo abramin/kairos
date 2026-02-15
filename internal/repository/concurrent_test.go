@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/db"
 	"github.com/alexanderramin/kairos/internal/testutil"
@@ -168,4 +169,96 @@ func TestConcurrentAccess_SequentialWritesConcurrentReads(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestConcurrentAccess_ProjectSequence_NoDuplicateSeq(t *testing.T) {
+	database := newConcurrentTestDB(t)
+	ctx := context.Background()
+
+	projRepo := NewSQLiteProjectRepo(database)
+	nodeRepo := NewSQLitePlanNodeRepo(database)
+	wiRepo := NewSQLiteWorkItemRepo(database)
+	uow := db.NewSQLiteUnitOfWork(database)
+
+	proj := testutil.NewTestProject("Seq Concurrency")
+	require.NoError(t, projRepo.Create(ctx, proj))
+
+	// Seed one existing node to force allocator bootstrap from existing seq.
+	root := testutil.NewTestNode(proj.ID, "Root")
+	root.Seq = 1
+	require.NoError(t, nodeRepo.Create(ctx, root))
+
+	retryTx := func(fn func() error) error {
+		const maxRetries = 10
+		for attempt := 0; attempt < maxRetries; attempt++ {
+			err := fn()
+			if err == nil {
+				return nil
+			}
+			if attempt == maxRetries-1 {
+				return err
+			}
+			time.Sleep(time.Millisecond * time.Duration(1<<attempt))
+		}
+		return nil
+	}
+
+	const workers = 40
+	var wg sync.WaitGroup
+	errCh := make(chan error, workers)
+
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			err := retryTx(func() error {
+				return uow.WithinTx(ctx, func(ctx context.Context, tx db.DBTX) error {
+					txSeq := NewSQLiteProjectSequenceRepo(tx)
+					txNode := NewSQLitePlanNodeRepo(tx)
+					txWork := NewSQLiteWorkItemRepo(tx)
+
+					seq, err := txSeq.NextProjectSeq(ctx, proj.ID)
+					if err != nil {
+						return err
+					}
+
+					if i%2 == 0 {
+						node := testutil.NewTestNode(proj.ID, fmt.Sprintf("Node-%d", i))
+						node.Seq = seq
+						return txNode.Create(ctx, node)
+					}
+
+					work := testutil.NewTestWorkItem(root.ID, fmt.Sprintf("Work-%d", i))
+					work.Seq = seq
+					return txWork.Create(ctx, work)
+				})
+			})
+			if err != nil {
+				errCh <- err
+			}
+		}(i)
+	}
+
+	wg.Wait()
+	close(errCh)
+	for err := range errCh {
+		require.NoError(t, err)
+	}
+
+	nodes, err := nodeRepo.ListByProject(ctx, proj.ID)
+	require.NoError(t, err)
+	items, err := wiRepo.ListByProject(ctx, proj.ID)
+	require.NoError(t, err)
+
+	seen := make(map[int]bool, len(nodes)+len(items))
+	for _, n := range nodes {
+		assert.Falsef(t, seen[n.Seq], "duplicate seq %d on node %s", n.Seq, n.ID)
+		seen[n.Seq] = true
+	}
+	for _, w := range items {
+		assert.Falsef(t, seen[w.Seq], "duplicate seq %d on work item %s", w.Seq, w.ID)
+		seen[w.Seq] = true
+	}
+
+	assert.Equal(t, len(nodes)+len(items), len(seen), "all created entities should have unique sequence IDs")
 }

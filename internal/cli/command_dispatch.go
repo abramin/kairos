@@ -2,10 +2,13 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 
+	kairosapp "github.com/alexanderramin/kairos/internal/app"
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
+	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/intelligence"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -53,7 +56,7 @@ func (c *commandBar) executeCommand(input string) tea.Cmd {
 	case "review":
 		return c.cmdReview(args)
 	case "replan":
-		return outputCmd(c.cobraCapture(append([]string{"replan"}, args...)))
+		return c.cmdReplan(args)
 	case "context":
 		return c.cmdContext(args)
 	case "draft":
@@ -78,14 +81,27 @@ func (c *commandBar) executeCommand(input string) tea.Cmd {
 		return nil
 	case "exit", "quit":
 		return tea.Quit
+	case "import":
+		if len(args) == 0 {
+			return outputCmd(formatter.StyleYellow.Render("Usage: import <file.json>"))
+		}
+		return tea.Batch(
+			asyncOutputCmd(func() string {
+				ctx := context.Background()
+				result, err := execImport(ctx, c.state.App, args[0])
+				if err != nil {
+					return shellError(err)
+				}
+				return result
+			}),
+			func() tea.Msg { return refreshViewMsg{} },
+		)
 	case "project":
 		return c.cmdEntityGroup(parts)
-	case "node", "work", "session":
+	case "node", "work", "session", "template":
 		return c.cmdEntityGroup(parts)
 	default:
-		// Fall through to cobra capture for unrecognized commands
-		output := c.cobraCapture(parts)
-		return outputCmd(output)
+		return outputCmd(fmt.Sprintf("Unknown command: %s. Type 'help' for available commands.", cmd))
 	}
 }
 
@@ -169,9 +185,66 @@ func (c *commandBar) explainWithFallback(
 	return fallback()
 }
 
-// ── cobra passthrough ────────────────────────────────────────────────────────
+// ── replan command ───────────────────────────────────────────────────────────
 
-// cobraCapture runs a command through the Cobra tree and captures output.
-func (c *commandBar) cobraCapture(args []string) string {
-	return captureCobraOutput(c.state.App, args, c.state.ActiveProjectID, c.state.ActiveShortID)
+func (c *commandBar) cmdReplan(args []string) tea.Cmd {
+	return tea.Batch(
+		loadingCmd("Replanning..."),
+		asyncOutputCmd(func() string {
+			ctx := context.Background()
+			req := kairosapp.NewReplanRequest(domain.TriggerManual)
+
+			// Parse --strategy flag if present.
+			_, flags := parseShellFlags(args)
+			if v, ok := flags["strategy"]; ok {
+				req.Strategy = v
+			}
+
+			resp, err := c.state.App.Replan.Replan(ctx, req)
+			if err != nil {
+				return shellError(err)
+			}
+
+			var b strings.Builder
+			b.WriteString(formatter.Header("Replan Results"))
+			b.WriteString(fmt.Sprintf("\n  Trigger:    %s\n", string(resp.Trigger)))
+			b.WriteString(fmt.Sprintf("  Strategy:   %s\n", resp.Strategy))
+			b.WriteString(fmt.Sprintf("  Projects:   %d recomputed\n", resp.RecomputedProjects))
+			b.WriteString(fmt.Sprintf("  Mode after: %s\n\n", string(resp.GlobalModeAfter)))
+
+			if len(resp.Deltas) > 0 {
+				headers := []string{"Project", "Risk Before", "Risk After", "Daily Min Before", "Daily Min After", "Changes"}
+				rows := make([][]string, 0, len(resp.Deltas))
+				for _, d := range resp.Deltas {
+					rows = append(rows, []string{
+						d.ProjectName,
+						formatter.RiskIndicator(d.RiskBefore),
+						formatter.RiskIndicator(d.RiskAfter),
+						fmt.Sprintf("%.0f", d.RequiredDailyMinBefore),
+						fmt.Sprintf("%.0f", d.RequiredDailyMinAfter),
+						fmt.Sprintf("%d items", d.ChangedItemsCount),
+					})
+				}
+				b.WriteString(formatter.RenderTable(headers, rows))
+			} else {
+				b.WriteString(formatter.Dim("  No changes needed."))
+			}
+
+			if resp.Explanation != nil {
+				b.WriteString("\n")
+				if len(resp.Explanation.CriticalProjects) > 0 {
+					b.WriteString(fmt.Sprintf("  Critical projects: %v\n", resp.Explanation.CriticalProjects))
+				}
+				for _, rule := range resp.Explanation.RulesApplied {
+					b.WriteString(fmt.Sprintf("  Rule: %s\n", formatter.Dim(rule)))
+				}
+			}
+
+			for _, w := range resp.Warnings {
+				b.WriteString(fmt.Sprintf("  WARNING: %s\n", w))
+			}
+
+			return b.String()
+		}),
+	)
 }

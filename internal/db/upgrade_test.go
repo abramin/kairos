@@ -193,6 +193,12 @@ func TestMigrate_UpgradePath_LegacyV1ToCurrentSchema(t *testing.T) {
 	require.NoError(t, err)
 	assert.Greater(t, wiSeq, 0, "work item seq should be backfilled")
 
+	// project_sequences.next_seq should be seeded from max existing seq + 1
+	var nextSeq int
+	err = db.QueryRow(`SELECT next_seq FROM project_sequences WHERE project_id = 'p1'`).Scan(&nextSeq)
+	require.NoError(t, err)
+	assert.Equal(t, max(nodeSeq, wiSeq)+1, nextSeq, "next_seq should track max existing seq + 1")
+
 	// === Verify assessment kind is now allowed ===
 	var createSQL string
 	err = db.QueryRow(`SELECT sql FROM sqlite_master WHERE type='table' AND name='plan_nodes'`).Scan(&createSQL)
@@ -213,4 +219,11 @@ func TestMigrate_UpgradePath_LegacyV1ToCurrentSchema(t *testing.T) {
 	err = db.QueryRow(`SELECT name FROM projects WHERE id = 'p1'`).Scan(&projNameAfter)
 	require.NoError(t, err)
 	assert.Equal(t, "Legacy Project", projNameAfter)
+}
+
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }

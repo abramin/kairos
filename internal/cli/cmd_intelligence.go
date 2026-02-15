@@ -8,6 +8,7 @@ import (
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/contract"
+	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/alexanderramin/kairos/internal/intelligence"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -125,8 +126,7 @@ func (c *commandBar) cmdExplain(args []string) tea.Cmd {
 		)
 
 	default:
-		// Fall through to cobra for flag-based usage.
-		return outputCmd(c.cobraCapture(append([]string{"explain"}, args...)))
+		return outputCmd(formatter.StyleYellow.Render("Usage: explain now [minutes] | explain why-not <id>"))
 	}
 }
 
@@ -193,7 +193,7 @@ func (c *commandBar) cmdReview(args []string) tea.Cmd {
 			asyncOutputCmd(c.runReviewWeeklyTUI),
 		)
 	default:
-		return outputCmd(c.cobraCapture(append([]string{"review"}, args...)))
+		return outputCmd(formatter.StyleYellow.Render("Usage: review weekly"))
 	}
 }
 
@@ -241,4 +241,20 @@ func (c *commandBar) runReviewWeeklyTUI() string {
 	}
 
 	return output
+}
+
+// buildZettelBacklog aggregates session summaries into reading/zettel data
+// for the zettelkasten backlog nudge in weekly reviews.
+func buildZettelBacklog(summaries []domain.SessionSummaryByType) formatter.ZettelBacklogData {
+	var data formatter.ZettelBacklogData
+	for _, s := range summaries {
+		switch s.WorkItemType {
+		case "reading":
+			data.ReadingMin += s.TotalMinutes
+			data.ReadingItems = append(data.ReadingItems, s)
+		case "zettel":
+			data.ZettelMin += s.TotalMinutes
+		}
+	}
+	return data
 }
