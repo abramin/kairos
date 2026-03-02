@@ -41,10 +41,10 @@ func (c *shellProjectCache) get(app *App) []*domain.Project {
 func allCommandNames() []string {
 	return []string{
 		"projects", "use", "inspect",
-		"status", "what-now", "replan",
+		"status", "what-now", "replan", "chart",
 		"log", "start", "finish", "add", "context",
-		"project", "node", "work", "session",
-		"draft", "import", "template",
+		"project", "node", "work", "session", "workout",
+		"draft", "import", "template", "tasks",
 		"ask", "explain", "review",
 		"clear", "help", "exit", "quit",
 	}
@@ -58,6 +58,7 @@ func subcommandNames() map[string][]string {
 		"work":     {"add", "inspect", "update", "done", "archive", "remove"},
 		"session":  {"log", "list", "remove"},
 		"template": {"list", "show", "draft"},
+		"workout":  {"log", "list", "delete"},
 		"explain":  {"now", "why-not"},
 		"review":   {"weekly"},
 	}

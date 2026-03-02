@@ -131,17 +131,9 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, msg.view.Init()
 
 	case refreshViewMsg:
-		// Broadcast to ALL views in the stack so underlying views (e.g. task list)
-		// reload data after mutations made in views above them (e.g. action menu forms).
-		var cmds []tea.Cmd
-		for i, v := range m.viewStack {
-			updated, cmd := v.Update(msg)
-			m.viewStack[i] = updated.(View)
-			if cmd != nil {
-				cmds = append(cmds, cmd)
-			}
-		}
-		return m, tea.Batch(cmds...)
+		// Broadcast to all views so underlying views (e.g. task list)
+		// can refresh after mutations made in views above them.
+		return m, m.updateAllViews(msg)
 
 	case cmdOutputMsg:
 		m.lastOutput = msg.output
@@ -167,7 +159,18 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.viewStack = m.viewStack[:len(m.viewStack)-1]
 		}
 		m.clearOutput()
-		m.cmdBar.Focus()
+		// Keep keyboard focus in navigable views (task list, checklist) so the
+		// user can immediately continue adding or editing without an extra Esc press.
+		if av := m.activeView(); av != nil {
+			switch av.ID() {
+			case ViewTaskList, ViewCheckList:
+				// leave cmdBar blurred
+			default:
+				m.cmdBar.Focus()
+			}
+		} else {
+			m.cmdBar.Focus()
+		}
 		// Batch the follow-up command with a refresh so the underlying view reloads.
 		return m, tea.Batch(msg.nextCmd, func() tea.Msg { return refreshViewMsg{} })
 
@@ -176,20 +179,23 @@ func (m appModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	}
 
-	// Forward other messages to command bar (e.g., cursor blink)
+	// Forward other non-key messages to command bar (e.g., cursor blink)
+	// and to all views. Broadcasting to all views prevents async completion
+	// messages (task loads, dashboard loads, etc.) from being dropped when
+	// their originating view is not currently active.
+	var cmds []tea.Cmd
 	if m.cmdBar.Focused() {
-		cmd := m.cmdBar.UpdateNonKey(msg)
-		return m, cmd
+		if cmd := m.cmdBar.UpdateNonKey(msg); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
 	}
-
-	// Forward to active view
-	if v := m.activeView(); v != nil {
-		updated, cmd := v.Update(msg)
-		m.setActiveView(updated.(View))
-		return m, cmd
+	if cmd := m.updateAllViews(msg); cmd != nil {
+		cmds = append(cmds, cmd)
 	}
-
-	return m, nil
+	if len(cmds) == 0 {
+		return m, nil
+	}
+	return m, tea.Batch(cmds...)
 }
 
 func (m appModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -372,6 +378,27 @@ func (m *appModel) renderStatusBar() string {
 func (m *appModel) clearOutput() {
 	m.lastOutput = ""
 	m.outputActive = false
+}
+
+// updateAllViews forwards a message to every view in the stack and batches
+// any resulting commands. This is required so hidden views can still process
+// async completion messages for loads they initiated earlier.
+func (m *appModel) updateAllViews(msg tea.Msg) tea.Cmd {
+	if len(m.viewStack) == 0 {
+		return nil
+	}
+	var cmds []tea.Cmd
+	for i, v := range m.viewStack {
+		updated, cmd := v.Update(msg)
+		m.viewStack[i] = updated.(View)
+		if cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+	}
+	if len(cmds) == 0 {
+		return nil
+	}
+	return tea.Batch(cmds...)
 }
 
 // outputViewportKeyMap returns a restricted keymap for the output viewport.

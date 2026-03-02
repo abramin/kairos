@@ -72,6 +72,8 @@ func (s *importService) importSchema(ctx context.Context, schema *importer.Impor
 		txNodes := repository.NewSQLitePlanNodeRepo(tx)
 		txWorkItems := repository.NewSQLiteWorkItemRepo(tx)
 		txDeps := repository.NewSQLiteDependencyRepo(tx)
+		txNodeRefs := repository.NewSQLiteNodeRefRepo(tx)
+		txWIRefs := repository.NewSQLiteWorkItemRefRepo(tx)
 
 		if err := txProjects.Create(ctx, generated.Project); err != nil {
 			return fmt.Errorf("creating project: %w", err)
@@ -92,6 +94,25 @@ func (s *importService) importSchema(ctx context.Context, schema *importer.Impor
 		for _, dep := range generated.Dependencies {
 			if err := txDeps.Create(ctx, &dep); err != nil {
 				return fmt.Errorf("creating dependency: %w", err)
+			}
+		}
+
+		// Store ref mappings for future updates
+		if generated.RefMap != nil {
+			projectID := generated.Project.ID
+			for _, sNode := range schema.Nodes {
+				if nodeID, ok := generated.RefMap[sNode.Ref]; ok {
+					if err := txNodeRefs.Set(ctx, nodeID, projectID, sNode.Ref); err != nil {
+						return fmt.Errorf("storing node ref %q: %w", sNode.Ref, err)
+					}
+				}
+			}
+			for _, sWI := range schema.WorkItems {
+				if wiID, ok := generated.RefMap[sWI.Ref]; ok {
+					if err := txWIRefs.Set(ctx, wiID, projectID, sWI.Ref); err != nil {
+						return fmt.Errorf("storing work item ref %q: %w", sWI.Ref, err)
+					}
+				}
 			}
 		}
 

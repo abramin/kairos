@@ -22,3 +22,7 @@ func (a *App) importProjectUseCase() app.ImportProjectUseCase {
 	}
 	return a.Import
 }
+
+func (a *App) projectUpdateUseCase() app.ProjectUpdateUseCase {
+	return a.ProjectUpdate
+}

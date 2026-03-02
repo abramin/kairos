@@ -9,6 +9,7 @@ import (
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/domain"
+	"github.com/alexanderramin/kairos/internal/service"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/google/uuid"
 )
@@ -66,6 +67,8 @@ func (c *commandBar) shouldStartEntityWizard(group, sub string, parts []string) 
 		return sub == "log"
 	case "node":
 		return sub == "add"
+	case "workout":
+		return sub == "log"
 	}
 	return false
 }
@@ -78,6 +81,8 @@ func (c *commandBar) cmdEntityWizard(group, sub string) tea.Cmd {
 		return c.wizardWorkAdd()
 	case "node add":
 		return c.wizardNodeAdd()
+	case "workout log":
+		return c.wizardWorkoutLog()
 	}
 	return nil
 }
@@ -185,6 +190,44 @@ func (c *commandBar) nodeAddGetKind(title string) tea.Cmd {
 			outputCmd(fmt.Sprintf("%s Created node: %s", formatter.StyleGreen.Render("✔"), formatter.Bold(title))),
 			func() tea.Msg { return refreshViewMsg{} },
 		)
+	})
+}
+
+// ── workout wizard ───────────────────────────────────────────────────────────
+
+func (c *commandBar) wizardWorkoutLog() tea.Cmd {
+	return c.workoutSelectCategory()
+}
+
+func (c *commandBar) workoutSelectCategory() tea.Cmd {
+	var category string
+	form := wizardSelectWorkoutCategory(&category)
+	return startWizardCmd(c.state, "Category", form, func() tea.Cmd {
+		return c.workoutGetMinutes(category)
+	})
+}
+
+func (c *commandBar) workoutGetMinutes(category string) tea.Cmd {
+	var minutes string
+	form := wizardInputDuration(30, &minutes)
+	return startWizardCmd(c.state, "Duration", form, func() tea.Cmd {
+		ctx := context.Background()
+		min, err := strconv.Atoi(minutes)
+		if err != nil || min <= 0 {
+			min = 30
+		}
+		req := service.LogWorkoutRequest{
+			Category: domain.WorkoutCategory(category),
+			Minutes:  min,
+		}
+		w, logErr := c.state.App.Workouts.LogWorkout(ctx, req)
+		if logErr != nil {
+			return outputCmd(shellError(logErr))
+		}
+		return outputCmd(fmt.Sprintf("%s Logged %s %s workout",
+			formatter.StyleGreen.Render("✔"),
+			formatter.Bold(formatter.FormatMinutes(w.Minutes)),
+			formatter.Bold(string(w.Category))))
 	})
 }
 

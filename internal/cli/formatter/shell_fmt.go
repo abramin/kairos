@@ -95,6 +95,15 @@ func FormatShellHelp() string {
 			},
 		},
 		{
+			title: "Fitness",
+			commands: [][]string{
+				{"workout log <cat> <min>", "Log a workout (e.g. workout log cal 30)"},
+				{"workout list", "List recent workouts"},
+				{"workout delete <id>", "Delete a workout entry"},
+				{"chart [--weeks N]", "Weekly time breakdown chart (default: 6 weeks)"},
+			},
+		},
+		{
 			title: "Intelligence",
 			commands: [][]string{
 				{"ask <question>", "Natural language command (requires LLM)"},

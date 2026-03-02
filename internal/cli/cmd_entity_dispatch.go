@@ -9,6 +9,8 @@ import (
 
 	"github.com/alexanderramin/kairos/internal/cli/formatter"
 	"github.com/alexanderramin/kairos/internal/domain"
+	"github.com/alexanderramin/kairos/internal/importer"
+	"github.com/alexanderramin/kairos/internal/service"
 	"github.com/google/uuid"
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -42,6 +44,7 @@ func entityGroupHelp(group string) string {
 		"work":     "add, inspect, update, done, archive, remove",
 		"session":  "log, list, remove",
 		"template": "list, show",
+		"workout":  "log, list, delete",
 	}
 	if s, ok := subs[group]; ok {
 		return fmt.Sprintf("%s subcommands: %s", group, s)
@@ -69,6 +72,8 @@ func (c *commandBar) dispatchEntityCommand(group, sub string, args []string) tea
 		result, err = c.dispatchSession(ctx, sub, positional, flags)
 	case "template":
 		result, err = c.dispatchTemplate(ctx, sub, positional, flags)
+	case "workout":
+		result, err = c.dispatchWorkout(ctx, sub, positional, flags)
 	default:
 		return outputCmd(fmt.Sprintf("Unknown entity group: %s", group))
 	}
@@ -243,9 +248,20 @@ func (c *commandBar) dispatchProject(ctx context.Context, sub string, pos []stri
 
 	case "import":
 		if len(pos) == 0 {
-			return "", fmt.Errorf("usage: project import <file.json>")
+			return "", fmt.Errorf("usage: project import <file.json> [--update-from PROJECT_SHORT_ID]")
 		}
+		// Check if --update-from flag is present
+		if projectShortID, ok := flags["update-from"]; ok {
+			return execUpdateProjectFromJSON(ctx, app, projectShortID, pos[0])
+		}
+		// Normal import (create new)
 		return execImport(ctx, app, pos[0])
+
+	case "update-from-json":
+		if len(pos) < 2 {
+			return "", fmt.Errorf("usage: project update-from-json <PROJECT_SHORT_ID> <file.json>")
+		}
+		return execUpdateProjectFromJSON(ctx, app, pos[0], pos[1])
 
 	default:
 		return "", fmt.Errorf("unknown project subcommand: %s", sub)
@@ -635,6 +651,103 @@ func (c *commandBar) dispatchTemplate(ctx context.Context, sub string, pos []str
 	}
 }
 
+// ── workout dispatch ─────────────────────────────────────────────────────
+
+func (c *commandBar) dispatchWorkout(ctx context.Context, sub string, pos []string, flags map[string]string) (string, error) {
+	app := c.state.App
+
+	switch sub {
+	case "log":
+		if len(pos) < 2 {
+			return "", fmt.Errorf("usage: workout log <category> <minutes> [--date YYYY-MM-DD] [--notes \"...\"]")
+		}
+		category := resolveWorkoutCategory(pos[0])
+		if category == "" {
+			return "", fmt.Errorf("unknown category %q — valid: qigong, calisthenics, running, kettlebell, gmb, stretching, other", pos[0])
+		}
+		minutes, err := strconv.Atoi(pos[1])
+		if err != nil || minutes <= 0 {
+			return "", fmt.Errorf("invalid minutes: %s", pos[1])
+		}
+		req := service.LogWorkoutRequest{
+			Category: domain.WorkoutCategory(category),
+			Minutes:  minutes,
+		}
+		if dateStr, ok := flags["date"]; ok {
+			t, err := time.Parse("2006-01-02", dateStr)
+			if err != nil {
+				return "", fmt.Errorf("invalid date %q: use YYYY-MM-DD format", dateStr)
+			}
+			req.PerformedAt = &t
+		}
+		if note, ok := flags["notes"]; ok {
+			req.Notes = &note
+		}
+		w, err := app.Workouts.LogWorkout(ctx, req)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%s Logged %s %s workout",
+			formatter.StyleGreen.Render("✔"),
+			formatter.Bold(formatter.FormatMinutes(w.Minutes)),
+			formatter.Bold(string(w.Category))), nil
+
+	case "list":
+		weeksStr := flags["weeks"]
+		weeks := 4
+		if weeksStr != "" {
+			if w, err := strconv.Atoi(weeksStr); err == nil && w > 0 {
+				weeks = w
+			}
+		}
+		now := time.Now().UTC()
+		from := now.AddDate(0, 0, -weeks*7)
+		logs, err := app.Workouts.ListByDateRange(ctx, from, now)
+		if err != nil {
+			return "", err
+		}
+		if len(logs) == 0 {
+			return "No workouts found.", nil
+		}
+		return formatter.FormatWorkoutList(logs), nil
+
+	case "delete":
+		if len(pos) == 0 {
+			return "", fmt.Errorf("usage: workout delete <id>")
+		}
+		if err := app.Workouts.DeleteWorkout(ctx, pos[0]); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%s Deleted workout", formatter.StyleGreen.Render("✔")), nil
+
+	default:
+		return "", fmt.Errorf("unknown workout subcommand: %s", sub)
+	}
+}
+
+// resolveWorkoutCategory resolves a case-insensitive prefix to a full workout category.
+// Returns empty string if no match or ambiguous.
+func resolveWorkoutCategory(input string) string {
+	lower := strings.ToLower(input)
+	categories := []string{
+		"qigong", "calisthenics", "running",
+		"kettlebell", "gmb", "stretching", "other",
+	}
+	var match string
+	for _, cat := range categories {
+		if cat == lower {
+			return cat
+		}
+		if strings.HasPrefix(cat, lower) {
+			if match != "" {
+				return "" // ambiguous
+			}
+			match = cat
+		}
+	}
+	return match
+}
+
 // ── shared helpers ───────────────────────────────────────────────────────────
 
 // execImport runs a project import and returns formatted output.
@@ -645,6 +758,13 @@ func execImport(ctx context.Context, app *App, filePath string) (string, error) 
 	}
 	result, err := importProject.ImportProject(ctx, filePath)
 	if err != nil {
+		if strings.Contains(err.Error(), "UNIQUE constraint failed: projects.short_id") {
+			suggestion := filePath
+			if schema, schemaErr := importer.LoadImportSchema(filePath); schemaErr == nil && schema.Project.ShortID != "" {
+				suggestion = fmt.Sprintf("%s --update-from %s", filePath, schema.Project.ShortID)
+			}
+			return "", fmt.Errorf("project already exists — to update it instead, use:\n  import %s", suggestion)
+		}
 		return "", err
 	}
 	return fmt.Sprintf("%s Imported %s [%s] — %d nodes, %d items, %d deps",
@@ -652,6 +772,25 @@ func execImport(ctx context.Context, app *App, filePath string) (string, error) 
 		formatter.Bold(result.Project.Name),
 		result.Project.ShortID,
 		result.NodeCount, result.WorkItemCount, result.DependencyCount), nil
+}
+
+// execUpdateProjectFromJSON runs a project update from JSON and returns formatted output.
+func execUpdateProjectFromJSON(ctx context.Context, app *App, projectShortID string, filePath string) (string, error) {
+	projectUpdate := app.projectUpdateUseCase()
+	if projectUpdate == nil {
+		return "", fmt.Errorf("project update use case is not configured")
+	}
+	result, err := projectUpdate.UpdateProjectFromJSON(ctx, projectShortID, filePath)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s Updated %s [%s]\n  Nodes: %d created, %d updated\n  Items: %d created, %d updated\n  Dependencies: %d added",
+		formatter.StyleGreen.Render("✔"),
+		formatter.Bold(result.Project.Name),
+		result.Project.ShortID,
+		result.NodesCreated, result.NodesUpdated,
+		result.WorkItemsCreated, result.WorkItemsUpdated,
+		result.DependenciesAdded), nil
 }
 
 // buildInspectTree builds the inspect output for a project, returning the formatted tree.

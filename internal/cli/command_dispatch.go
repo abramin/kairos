@@ -77,18 +77,32 @@ func (c *commandBar) executeCommand(input string) tea.Cmd {
 			return pushView(newHelpChatView(c.state))
 		}
 		return outputCmd(formatter.FormatShellHelp())
+	case "tasks":
+		return pushView(newChecklistView(c.state))
 	case "clear":
 		return nil
 	case "exit", "quit":
 		return tea.Quit
 	case "import":
 		if len(args) == 0 {
-			return outputCmd(formatter.StyleYellow.Render("Usage: import <file.json>"))
+			return outputCmd(formatter.StyleYellow.Render("Usage: import <file.json> [--update-from PROJECT_SHORT_ID]"))
 		}
+		pos, flags := parseShellFlags(args)
+		if len(pos) == 0 {
+			return outputCmd(formatter.StyleYellow.Render("Usage: import <file.json> [--update-from PROJECT_SHORT_ID]"))
+		}
+		filePath := pos[0]
+		updateFrom := flags["update-from"]
 		return tea.Batch(
 			asyncOutputCmd(func() string {
 				ctx := context.Background()
-				result, err := execImport(ctx, c.state.App, args[0])
+				var result string
+				var err error
+				if updateFrom != "" {
+					result, err = execUpdateProjectFromJSON(ctx, c.state.App, updateFrom, filePath)
+				} else {
+					result, err = execImport(ctx, c.state.App, filePath)
+				}
 				if err != nil {
 					return shellError(err)
 				}
@@ -96,9 +110,11 @@ func (c *commandBar) executeCommand(input string) tea.Cmd {
 			}),
 			func() tea.Msg { return refreshViewMsg{} },
 		)
+	case "chart":
+		return c.cmdChart(args)
 	case "project":
 		return c.cmdEntityGroup(parts)
-	case "node", "work", "session", "template":
+	case "node", "work", "session", "template", "workout":
 		return c.cmdEntityGroup(parts)
 	default:
 		return outputCmd(fmt.Sprintf("Unknown command: %s. Type 'help' for available commands.", cmd))
@@ -183,6 +199,32 @@ func (c *commandBar) explainWithFallback(
 		}
 	}
 	return fallback()
+}
+
+// ── chart command ────────────────────────────────────────────────────────────
+
+func (c *commandBar) cmdChart(args []string) tea.Cmd {
+	_, flags := parseShellFlags(args)
+	numWeeks := 6
+	if v, ok := flags["weeks"]; ok {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			numWeeks = n
+		}
+	}
+	if c.state.App.Chart == nil {
+		return outputCmd(formatter.StyleYellow.Render("Chart service not available."))
+	}
+	return tea.Batch(
+		loadingCmd("Loading chart..."),
+		asyncOutputCmd(func() string {
+			ctx := context.Background()
+			breakdown, err := c.state.App.Chart.WeeklyBreakdown(ctx, numWeeks)
+			if err != nil {
+				return shellError(err)
+			}
+			return formatter.RenderChart(breakdown, c.state.Width)
+		}),
+	)
 }
 
 // ── replan command ───────────────────────────────────────────────────────────

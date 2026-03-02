@@ -1,0 +1,545 @@
+{
+    "project": {
+        "short_id": "PSY-HIST01",
+        "name": "History of Psychology (Independent Study)",
+        "domain": "education",
+        "start_date": "2026-02-09"
+    },
+    "defaults": {
+        "duration_mode": "estimate",
+        "session_policy": {
+            "min_session_min": 15,
+            "max_session_min": 60,
+            "default_session_min": 30,
+            "splittable": true
+        }
+    },
+    "nodes": [
+        {
+            "ref": "w1",
+            "title": "Week 1 - Can there be a science of mind?",
+            "kind": "module",
+            "order": 1
+        },
+        {
+            "ref": "w2",
+            "title": "Week 2 - Physiology and measurement",
+            "kind": "module",
+            "order": 2
+        },
+        {
+            "ref": "w3",
+            "title": "Week 3 - Phrenology and scientific overreach",
+            "kind": "module",
+            "order": 3
+        },
+        {
+            "ref": "w4",
+            "title": "Week 4 - Darwin and evolutionary mind",
+            "kind": "module",
+            "order": 4
+        },
+        {
+            "ref": "w5",
+            "title": "Week 5 - Wundt and experimental psychology",
+            "kind": "module",
+            "order": 5
+        },
+        {
+            "ref": "w6",
+            "title": "Week 6 - Freud and the unconscious",
+            "kind": "module",
+            "order": 6
+        },
+        {
+            "ref": "w7",
+            "title": "Week 7 - Behaviorism",
+            "kind": "module",
+            "order": 7
+        },
+        {
+            "ref": "w8",
+            "title": "Week 8 - Gestalt psychology",
+            "kind": "module",
+            "order": 8
+        },
+        {
+            "ref": "w9",
+            "title": "Week 9 - Crisis of behaviorism",
+            "kind": "module",
+            "order": 9
+        },
+        {
+            "ref": "w10",
+            "title": "Week 10 - Cognitive psychology",
+            "kind": "module",
+            "order": 10
+        },
+        {
+            "ref": "w11",
+            "title": "Week 11 - Psychology and society",
+            "kind": "module",
+            "order": 11
+        },
+        {
+            "ref": "w12",
+            "title": "Week 12 - What kind of science is psychology?",
+            "kind": "module",
+            "order": 12
+        },
+        {
+            "ref": "final",
+            "title": "Final Paper (3,000 words)",
+            "kind": "assessment",
+            "order": 13
+        }
+    ],
+    "work_items": [
+        {
+            "ref": "w1_read_rs",
+            "node_ref": "w1",
+            "title": "Richards & Stenner Ch. 1: Introduction - Psychology and History",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w1_read_primary",
+            "node_ref": "w1",
+            "title": "Descartes: Meditations II",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w1_read_secondary",
+            "node_ref": "w1",
+            "title": "Roger Smith: Between Mind and Nature (pp. 1-28)",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w1_read_danziger",
+            "node_ref": "w1",
+            "title": "Danziger Ch. 1: Introduction",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w1_write",
+            "node_ref": "w1",
+            "title": "500-word reflection using Richards & Stenner framework",
+            "type": "writing",
+            "planned_min": 90
+        },
+        {
+            "ref": "w2_read_rs",
+            "node_ref": "w2",
+            "title": "Richards & Stenner Ch. 2: Psychology 1600-1850",
+            "type": "reading",
+            "planned_min": 100
+        },
+        {
+            "ref": "w2_read_primary",
+            "node_ref": "w2",
+            "title": "Helmholtz: The Facts of Perception",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w2_read_secondary",
+            "node_ref": "w2",
+            "title": "Mandler Ch. 2",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w2_read_danziger",
+            "node_ref": "w2",
+            "title": "Danziger Ch. 2: Historical roots",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w2_write",
+            "node_ref": "w2",
+            "title": "Diagram physiology as measurement",
+            "type": "exercise",
+            "planned_min": 60
+        },
+        {
+            "ref": "w3_read_primary",
+            "node_ref": "w3",
+            "title": "Gall: On the Functions of the Brain",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "w3_read_secondary",
+            "node_ref": "w3",
+            "title": "Danziger: Naming the Mind Ch. 2",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w3_read_danziger",
+            "node_ref": "w3",
+            "title": "Danziger Ch. 3: Divergence of investigative practice",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w3_write",
+            "node_ref": "w3",
+            "title": "Critique of phrenology's appeal",
+            "type": "writing",
+            "planned_min": 60
+        },
+        {
+            "ref": "w4_read_rs",
+            "node_ref": "w4",
+            "title": "Richards & Stenner Ch. 3: Founding Psychology",
+            "type": "reading",
+            "planned_min": 100
+        },
+        {
+            "ref": "w4_read_primary",
+            "node_ref": "w4",
+            "title": "Darwin: Expression of the Emotions",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w4_read_secondary",
+            "node_ref": "w4",
+            "title": "Robert Richards: Darwin and Evolutionary Theories",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "w4_read_danziger",
+            "node_ref": "w4",
+            "title": "Danziger Ch. 4: Social structure of experimentation",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w4_write",
+            "node_ref": "w4",
+            "title": "Darwin's psychology: openings and limits",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w5_read_rs",
+            "node_ref": "w5",
+            "title": "Richards & Stenner Ch. 4: William James",
+            "type": "reading",
+            "planned_min": 100
+        },
+        {
+            "ref": "w5_read_primary",
+            "node_ref": "w5",
+            "title": "Wundt: Principles of Physiological Psychology",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "w5_read_secondary",
+            "node_ref": "w5",
+            "title": "Boring: History of Experimental Psychology",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "w5_read_danziger",
+            "node_ref": "w5",
+            "title": "Danziger Ch. 5: Triumph of the aggregate",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w5_write",
+            "node_ref": "w5",
+            "title": "Wundt vs modern experimentation + James vs Wundt",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w6_read_rs",
+            "node_ref": "w6",
+            "title": "Richards & Stenner Ch. 15: Psychology, Madness (first half)",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w6_read_primary",
+            "node_ref": "w6",
+            "title": "Freud: Introductory Lectures 1-3",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "w6_read_secondary",
+            "node_ref": "w6",
+            "title": "Sulloway: Freud, Biologist of the Mind Ch. 1",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "w6_read_danziger",
+            "node_ref": "w6",
+            "title": "Danziger Ch. 6: Identifying the subject",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w6_write",
+            "node_ref": "w6",
+            "title": "Freud and the new psychological subject",
+            "type": "writing",
+            "planned_min": 90
+        },
+        {
+            "ref": "w7_read_rs",
+            "node_ref": "w7",
+            "title": "Richards & Stenner Ch. 5: Behaviourism",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w7_read_primary",
+            "node_ref": "w7",
+            "title": "Watson: Psychology as the Behaviorist Views It + Skinner Ch. 1-2",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "w7_read_secondary",
+            "node_ref": "w7",
+            "title": "Greenwood: Understanding the Cognitive Revolution",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "w7_read_danziger",
+            "node_ref": "w7",
+            "title": "Danziger Ch. 7: Marketable methods",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w7_write",
+            "node_ref": "w7",
+            "title": "What behaviorism excludes, and why",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w8_read_rs",
+            "node_ref": "w8",
+            "title": "Richards & Stenner Ch. 6: Gestalt Psychology",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w8_read_primary",
+            "node_ref": "w8",
+            "title": "Wertheimer: Laws of Organization + Köhler: Mentality of Apes",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "w8_read_secondary",
+            "node_ref": "w8",
+            "title": "Mitchell Ash: Gestalt Psychology in German Culture",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "w8_read_danziger",
+            "node_ref": "w8",
+            "title": "Danziger Ch. 8: Investigative practice as professional project",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w8_write",
+            "node_ref": "w8",
+            "title": "Why Gestalt psychology failed to dominate",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w9_read_primary",
+            "node_ref": "w9",
+            "title": "Chomsky: Review of Verbal Behavior",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "w9_read_secondary",
+            "node_ref": "w9",
+            "title": "Gardner: The Mind's New Science Ch. 1",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w9_read_danziger",
+            "node_ref": "w9",
+            "title": "Danziger Ch. 9: From quantification to methodolatry",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w9_write",
+            "node_ref": "w9",
+            "title": "Cognitive revolution or rebranding?",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w10_read_rs",
+            "node_ref": "w10",
+            "title": "Richards & Stenner Ch. 7: Cognitive Psychology",
+            "type": "reading",
+            "planned_min": 75
+        },
+        {
+            "ref": "w10_read_primary",
+            "node_ref": "w10",
+            "title": "Neisser: Cognitive Psychology Ch. 1",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w10_read_secondary",
+            "node_ref": "w10",
+            "title": "Mandler Ch. 7",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w10_read_danziger",
+            "node_ref": "w10",
+            "title": "Danziger Ch. 10: Investigating persons",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w10_write",
+            "node_ref": "w10",
+            "title": "Implicit metaphors of cognition",
+            "type": "exercise",
+            "planned_min": 60
+        },
+        {
+            "ref": "w11_read_rs1",
+            "node_ref": "w11",
+            "title": "Richards & Stenner Ch. 18: Psychology and Gender",
+            "type": "reading",
+            "planned_min": 100
+        },
+        {
+            "ref": "w11_read_rs2",
+            "node_ref": "w11",
+            "title": "Richards & Stenner Ch. 23: Psychology and 'Race'",
+            "type": "reading",
+            "planned_min": 100
+        },
+        {
+            "ref": "w11_read_primary",
+            "node_ref": "w11",
+            "title": "Piaget: Origins of Intelligence",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w11_read_secondary",
+            "node_ref": "w11",
+            "title": "Nikolas Rose: Inventing Our Selves Ch. 1",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w11_read_danziger",
+            "node_ref": "w11",
+            "title": "Danziger Ch. 11: Social construction of psychological knowledge",
+            "type": "reading",
+            "planned_min": 60
+        },
+        {
+            "ref": "w11_write",
+            "node_ref": "w11",
+            "title": "Psychology and personhood + marginalized groups",
+            "type": "writing",
+            "planned_min": 75
+        },
+        {
+            "ref": "w12_read_rs1",
+            "node_ref": "w12",
+            "title": "Richards & Stenner Ch. 14: Applied Psychology",
+            "type": "reading",
+            "planned_min": 100
+        },
+        {
+            "ref": "w12_read_rs2",
+            "node_ref": "w12",
+            "title": "Richards & Stenner Ch. 25: Closure - Or Not?",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w12_read_rs3",
+            "node_ref": "w12",
+            "title": "Richards & Stenner Appendix: The Elephants Outside the Room (optional)",
+            "type": "reading",
+            "planned_min": 45
+        },
+        {
+            "ref": "w12_read_primary",
+            "node_ref": "w12",
+            "title": "Kuhn: Structure of Scientific Revolutions Ch. 2",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w12_read_secondary",
+            "node_ref": "w12",
+            "title": "Hacking: Historical Ontology Essay 1",
+            "type": "reading",
+            "planned_min": 90
+        },
+        {
+            "ref": "w12_write",
+            "node_ref": "w12",
+            "title": "Final paper thesis statement",
+            "type": "writing",
+            "planned_min": 60
+        },
+        {
+            "ref": "final_plan",
+            "node_ref": "final",
+            "title": "Select question and outline argument",
+            "type": "review",
+            "planned_min": 120
+        },
+        {
+            "ref": "final_draft",
+            "node_ref": "final",
+            "title": "Draft final paper (must engage Danziger + Richards & Stenner)",
+            "type": "writing",
+            "planned_min": 600
+        },
+        {
+            "ref": "final_submit",
+            "node_ref": "final",
+            "title": "Submit final paper",
+            "type": "admin",
+            "planned_min": 60,
+            "session_policy": {
+                "min_session_min": 30,
+                "max_session_min": 60,
+                "splittable": false
+            }
+        }
+    ]
+}

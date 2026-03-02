@@ -156,7 +156,7 @@ func TestTUI_ActionMenu_EditOpensForm(t *testing.T) {
 	assert.Equal(t, ViewForm, d.ActiveViewID())
 }
 
-func TestTUI_ActionMenu_EditEscReturnsToMenu(t *testing.T) {
+func TestTUI_ActionMenu_EditEscReturnsToParentView(t *testing.T) {
 	app := testApp(t)
 	seedProjectWithWork(t, app)
 
@@ -170,9 +170,9 @@ func TestTUI_ActionMenu_EditEscReturnsToMenu(t *testing.T) {
 	d.PressKey('e')
 	assert.Equal(t, ViewForm, d.ActiveViewID())
 
-	// ESC cancels the edit form → should return to action menu, not skip past it.
+	// ESC cancels the edit form and returns to the parent view directly.
 	d.PressEsc()
-	assert.Equal(t, ViewActionMenu, d.ActiveViewID())
+	assert.Equal(t, ViewRecommendation, d.ActiveViewID())
 }
 
 // =============================================================================
@@ -299,6 +299,40 @@ func TestTUI_TaskList_EnterPushesActionMenu(t *testing.T) {
 	view := d.View()
 	assert.Contains(t, view, "ACTIONS")
 	assert.Contains(t, view, "Task List Item")
+}
+
+func TestTUI_TaskList_EditEscReturnsToTaskList(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Edit Return", testutil.WithShortID("EDT01"),
+		testutil.WithTargetDate(time.Now().UTC().AddDate(0, 3, 0)))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Week 1", testutil.WithNodeKind(domain.NodeWeek))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	wi := testutil.NewTestWorkItem(node.ID, "Editable Task",
+		testutil.WithPlannedMin(60),
+		testutil.WithSessionBounds(15, 60, 30))
+	require.NoError(t, app.WorkItems.Create(ctx, wi))
+
+	d := NewTestDriver(t, app)
+
+	d.Command("inspect EDT01")
+	assert.Equal(t, ViewTaskList, d.ActiveViewID())
+
+	// Enter work item actions, then edit.
+	d.PressKey('j')
+	d.PressEnter()
+	assert.Equal(t, ViewActionMenu, d.ActiveViewID())
+
+	d.PressKey('e')
+	assert.Equal(t, ViewForm, d.ActiveViewID())
+
+	// ESC from edit returns directly to task list.
+	d.PressEsc()
+	assert.Equal(t, ViewTaskList, d.ActiveViewID())
 }
 
 // =============================================================================

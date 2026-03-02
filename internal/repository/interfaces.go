@@ -80,6 +80,13 @@ type DependencyRepo interface {
 	ListBlockedWorkItemIDs(ctx context.Context, candidateIDs []string) (map[string]bool, error)
 }
 
+// ProjectWeekMinutes holds aggregated session minutes for a single project in a single ISO week.
+type ProjectWeekMinutes struct {
+	ProjectName string
+	ISOWeek     string // e.g. "2026-W08"
+	TotalMin    int
+}
+
 type SessionRepo interface {
 	Create(ctx context.Context, s *domain.WorkSessionLog) error
 	GetByID(ctx context.Context, id string) (*domain.WorkSessionLog, error)
@@ -87,10 +94,44 @@ type SessionRepo interface {
 	ListRecent(ctx context.Context, days int) ([]*domain.WorkSessionLog, error)
 	ListRecentByProject(ctx context.Context, projectID string, days int) ([]*domain.WorkSessionLog, error)
 	ListRecentSummaryByType(ctx context.Context, days int) ([]domain.SessionSummaryByType, error)
+	ListSessionMinutesByWeek(ctx context.Context, from, to time.Time) ([]ProjectWeekMinutes, error)
 	Delete(ctx context.Context, id string) error
 }
 
 type UserProfileRepo interface {
 	Get(ctx context.Context) (*domain.UserProfile, error)
 	Upsert(ctx context.Context, p *domain.UserProfile) error
+}
+
+// NodeRefRepo tracks the mapping from JSON ref strings to node IDs for project updates.
+type NodeRefRepo interface {
+	Set(ctx context.Context, nodeID, projectID, ref string) error
+	GetByProjectAndRef(ctx context.Context, projectID, ref string) (string, error)
+	DeleteByNodeID(ctx context.Context, nodeID string) error
+}
+
+// WorkItemRefRepo tracks the mapping from JSON ref strings to work item IDs for project updates.
+type WorkItemRefRepo interface {
+	Set(ctx context.Context, workItemID, projectID, ref string) error
+	GetByProjectAndRef(ctx context.Context, projectID, ref string) (string, error)
+	DeleteByWorkItemID(ctx context.Context, workItemID string) error
+}
+
+// WorkoutLogRepo manages workout log persistence.
+type WorkoutLogRepo interface {
+	Create(ctx context.Context, log *domain.WorkoutLog) error
+	Delete(ctx context.Context, id string) error
+	ListByDateRange(ctx context.Context, from, to time.Time) ([]domain.WorkoutLog, error)
+	ListRecent(ctx context.Context, limit int) ([]domain.WorkoutLog, error)
+}
+
+// TaskRepo manages global (non-project-scoped) task checklist persistence.
+type TaskRepo interface {
+	Create(ctx context.Context, t *domain.Task) error
+	GetByID(ctx context.Context, id string) (*domain.Task, error)
+	ListActive(ctx context.Context) ([]*domain.Task, error)
+	Update(ctx context.Context, t *domain.Task) error
+	Archive(ctx context.Context, id string, now time.Time) error
+	Delete(ctx context.Context, id string) error
+	SwapOrder(ctx context.Context, idA, idB string) error
 }

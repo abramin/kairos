@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestApplyEditWorkItem_ReturnsOutputMessageAndUpdatesItem(t *testing.T) {
+func TestApplyEditWorkItem_UpdatesItem(t *testing.T) {
 	app := testApp(t)
 	ctx := context.Background()
 	_, wiID := seedProjectWithWork(t, app)
@@ -24,10 +24,8 @@ func TestApplyEditWorkItem_ReturnsOutputMessageAndUpdatesItem(t *testing.T) {
 		maxSession: "80",
 	}
 
-	msg := applyEditWorkItem(app, wiID, fields)
-	out, ok := msg.(cmdOutputMsg)
-	require.True(t, ok, "expected cmdOutputMsg, got %T", msg)
-	assert.Contains(t, out.output, "Updated:")
+	err := applyEditWorkItem(app, wiID, fields)
+	require.NoError(t, err)
 
 	updated, err := app.WorkItems.GetByID(ctx, wiID)
 	require.NoError(t, err)
@@ -45,7 +43,7 @@ func TestApplyEditWorkItem_ReturnsOutputMessageAndUpdatesItem(t *testing.T) {
 	}
 }
 
-func TestApplyEditWorkItem_ErrorReturnsOutputMessage(t *testing.T) {
+func TestApplyEditWorkItem_ReturnsErrorForMissingItem(t *testing.T) {
 	app := testApp(t)
 	fields := &editWorkItemFields{
 		title:      "Does Not Matter",
@@ -53,9 +51,7 @@ func TestApplyEditWorkItem_ErrorReturnsOutputMessage(t *testing.T) {
 		itemType:   "task",
 	}
 
-	msg := applyEditWorkItem(app, "missing-id", fields)
-	out, ok := msg.(cmdOutputMsg)
-	require.True(t, ok, "expected cmdOutputMsg, got %T", msg)
-	assert.Contains(t, out.output, "Error:")
+	err := applyEditWorkItem(app, "missing-id", fields)
+	assert.Error(t, err)
 }
 

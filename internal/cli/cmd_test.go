@@ -28,12 +28,15 @@ func testApp(t *testing.T) *App {
 	depRepo := repository.NewSQLiteDependencyRepo(db)
 	sessRepo := repository.NewSQLiteSessionRepo(db)
 	profRepo := repository.NewSQLiteUserProfileRepo(db)
+	workoutRepo := repository.NewSQLiteWorkoutLogRepo(db)
 
 	return &App{
 		Projects:  service.NewProjectService(projRepo),
 		Nodes:     service.NewNodeService(nodeRepo, uow),
 		WorkItems: service.NewWorkItemService(wiRepo, nodeRepo, uow),
 		Sessions:  service.NewSessionService(sessRepo, uow),
+		Workouts:  service.NewWorkoutService(workoutRepo),
+		Chart:     service.NewChartService(sessRepo, workoutRepo),
 		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo),
 		Status:    service.NewStatusService(projRepo, wiRepo, sessRepo, profRepo),
 		Replan:    service.NewReplanService(projRepo, wiRepo, sessRepo, profRepo, uow),
@@ -644,4 +647,316 @@ func TestParseShellFlags_Empty(t *testing.T) {
 	pos, flags := parseShellFlags(nil)
 	assert.Empty(t, pos)
 	assert.Empty(t, flags)
+}
+
+// --- workout dispatch tests ---
+
+func TestDispatchWorkout_Log(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	result, err := cb.dispatchWorkout(ctx, "log", []string{"qigong", "30"}, map[string]string{})
+	require.NoError(t, err)
+	assert.Contains(t, result, "qigong")
+	assert.Contains(t, result, "30")
+
+	logs, err := app.Workouts.ListRecent(ctx, 10)
+	require.NoError(t, err)
+	require.Len(t, logs, 1)
+	assert.Equal(t, domain.WorkoutQigong, logs[0].Category)
+	assert.Equal(t, 30, logs[0].Minutes)
+}
+
+func TestDispatchWorkout_Log_WithDate(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	result, err := cb.dispatchWorkout(ctx, "log", []string{"running", "45"}, map[string]string{"date": "2026-01-15"})
+	require.NoError(t, err)
+	assert.Contains(t, result, "running")
+
+	logs, err := app.Workouts.ListRecent(ctx, 10)
+	require.NoError(t, err)
+	require.Len(t, logs, 1)
+	assert.Equal(t, 2026, logs[0].PerformedAt.Year())
+}
+
+func TestDispatchWorkout_Log_InvalidCategory(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchWorkout(ctx, "log", []string{"yoga", "30"}, map[string]string{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "yoga")
+}
+
+func TestDispatchWorkout_Log_InvalidMinutes(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchWorkout(ctx, "log", []string{"running", "0"}, map[string]string{})
+	assert.Error(t, err)
+}
+
+func TestDispatchWorkout_List_Empty(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	result, err := cb.dispatchWorkout(ctx, "list", nil, map[string]string{})
+	require.NoError(t, err)
+	assert.Contains(t, result, "No workouts")
+}
+
+func TestDispatchWorkout_List_ReturnsEntries(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	_, err := app.Workouts.LogWorkout(ctx, service.LogWorkoutRequest{
+		Category: domain.WorkoutRunning,
+		Minutes:  25,
+	})
+	require.NoError(t, err)
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	result, err := cb.dispatchWorkout(ctx, "list", nil, map[string]string{})
+	require.NoError(t, err)
+	assert.NotEmpty(t, result)
+}
+
+func TestDispatchWorkout_Delete(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	log, err := app.Workouts.LogWorkout(ctx, service.LogWorkoutRequest{
+		Category: domain.WorkoutKettlebell,
+		Minutes:  20,
+	})
+	require.NoError(t, err)
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	result, err := cb.dispatchWorkout(ctx, "delete", []string{log.ID}, map[string]string{})
+	require.NoError(t, err)
+	assert.Contains(t, result, "Deleted")
+
+	remaining, err := app.Workouts.ListRecent(ctx, 10)
+	require.NoError(t, err)
+	assert.Empty(t, remaining)
+}
+
+func TestDispatchWorkout_UnknownSubcommand(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchWorkout(ctx, "whatever", nil, map[string]string{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown")
+}
+
+// --- chart service wiring test ---
+
+func TestChart_WeeklyBreakdown_EmptyDB(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	breakdown, err := app.Chart.WeeklyBreakdown(ctx, 4)
+	require.NoError(t, err)
+	require.Len(t, breakdown, 4)
+}
+
+func TestChart_WeeklyBreakdown_WithData(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+	_, wiID := seedProjectWithWork(t, app)
+
+	err := app.Sessions.LogSession(ctx, &domain.WorkSessionLog{
+		ID:         "ses-chart-1",
+		WorkItemID: wiID,
+		Minutes:    45,
+		StartedAt:  time.Now().UTC(),
+		CreatedAt:  time.Now().UTC(),
+	})
+	require.NoError(t, err)
+
+	breakdown, err := app.Chart.WeeklyBreakdown(ctx, 2)
+	require.NoError(t, err)
+	require.Len(t, breakdown, 2)
+
+	// At least one week should have session minutes.
+	total := 0
+	for _, w := range breakdown {
+		for _, seg := range w.Segments {
+			total += seg.Minutes
+		}
+	}
+	assert.Greater(t, total, 0, "expected logged session to appear in chart breakdown")
+}
+
+// --- command dispatch error-path tests ---
+
+func TestDispatchProject_Inspect_UnknownID(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchProject(ctx, "inspect", []string{"NOPE99"}, map[string]string{})
+	assert.Error(t, err)
+}
+
+func TestDispatchProject_Archive_UnknownID(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchProject(ctx, "archive", []string{"NOPE99"}, map[string]string{})
+	assert.Error(t, err)
+}
+
+func TestDispatchProject_Remove_WithoutForce_HasWork(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+	projID, _ := seedProjectWithWork(t, app)
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchProject(ctx, "remove", []string{projID}, map[string]string{})
+	// Without --force, removing a project with work items should error.
+	assert.Error(t, err)
+}
+
+func TestDispatchProject_Add_MissingRequiredFlags(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchProject(ctx, "add", nil, map[string]string{"id": "X"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "usage")
+}
+
+func TestDispatchProject_Update_UnknownID(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchProject(ctx, "update", []string{"NOPE99"}, map[string]string{"name": "New"})
+	assert.Error(t, err)
+}
+
+func TestDispatchWork_Add_MissingFlags(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchWork(ctx, "add", nil, map[string]string{"node": "somenode"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "usage")
+}
+
+func TestDispatchWork_Done_UnknownItem(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchWork(ctx, "done", []string{"nonexistent-id"}, map[string]string{})
+	assert.Error(t, err)
+}
+
+func TestDispatchWorkout_Log_MissingArgs(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchWorkout(ctx, "log", []string{"running"}, map[string]string{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "usage")
+}
+
+func TestDispatchProject_UnknownSubcommand(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	state := &SharedState{App: app}
+	cb := &commandBar{state: state}
+
+	_, err := cb.dispatchProject(ctx, "frobnicate", nil, map[string]string{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown")
+}
+
+// --- resolveWorkoutCategory ---
+
+func TestResolveWorkoutCategory(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		// Exact matches.
+		{"qigong", "qigong"},
+		{"calisthenics", "calisthenics"},
+		{"running", "running"},
+		{"kettlebell", "kettlebell"},
+		{"gmb", "gmb"},
+		{"stretching", "stretching"},
+		{"other", "other"},
+		// Case-insensitive exact.
+		{"Qigong", "qigong"},
+		{"RUNNING", "running"},
+		{"GMB", "gmb"},
+		// Prefix matching.
+		{"q", "qigong"},
+		{"cal", "calisthenics"},
+		{"run", "running"},
+		{"k", "kettlebell"},
+		{"g", "gmb"},
+		{"str", "stretching"},
+		{"ot", "other"},
+		// Ambiguous prefix → empty.
+		{"", ""},
+		// Unknown category → empty.
+		{"yoga", ""},
+		{"swimming", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := resolveWorkoutCategory(tt.input)
+			assert.Equal(t, tt.want, got, "resolveWorkoutCategory(%q)", tt.input)
+		})
+	}
 }

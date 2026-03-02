@@ -17,6 +17,7 @@ const (
 	ViewForm
 	ViewDraft
 	ViewHelpChat
+	ViewCheckList // global standalone task checklist
 )
 
 // View is the interface that all TUI views must implement.

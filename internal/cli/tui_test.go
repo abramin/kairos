@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/alexanderramin/kairos/internal/domain"
@@ -128,6 +129,48 @@ func TestTUI_InspectPushesTaskList(t *testing.T) {
 
 	view := d.View()
 	assert.Contains(t, view, "Read Chapter 1")
+}
+
+func TestTUI_TaskListScrollsLongProjects(t *testing.T) {
+	app := testApp(t)
+	ctx := context.Background()
+
+	proj := testutil.NewTestProject("Applied Phenomenology", testutil.WithShortID("APP01"))
+	require.NoError(t, app.Projects.Create(ctx, proj))
+
+	node := testutil.NewTestNode(proj.ID, "Block 1", testutil.WithNodeKind(domain.NodeModule))
+	require.NoError(t, app.Nodes.Create(ctx, node))
+
+	for i := 1; i <= 40; i++ {
+		wi := testutil.NewTestWorkItem(node.ID, fmt.Sprintf("Reading %02d", i),
+			testutil.WithPlannedMin(30),
+			testutil.WithSessionBounds(15, 60, 30),
+		)
+		require.NoError(t, app.WorkItems.Create(ctx, wi))
+	}
+
+	d := NewTestDriver(t, app)
+	d.Command("inspect APP01")
+	require.Equal(t, ViewTaskList, d.ActiveViewID())
+
+	// Small terminal height forces internal task-list scrolling.
+	d.Send(tea.WindowSizeMsg{Width: 100, Height: 12})
+
+	topView := d.View()
+	assert.Contains(t, topView, "Reading 01")
+	assert.NotContains(t, topView, "Reading 40")
+
+	for i := 0; i < 40; i++ {
+		d.PressDown()
+	}
+
+	bottomView := d.View()
+	assert.Contains(t, bottomView, "Reading 40")
+
+	m := d.appModel()
+	taskView, ok := m.activeView().(*taskListView)
+	require.True(t, ok)
+	assert.Greater(t, taskView.scrollTop, 0)
 }
 
 func TestTUI_DraftPushAndCancel(t *testing.T) {

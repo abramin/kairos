@@ -15,6 +15,9 @@ type App struct {
 	Nodes     service.NodeService
 	WorkItems service.WorkItemService
 	Sessions  service.SessionService
+	Workouts  service.WorkoutService
+	Tasks     service.TaskService
+	Chart     service.ChartService
 	WhatNow   app.WhatNowUseCase
 	Status    app.StatusUseCase
 	Replan    app.ReplanUseCase
@@ -25,6 +28,7 @@ type App struct {
 	LogSession    app.LogSessionUseCase
 	InitProject   app.InitProjectUseCase
 	ImportProject app.ImportProjectUseCase
+	ProjectUpdate app.ProjectUpdateUseCase
 
 	// v2 intelligence services (nil when LLM disabled)
 	Intent        intelligence.IntentService

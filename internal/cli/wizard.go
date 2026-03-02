@@ -261,6 +261,27 @@ func validateOptionalDate(s string) error {
 	return nil
 }
 
+// wizardSelectWorkoutCategory creates a huh form to select a workout category.
+func wizardSelectWorkoutCategory(result *string) *huh.Form {
+	*result = "calisthenics" // default
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Workout Category").
+				Options(
+					huh.NewOption("Qigong", "qigong"),
+					huh.NewOption("Calisthenics", "calisthenics"),
+					huh.NewOption("Running", "running"),
+					huh.NewOption("Kettlebell", "kettlebell"),
+					huh.NewOption("GMB Movement", "gmb"),
+					huh.NewOption("Stretching", "stretching"),
+					huh.NewOption("Other", "other"),
+				).
+				Value(result),
+		),
+	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
+}
+
 // wizardConfirm creates a huh form for a yes/no confirmation.
 func wizardConfirm(title string, result *bool) *huh.Form {
 	return huh.NewForm(

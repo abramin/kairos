@@ -15,6 +15,7 @@ var destructiveCommands = map[string]map[string]bool{
 	"node":    {"remove": true},
 	"work":    {"remove": true, "archive": true},
 	"session": {"remove": true},
+	"workout": {"delete": true},
 }
 
 func RunShell(app *App) error {

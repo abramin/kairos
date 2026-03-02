@@ -47,6 +47,7 @@ type taskListView struct {
 	state          *SharedState
 	rows           []taskRow
 	cursor         int
+	scrollTop      int
 	loading        bool
 	err            error
 	collapsedNodes map[string]bool // nodeID -> collapsed
@@ -105,6 +106,7 @@ func (v *taskListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return v, nil
 		}
 		v.rows = msg.rows
+		v.clampCursor()
 		return v, nil
 
 	case refreshViewMsg:
@@ -223,19 +225,47 @@ func (v *taskListView) toggleDone(row taskRow) tea.Cmd {
 }
 
 func (v *taskListView) deleteItem(row taskRow) tea.Cmd {
-	return execDeleteItem(v.state, row.itemID, row.title)
+	state := v.state
+	itemID, title := row.itemID, row.title
+	var confirmed bool
+	form := wizardConfirm(fmt.Sprintf("Delete %q?", title), &confirmed)
+	return pushView(newWizardView(state, "Confirm Delete", form, func() tea.Cmd {
+		if !confirmed {
+			return nil
+		}
+		return func() tea.Msg {
+			if err := state.App.WorkItems.Delete(context.Background(), itemID); err != nil {
+				return formErrorOutput(err)
+			}
+			if state.ActiveItemID == itemID {
+				state.ClearItemContext()
+			}
+			return nil
+		}
+	}))
 }
 
 func (v *taskListView) deleteNode(row taskRow) tea.Cmd {
+	state := v.state
 	title, nodeID := row.title, row.nodeID
 	prompt := fmt.Sprintf("Delete %q", title)
 	if row.childCount > 0 {
 		prompt += fmt.Sprintf(" and %d item(s)", row.childCount)
 	}
 	prompt += "?"
-	return execConfirmDelete(v.state, prompt, title, func(ctx context.Context) error {
-		return v.state.App.Nodes.Delete(ctx, nodeID)
-	})
+	var confirmed bool
+	form := wizardConfirm(prompt, &confirmed)
+	return pushView(newWizardView(state, "Confirm Delete", form, func() tea.Cmd {
+		if !confirmed {
+			return nil
+		}
+		return func() tea.Msg {
+			if err := state.App.Nodes.Delete(context.Background(), nodeID); err != nil {
+				return formErrorOutput(err)
+			}
+			return nil
+		}
+	}))
 }
 
 func (v *taskListView) visibleRows() []taskRow {
@@ -285,58 +315,114 @@ func (v *taskListView) View() string {
 
 	visible := v.visibleRows()
 	if len(visible) == 0 {
+		v.cursor = 0
+		v.scrollTop = 0
 		return "\n  " + formatter.Dim("No tasks in this project.")
 	}
+	v.clampCursor()
 
 	var jumpHint string
 	if v.jumpBuf != "" {
-		jumpHint = "  " + formatter.Dim("jump: #"+v.jumpBuf) + "\n"
+		jumpHint = "  " + formatter.Dim("jump: #"+v.jumpBuf)
 	}
 
 	groups := groupNodeRows(visible)
 	threshold := twoColMinWidth*2 + twoColGap
 	useTwoCol := v.state.Width >= threshold && len(groups) >= 2 && len(visible) > v.state.ContentHeight()
-
-	if !useTwoCol {
-		return jumpHint + v.renderSingleColumn(visible)
+	linesAvail := v.state.ContentHeight()
+	if jumpHint != "" {
+		linesAvail--
+	}
+	if linesAvail < 1 {
+		linesAvail = 1
 	}
 
-	colWidth := (v.state.Width - twoColGap) / 2
-	splitAt := splitGroups(groups)
-	leftGroups := groups[:splitAt]
-	rightGroups := groups[splitAt:]
-
-	leftLines := v.renderGroupLines(leftGroups, colWidth)
-	rightLines := v.renderGroupLines(rightGroups, colWidth)
-
-	// Pad the shorter column so JoinHorizontal aligns correctly.
-	maxLines := len(leftLines)
-	if len(rightLines) > maxLines {
-		maxLines = len(rightLines)
+	layout := v.renderSingleColumnLines(visible)
+	if useTwoCol {
+		colWidth := (v.state.Width - twoColGap) / 2
+		layout = v.renderTwoColumnLines(visible, groups, colWidth)
 	}
-	for len(leftLines) < maxLines {
-		leftLines = append(leftLines, "")
-	}
-	for len(rightLines) < maxLines {
-		rightLines = append(rightLines, "")
-	}
+	body := v.renderWindow(layout.lines, layout.rowToLine, linesAvail)
 
-	leftCol := lipgloss.NewStyle().Width(colWidth).Render(strings.Join(leftLines, "\n"))
-	rightCol := lipgloss.NewStyle().Width(colWidth).Render(strings.Join(rightLines, "\n"))
-	gap := strings.Repeat(" ", twoColGap)
-
-	return jumpHint + "\n" + lipgloss.JoinHorizontal(lipgloss.Top, leftCol, gap, rightCol)
+	if jumpHint != "" {
+		if body == "" {
+			return jumpHint
+		}
+		return jumpHint + "\n" + body
+	}
+	if body == "" {
+		return "\n"
+	}
+	return "\n" + body
 }
 
-// renderSingleColumn is the original single-column layout.
-func (v *taskListView) renderSingleColumn(visible []taskRow) string {
-	var b strings.Builder
-	b.WriteString("\n")
-	for i, row := range visible {
-		b.WriteString(v.renderRow(row, i == v.cursor, 0))
-		b.WriteByte('\n')
+func (v *taskListView) clampCursor() {
+	visibleCount := len(v.visibleRows())
+	if visibleCount == 0 {
+		v.cursor = 0
+		v.scrollTop = 0
+		return
 	}
-	return b.String()
+	if v.cursor < 0 {
+		v.cursor = 0
+	}
+	if v.cursor >= visibleCount {
+		v.cursor = visibleCount - 1
+	}
+}
+
+type renderedTaskLayout struct {
+	lines     []string
+	rowToLine []int
+}
+
+func (v *taskListView) renderSingleColumnLines(visible []taskRow) renderedTaskLayout {
+	lines := make([]string, 0, len(visible))
+	rowToLine := make([]int, len(visible))
+	for i, row := range visible {
+		lines = append(lines, v.renderRow(row, i == v.cursor, 0))
+		rowToLine[i] = i
+	}
+	return renderedTaskLayout{
+		lines:     lines,
+		rowToLine: rowToLine,
+	}
+}
+
+func (v *taskListView) renderWindow(lines []string, rowToLine []int, height int) string {
+	if len(lines) == 0 {
+		v.scrollTop = 0
+		return ""
+	}
+
+	cursorLine := v.cursor
+	if v.cursor >= 0 && v.cursor < len(rowToLine) && rowToLine[v.cursor] >= 0 {
+		cursorLine = rowToLine[v.cursor]
+	}
+
+	if cursorLine < v.scrollTop {
+		v.scrollTop = cursorLine
+	}
+	if cursorLine >= v.scrollTop+height {
+		v.scrollTop = cursorLine - height + 1
+	}
+
+	maxTop := len(lines) - height
+	if maxTop < 0 {
+		maxTop = 0
+	}
+	if v.scrollTop > maxTop {
+		v.scrollTop = maxTop
+	}
+	if v.scrollTop < 0 {
+		v.scrollTop = 0
+	}
+
+	end := v.scrollTop + height
+	if end > len(lines) {
+		end = len(lines)
+	}
+	return strings.Join(lines[v.scrollTop:end], "\n")
 }
 
 // renderRow renders a single taskRow. If colWidth > 0, the output is truncated.
@@ -395,16 +481,67 @@ func (v *taskListView) renderRow(row taskRow, isCursor bool, colWidth int) strin
 	return line
 }
 
+type renderedGroupLine struct {
+	text     string
+	rowIndex int // -1 means padding / no associated row.
+}
+
 // renderGroupLines renders a slice of node groups into individual lines.
-func (v *taskListView) renderGroupLines(groups []nodeGroup, colWidth int) []string {
-	var lines []string
+func (v *taskListView) renderGroupLines(groups []nodeGroup, colWidth int) []renderedGroupLine {
+	var lines []renderedGroupLine
 	for _, g := range groups {
 		for i, row := range g.rows {
 			globalIdx := g.startIdx + i
-			lines = append(lines, v.renderRow(row, globalIdx == v.cursor, colWidth))
+			lines = append(lines, renderedGroupLine{
+				text:     v.renderRow(row, globalIdx == v.cursor, colWidth),
+				rowIndex: globalIdx,
+			})
 		}
 	}
 	return lines
+}
+
+func (v *taskListView) renderTwoColumnLines(visible []taskRow, groups []nodeGroup, colWidth int) renderedTaskLayout {
+	splitAt := splitGroups(groups)
+	leftGroups := groups[:splitAt]
+	rightGroups := groups[splitAt:]
+	leftLines := v.renderGroupLines(leftGroups, colWidth)
+	rightLines := v.renderGroupLines(rightGroups, colWidth)
+
+	maxLines := len(leftLines)
+	if len(rightLines) > maxLines {
+		maxLines = len(rightLines)
+	}
+	for len(leftLines) < maxLines {
+		leftLines = append(leftLines, renderedGroupLine{text: "", rowIndex: -1})
+	}
+	for len(rightLines) < maxLines {
+		rightLines = append(rightLines, renderedGroupLine{text: "", rowIndex: -1})
+	}
+
+	rowToLine := make([]int, len(visible))
+	for i := range rowToLine {
+		rowToLine[i] = -1
+	}
+	gap := strings.Repeat(" ", twoColGap)
+	leftStyle := lipgloss.NewStyle().Width(colWidth)
+	rightStyle := lipgloss.NewStyle().Width(colWidth)
+
+	lines := make([]string, 0, maxLines)
+	for i := 0; i < maxLines; i++ {
+		lines = append(lines, leftStyle.Render(leftLines[i].text)+gap+rightStyle.Render(rightLines[i].text))
+		if leftLines[i].rowIndex >= 0 {
+			rowToLine[leftLines[i].rowIndex] = i
+		}
+		if rightLines[i].rowIndex >= 0 {
+			rowToLine[rightLines[i].rowIndex] = i
+		}
+	}
+
+	return renderedTaskLayout{
+		lines:     lines,
+		rowToLine: rowToLine,
+	}
 }
 
 // ── two-column helpers ──────────────────────────────────────────────────────

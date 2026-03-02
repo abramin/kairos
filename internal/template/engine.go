@@ -21,6 +21,7 @@ type GeneratedProject struct {
 	Nodes        []*domain.PlanNode
 	WorkItems    []*domain.WorkItem
 	Dependencies []domain.Dependency
+	RefMap       map[string]string // ref → UUID (populated by import converter)
 }
 
 // LoadSchema reads and parses a template JSON file.

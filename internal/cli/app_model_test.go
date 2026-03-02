@@ -21,6 +21,21 @@ type stubView struct {
 	updateSeen []tea.Msg
 }
 
+type hiddenLoadedMsg struct{}
+
+type asyncRefreshView struct {
+	*stubView
+}
+
+func (v *asyncRefreshView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	v.updateSeen = append(v.updateSeen, msg)
+	switch msg.(type) {
+	case refreshViewMsg:
+		return v, func() tea.Msg { return hiddenLoadedMsg{} }
+	}
+	return v, nil
+}
+
 func (v *stubView) Init() tea.Cmd { return v.initCmd }
 
 func (v *stubView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -193,6 +208,44 @@ func TestAppModel_LoadingMessage(t *testing.T) {
 	require.Nil(t, cmd)
 	assert.Equal(t, "result text", m.lastOutput)
 	assert.NotContains(t, m.lastOutput, "Thinking...")
+}
+
+func TestAppModel_NonActiveViewReceivesAsyncCompletionMessages(t *testing.T) {
+	m := newAppModel(testApp(t))
+	hidden := &asyncRefreshView{stubView: newStubView(ViewTaskList, "Tasks", "tasks")}
+	active := newStubView(ViewActionMenu, "Actions", "actions")
+	m.viewStack = []View{hidden, active}
+
+	// Trigger refresh broadcast. Hidden view returns an async completion cmd.
+	model, cmd := m.Update(refreshViewMsg{})
+	m = model.(appModel)
+	require.NotNil(t, cmd)
+
+	// Execute the returned batch and feed messages back into Update.
+	got := cmd()
+	if batch, ok := got.(tea.BatchMsg); ok {
+		for _, c := range batch {
+			if c == nil {
+				continue
+			}
+			model, _ = m.Update(c())
+			m = model.(appModel)
+		}
+	} else {
+		model, _ = m.Update(got)
+		m = model.(appModel)
+	}
+
+	// Hidden view should have seen its async completion message even though
+	// it is not the active top-of-stack view.
+	var sawLoaded bool
+	for _, seen := range hidden.updateSeen {
+		if _, ok := seen.(hiddenLoadedMsg); ok {
+			sawLoaded = true
+			break
+		}
+	}
+	assert.True(t, sawLoaded, "hidden view should receive async completion message")
 }
 
 func TestViewCapturesInput(t *testing.T) {

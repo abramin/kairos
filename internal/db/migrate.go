@@ -236,6 +236,47 @@ var migrations = []string{
 	`ALTER TABLE plan_nodes ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`,
 	`ALTER TABLE work_items ADD COLUMN description TEXT NOT NULL DEFAULT ''`,
 	`ALTER TABLE work_items ADD COLUMN completed_at TEXT`,
+
+	// Ref tracking for project updates: map node/work-item refs to IDs
+	`CREATE TABLE IF NOT EXISTS node_refs (
+		node_id    TEXT PRIMARY KEY REFERENCES plan_nodes(id) ON DELETE CASCADE,
+		project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		ref        TEXT NOT NULL,
+		UNIQUE(project_id, ref)
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_node_refs_project_ref ON node_refs(project_id, ref)`,
+
+	`CREATE TABLE IF NOT EXISTS workitem_refs (
+		work_item_id TEXT PRIMARY KEY REFERENCES work_items(id) ON DELETE CASCADE,
+		project_id   TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+		ref          TEXT NOT NULL,
+		UNIQUE(project_id, ref)
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_workitem_refs_project_ref ON workitem_refs(project_id, ref)`,
+
+	// Workout logging (v3)
+	`CREATE TABLE IF NOT EXISTS workout_logs (
+		id            TEXT PRIMARY KEY,
+		category      TEXT NOT NULL,
+		minutes       INTEGER NOT NULL CHECK (minutes > 0),
+		performed_at  TEXT NOT NULL,
+		notes         TEXT,
+		created_at    TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_workout_logs_performed ON workout_logs(performed_at)`,
+	`CREATE INDEX IF NOT EXISTS idx_workout_logs_category ON workout_logs(category)`,
+
+	// Global task checklist (not project-scoped)
+	`CREATE TABLE IF NOT EXISTS tasks (
+		id          TEXT PRIMARY KEY,
+		title       TEXT NOT NULL,
+		description TEXT NOT NULL DEFAULT '',
+		order_index INTEGER NOT NULL DEFAULT 0,
+		archived_at TEXT,
+		created_at  TEXT NOT NULL,
+		updated_at  TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_tasks_order ON tasks(order_index) WHERE archived_at IS NULL`,
 }
 
 // migrateBackfillSeq assigns sequential IDs to existing nodes and work items

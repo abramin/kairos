@@ -129,29 +129,41 @@ kairos project import docs/project-sample.json
 - In TUI: press `d` or run `: draft`
 - CLI: `kairos project draft`
 
-## One-shot CLI (automation/scripts)
+## One-shot mode (scripting)
 
-Use direct commands for scripts/CI:
-
-```bash
-kairos project list
-kairos status --project PHI01 --recalc
-kairos what-now --minutes 60
-kairos session log --work-item 5 --project PHI01 --minutes 45 --units-done 1
-```
-
-Note: `kairos` with no args requires an interactive terminal.
-
-## Common commands
+Pass a command as an argument to skip the TUI and print to stdout:
 
 ```bash
-kairos project inspect PHI01
-kairos node update 3 --project PHI01 --title "Week 4 - Ethics"
-kairos work update 5 --project PHI01 --planned-min 75
-kairos work done 5 --project PHI01
-kairos session list --work-item 5 --project PHI01
-kairos template list
+kairos what-now 60      # recommendations for 60 min (also: 1h30m)
+kairos status           # project progress overview
+kairos chart            # weekly time breakdown chart
+kairos chart --weeks 4  # last 4 weeks
+kairos projects         # list active projects
+kairos help             # command reference
 ```
+
+Useful in cron jobs, shell scripts, or piping into other tools. Set `COLUMNS` to control chart width.
+
+## Global task checklist
+
+Kairos has a lightweight global to-do list independent of any project. Tasks are ordered and persist across sessions.
+
+In the shell:
+
+```text
+: tasks             (open checklist view)
+```
+
+Checklist view keys:
+
+- `a` add a task
+- `enter` mark done / confirm edit
+- `e` edit selected task
+- `d` delete selected task
+- `K` / `J` move task up / down
+- `esc` close
+
+Tasks are separate from project work items — use them for personal to-dos, daily intentions, or anything that doesn't belong to a specific plan.
 
 ## Documentation map
 

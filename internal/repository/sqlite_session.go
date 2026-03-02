@@ -112,6 +112,61 @@ func (r *SQLiteSessionRepo) ListRecentSummaryByType(ctx context.Context, days in
 	return summaries, nil
 }
 
+func (r *SQLiteSessionRepo) ListSessionMinutesByWeek(ctx context.Context, from, to time.Time) ([]ProjectWeekMinutes, error) {
+	// Group by project + calendar date in SQL; Go converts dates to ISO weeks.
+	// SQLite lacks native ISO week support, so we avoid strftime('%W') which
+	// doesn't match Go's time.ISOWeek().
+	query := `SELECT p.name,
+	                 date(s.started_at) AS session_date,
+	                 SUM(s.minutes) AS total_min
+	          FROM work_session_logs s
+	          JOIN work_items w ON s.work_item_id = w.id
+	          JOIN plan_nodes n ON w.node_id = n.id
+	          JOIN projects p ON n.project_id = p.id
+	          WHERE s.started_at >= ? AND s.started_at < ?
+	          GROUP BY p.name, session_date
+	          ORDER BY session_date DESC, total_min DESC`
+	rows, err := r.db.QueryContext(ctx, query, from.Format(time.RFC3339), to.Format(time.RFC3339))
+	if err != nil {
+		return nil, fmt.Errorf("listing session minutes by week: %w", err)
+	}
+	defer rows.Close()
+
+	// Aggregate per-date rows into per-ISO-week results.
+	type key struct {
+		project string
+		isoWeek string
+	}
+	agg := make(map[key]int)
+	for rows.Next() {
+		var projectName, dateStr string
+		var mins int
+		if err := rows.Scan(&projectName, &dateStr, &mins); err != nil {
+			return nil, fmt.Errorf("scanning session day row: %w", err)
+		}
+		d, err := time.Parse("2006-01-02", dateStr)
+		if err != nil {
+			return nil, fmt.Errorf("parsing session date %q: %w", dateStr, err)
+		}
+		y, w := d.ISOWeek()
+		isoWk := fmt.Sprintf("%d-W%02d", y, w)
+		agg[key{project: projectName, isoWeek: isoWk}] += mins
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating session day rows: %w", err)
+	}
+
+	results := make([]ProjectWeekMinutes, 0, len(agg))
+	for k, mins := range agg {
+		results = append(results, ProjectWeekMinutes{
+			ProjectName: k.project,
+			ISOWeek:     k.isoWeek,
+			TotalMin:    mins,
+		})
+	}
+	return results, nil
+}
+
 func (r *SQLiteSessionRepo) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM work_session_logs WHERE id = ?`
 	_, err := r.db.ExecContext(ctx, query, id)

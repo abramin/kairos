@@ -258,7 +258,9 @@ func (v *actionMenuView) actionMarkDone() tea.Cmd {
 }
 
 func (v *actionMenuView) actionEdit() tea.Cmd {
-	return pushView(newEditWorkItemView(v.state, v.itemID, v.itemTitle))
+	// Replace the action menu with the edit form so completion/cancel returns
+	// to the parent view (task list, recommendation, etc.) directly.
+	return replaceView(newEditWorkItemView(v.state, v.itemID, v.itemTitle))
 }
 
 func (v *actionMenuView) actionDelete() tea.Cmd {

@@ -38,3 +38,17 @@ type ImportProjectUseCase interface {
 	ImportProject(ctx context.Context, filePath string) (*ImportResult, error)
 	ImportProjectFromSchema(ctx context.Context, schema *importer.ImportSchema) (*ImportResult, error)
 }
+
+type ProjectUpdateResult struct {
+	Project              *domain.Project
+	NodesCreated         int
+	NodesUpdated         int
+	WorkItemsCreated     int
+	WorkItemsUpdated     int
+	DependenciesAdded    int
+	DependenciesPreserved int
+}
+
+type ProjectUpdateUseCase interface {
+	UpdateProjectFromJSON(ctx context.Context, projectShortID string, filePath string) (*ProjectUpdateResult, error)
+}

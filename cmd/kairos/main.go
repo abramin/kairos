@@ -16,13 +16,13 @@ import (
 )
 
 func main() {
-	if err := run(); err != nil {
+	if err := run(os.Args[1:]); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(args []string) error {
 	// Determine DB path: env var or default ~/.kairos/kairos.db
 	dbPath := os.Getenv("KAIROS_DB")
 	if dbPath == "" {
@@ -63,6 +63,8 @@ func run() error {
 	depRepo := repository.NewSQLiteDependencyRepo(database)
 	sessionRepo := repository.NewSQLiteSessionRepo(database)
 	profileRepo := repository.NewSQLiteUserProfileRepo(database)
+	workoutRepo := repository.NewSQLiteWorkoutLogRepo(database)
+	taskRepo := repository.NewSQLiteTaskRepo(database)
 
 	// Wire unit of work for transactional operations
 	uow := db.NewSQLiteUnitOfWork(database)
@@ -76,12 +78,18 @@ func run() error {
 	sessionSvc := service.NewSessionService(sessionRepo, uow, useCaseObserver)
 	templateSvc := service.NewTemplateService(templateDir, uow, useCaseObserver)
 	importSvc := service.NewImportService(uow, useCaseObserver)
+	projectUpdateSvc := service.NewProjectUpdateService(uow, useCaseObserver)
+	workoutSvc := service.NewWorkoutService(workoutRepo, useCaseObserver)
+	chartSvc := service.NewChartService(sessionRepo, workoutRepo)
 
 	app := &cli.App{
 		Projects:  service.NewProjectService(projectRepo),
 		Nodes:     service.NewNodeService(nodeRepo, uow),
 		WorkItems: service.NewWorkItemService(workItemRepo, nodeRepo, uow),
 		Sessions:  sessionSvc,
+		Workouts:  workoutSvc,
+		Tasks:     service.NewTaskService(taskRepo),
+		Chart:     chartSvc,
 		WhatNow:   service.NewWhatNowService(workItemRepo, sessionRepo, depRepo, profileRepo, useCaseObserver),
 		Status:    service.NewStatusService(projectRepo, workItemRepo, sessionRepo, profileRepo),
 		Replan:    service.NewReplanService(projectRepo, workItemRepo, sessionRepo, profileRepo, uow, useCaseObserver),
@@ -91,6 +99,7 @@ func run() error {
 		LogSession:    sessionSvc,
 		InitProject:   templateSvc,
 		ImportProject: importSvc,
+		ProjectUpdate: projectUpdateSvc,
 	}
 
 	// Detect interactive terminal for shell-only entrypoint.
@@ -115,7 +124,12 @@ func run() error {
 		app.Help = intelligence.NewHelpService(llmClient, observer)
 	}
 
-	// Launch interactive shell (only entry point).
+	// Non-interactive one-shot mode: kairos <cmd> [args...]
+	if len(args) > 0 {
+		return cli.RunOneShot(app, args[0], args[1:])
+	}
+
+	// Launch interactive shell.
 	if !app.IsInteractive() {
 		return fmt.Errorf("kairos requires an interactive terminal")
 	}

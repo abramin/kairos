@@ -149,11 +149,11 @@ type editWorkItemFields struct {
 }
 
 // applyEditWorkItem persists edited fields to the work item in the database.
-func applyEditWorkItem(app *App, itemID string, f *editWorkItemFields) tea.Msg {
+func applyEditWorkItem(app *App, itemID string, f *editWorkItemFields) error {
 	ctx := context.Background()
 	current, err := app.WorkItems.GetByID(ctx, itemID)
 	if err != nil {
-		return formErrorOutput(err)
+		return err
 	}
 
 	current.Title = f.title
@@ -185,13 +185,7 @@ func applyEditWorkItem(app *App, itemID string, f *editWorkItemFields) tea.Msg {
 		current.MaxSessionMin = v
 	}
 
-	if err := app.WorkItems.Update(ctx, current); err != nil {
-		return formErrorOutput(err)
-	}
-
-	return formSuccessOutput(fmt.Sprintf("%s Updated: %s",
-		formatter.StyleGreen.Render("✔"),
-		formatter.Bold(f.title)))
+	return app.WorkItems.Update(ctx, current)
 }
 
 // newEditWorkItemView creates a wizard form for editing a work item's fields.
@@ -281,7 +275,10 @@ func newEditWorkItemView(state *SharedState, itemID, title string) View {
 	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
 
 	done := func() tea.Cmd {
-		return func() tea.Msg { return applyEditWorkItem(state.App, itemID, f) }
+		if err := applyEditWorkItem(state.App, itemID, f); err != nil {
+			return func() tea.Msg { return formErrorOutput(err) }
+		}
+		return nil // the refreshed task list confirms the update
 	}
 
 	return newWizardView(state, "Edit Work Item", form, done)
@@ -353,12 +350,7 @@ func newAddWorkItemView(state *SharedState, nodeID string) View {
 		}
 
 		state.SetActiveItem(w.ID, w.Title, w.Seq)
-		return func() tea.Msg {
-			return formSuccessOutput(fmt.Sprintf("%s Added: %s (%s)",
-				formatter.StyleGreen.Render("✔"),
-				formatter.Bold(newTitle),
-				formatter.FormatMinutes(dur)))
-		}
+		return nil // the refreshed task list confirms the addition
 	}
 
 	return newWizardView(state, "Add Work Item", form, done)

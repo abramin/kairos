@@ -44,6 +44,7 @@ func Convert(schema *ImportSchema) (*tmpl.GeneratedProject, error) {
 		Nodes:        nodes,
 		WorkItems:    workItems,
 		Dependencies: deps,
+		RefMap:       refMap,
 	}, nil
 }
 

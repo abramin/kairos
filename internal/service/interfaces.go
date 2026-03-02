@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/app"
 	"github.com/alexanderramin/kairos/internal/domain"
@@ -74,4 +75,46 @@ type ImportResult = app.ImportResult
 type ImportService interface {
 	ImportProject(ctx context.Context, filePath string) (*ImportResult, error)
 	ImportProjectFromSchema(ctx context.Context, schema *importer.ImportSchema) (*ImportResult, error)
+}
+
+type ProjectUpdateResult = app.ProjectUpdateResult
+
+type ProjectUpdateService interface {
+	UpdateProjectFromJSON(ctx context.Context, projectShortID string, filePath string) (*ProjectUpdateResult, error)
+}
+
+type ChartService interface {
+	WeeklyBreakdown(ctx context.Context, numWeeks int) ([]domain.WeeklyBreakdown, error)
+}
+
+// LogWorkoutRequest holds parameters for logging a workout.
+type LogWorkoutRequest struct {
+	Category    domain.WorkoutCategory
+	Minutes     int
+	PerformedAt *time.Time
+	Notes       *string
+}
+
+type WorkoutService interface {
+	LogWorkout(ctx context.Context, req LogWorkoutRequest) (domain.WorkoutLog, error)
+	DeleteWorkout(ctx context.Context, id string) error
+	ListRecent(ctx context.Context, limit int) ([]domain.WorkoutLog, error)
+	ListByDateRange(ctx context.Context, from, to time.Time) ([]domain.WorkoutLog, error)
+}
+
+// AddTaskRequest holds parameters for creating a new global task.
+type AddTaskRequest struct {
+	Title       string
+	Description string
+}
+
+// TaskService manages the global standalone task checklist.
+type TaskService interface {
+	Add(ctx context.Context, req AddTaskRequest) (*domain.Task, error)
+	ListActive(ctx context.Context) ([]*domain.Task, error)
+	Update(ctx context.Context, id, title, description string) error
+	MarkDone(ctx context.Context, id string) error
+	Delete(ctx context.Context, id string) error
+	MoveUp(ctx context.Context, id string) error
+	MoveDown(ctx context.Context, id string) error
 }
