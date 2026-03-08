@@ -64,6 +64,7 @@ func FormatShellHelp() string {
 				{"what-now [min]", "Get session recommendations (default: 60 min)"},
 				{"status", "Show progress overview"},
 				{"replan", "Rebalance project schedules"},
+				{"calendar sync [--days N]", "Push due items to Google Calendar via gws"},
 			},
 		},
 		{

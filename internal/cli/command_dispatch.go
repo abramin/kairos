@@ -112,6 +112,8 @@ func (c *commandBar) executeCommand(input string) tea.Cmd {
 			}),
 			func() tea.Msg { return refreshViewMsg{} },
 		)
+	case "calendar":
+		return c.cmdCalendarSync(args)
 	case "chart":
 		return c.cmdChart(args)
 	case "project":

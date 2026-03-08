@@ -30,12 +30,25 @@ type NodeService interface {
 	Delete(ctx context.Context, id string) error
 }
 
+// DueItem is a flattened view of a work item with its due date and project context,
+// returned by WorkItemService.ListDueItems for use by calendar sync.
+type DueItem struct {
+	WorkItemID  string
+	Seq         int
+	Title       string
+	ProjectName string
+	DueDate     time.Time
+	PlannedMin  int
+	Status      domain.WorkItemStatus
+}
+
 type WorkItemService interface {
 	Create(ctx context.Context, w *domain.WorkItem) error
 	GetByID(ctx context.Context, id string) (*domain.WorkItem, error)
 	GetBySeq(ctx context.Context, projectID string, seq int) (*domain.WorkItem, error)
 	ListByNode(ctx context.Context, nodeID string) ([]*domain.WorkItem, error)
 	ListByProject(ctx context.Context, projectID string) ([]*domain.WorkItem, error)
+	ListDueItems(ctx context.Context, daysAhead int) ([]DueItem, error)
 	Update(ctx context.Context, w *domain.WorkItem) error
 	MarkDone(ctx context.Context, id string) error
 	Reopen(ctx context.Context, id string) error

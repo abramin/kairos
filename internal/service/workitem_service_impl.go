@@ -126,6 +126,38 @@ func (s *workItemService) MarkInProgress(ctx context.Context, id string) error {
 	return s.workItems.Update(ctx, w)
 }
 
+func (s *workItemService) ListDueItems(ctx context.Context, daysAhead int) ([]DueItem, error) {
+	if daysAhead <= 0 {
+		daysAhead = 14
+	}
+	candidates, err := s.workItems.ListSchedulable(ctx, false)
+	if err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	cutoff := now.AddDate(0, 0, daysAhead)
+	var out []DueItem
+	for _, c := range candidates {
+		due := c.WorkItem.DueDate
+		if due == nil {
+			due = c.NodeDueDate
+		}
+		if due == nil || due.After(cutoff) {
+			continue
+		}
+		out = append(out, DueItem{
+			WorkItemID:  c.WorkItem.ID,
+			Seq:         c.WorkItem.Seq,
+			Title:       c.WorkItem.Title,
+			ProjectName: c.ProjectName,
+			DueDate:     *due,
+			PlannedMin:  c.WorkItem.PlannedMin,
+			Status:      c.WorkItem.Status,
+		})
+	}
+	return out, nil
+}
+
 func (s *workItemService) Archive(ctx context.Context, id string) error {
 	return s.workItems.Archive(ctx, id)
 }
