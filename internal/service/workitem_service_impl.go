@@ -45,6 +45,11 @@ func (s *workItemService) Create(ctx context.Context, w *domain.WorkItem) error 
 	if w.DurationSource == "" {
 		w.DurationSource = domain.SourceManual
 	}
+	if w.MinSessionMin == 0 && w.MaxSessionMin == 0 && w.DefaultSessionMin == 0 {
+		w.MinSessionMin = domain.DefaultMinSessionMin
+		w.MaxSessionMin = domain.DefaultMaxSessionMin
+		w.DefaultSessionMin = domain.DefaultDefaultSessionMin
+	}
 
 	return s.uow.WithinTx(ctx, func(ctx context.Context, tx db.DBTX) error {
 		txNodes := repository.NewSQLitePlanNodeRepo(tx)
@@ -94,6 +99,17 @@ func (s *workItemService) MarkDone(ctx context.Context, id string) error {
 		return err
 	}
 	if err := w.MarkDone(time.Now().UTC()); err != nil {
+		return err
+	}
+	return s.workItems.Update(ctx, w)
+}
+
+func (s *workItemService) Reopen(ctx context.Context, id string) error {
+	w, err := s.workItems.GetByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if err := w.Reopen(time.Now().UTC()); err != nil {
 		return err
 	}
 	return s.workItems.Update(ctx, w)

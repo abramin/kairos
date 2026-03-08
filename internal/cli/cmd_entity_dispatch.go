@@ -39,7 +39,7 @@ func parseShellFlags(args []string) (positional []string, flags map[string]strin
 // entityGroupHelp returns usage text for a bare entity group command.
 func entityGroupHelp(group string) string {
 	subs := map[string]string{
-		"project":  "list, inspect, add, update, archive, unarchive, remove, init, import, draft",
+		"project":  "list, inspect, add, edit, update, archive, unarchive, remove, init, import, draft",
 		"node":     "add, inspect, update, remove",
 		"work":     "add, inspect, update, done, archive, remove",
 		"session":  "log, list, remove",
@@ -57,6 +57,18 @@ func (c *commandBar) dispatchEntityCommand(group, sub string, args []string) tea
 	ctx := context.Background()
 	positional, flags := parseShellFlags(args)
 	app := c.state.App
+
+	// project edit launches an interactive TUI form (needs pushView, not string return)
+	if group == "project" && sub == "edit" {
+		if len(positional) == 0 {
+			return outputCmd(shellError(fmt.Errorf("usage: project edit <id>")))
+		}
+		projectID, err := resolveProjectID(ctx, app, positional[0])
+		if err != nil {
+			return outputCmd(shellError(err))
+		}
+		return pushView(newEditProjectView(c.state, projectID))
+	}
 
 	var result string
 	var err error
@@ -485,6 +497,20 @@ func (c *commandBar) dispatchWork(ctx context.Context, sub string, pos []string,
 			return "", err
 		}
 		return fmt.Sprintf("%s Marked as done", formatter.StyleGreen.Render("✔")), nil
+
+	case "reopen":
+		if len(pos) == 0 {
+			return "", fmt.Errorf("usage: work reopen <id>")
+		}
+		wiID, err := resolveWorkItemID(ctx, app, pos[0], projectID)
+		if err != nil {
+			return "", err
+		}
+		wi, err := app.WorkItems.GetByID(ctx, wiID)
+		if err != nil {
+			return "", err
+		}
+		return execReopen(ctx, app, wiID, wi.Title)
 
 	case "archive":
 		if len(pos) == 0 {

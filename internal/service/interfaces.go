@@ -38,6 +38,7 @@ type WorkItemService interface {
 	ListByProject(ctx context.Context, projectID string) ([]*domain.WorkItem, error)
 	Update(ctx context.Context, w *domain.WorkItem) error
 	MarkDone(ctx context.Context, id string) error
+	Reopen(ctx context.Context, id string) error
 	MarkInProgress(ctx context.Context, id string) error
 	Archive(ctx context.Context, id string) error
 	Delete(ctx context.Context, id string) error

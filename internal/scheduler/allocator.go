@@ -123,6 +123,16 @@ func tryAllocate(c ScoredCandidate, remaining int) (*app.WorkSlice, *app.Constra
 		allocated = clamp(workRemaining, minS, upper)
 	}
 
+	// Safety net: never emit a zero-minute slice
+	if allocated <= 0 {
+		return nil, &app.ConstraintBlocker{
+			EntityType: "work_item",
+			EntityID:   c.Input.WorkItemID,
+			Code:       app.BlockerSessionMinExceedsAvail,
+			Message:    "No viable session duration: check session policy",
+		}
+	}
+
 	reasons := make([]app.RecommendationReason, len(c.Reasons))
 	copy(reasons, c.Reasons)
 	if allocated != defS {

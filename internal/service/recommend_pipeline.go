@@ -228,6 +228,13 @@ func ScoreCandidates(
 			NodeID:              c.WorkItem.NodeID,
 		}
 
+		// Normalize session policy for items created before defaults were enforced.
+		if input.MinSessionMin == 0 && input.MaxSessionMin == 0 && input.DefaultSessionMin == 0 {
+			input.MinSessionMin = domain.DefaultMinSessionMin
+			input.MaxSessionMin = domain.DefaultMaxSessionMin
+			input.DefaultSessionMin = domain.DefaultDefaultSessionMin
+		}
+
 		scored = append(scored, scheduler.ScoreWorkItem(input))
 	}
 	return scored

@@ -12,6 +12,11 @@ const statusProgressBarWidth = 10
 
 // FormatStatus formats a StatusResponse into a styled CLI dashboard string.
 func FormatStatus(resp *contract.StatusResponse) string {
+	return FormatStatusAt(resp, time.Now())
+}
+
+// FormatStatusAt formats a StatusResponse using a fixed reference time for due dates.
+func FormatStatusAt(resp *contract.StatusResponse, now time.Time) string {
 	var b strings.Builder
 
 	// Build the table.
@@ -32,7 +37,7 @@ func FormatStatus(resp *contract.StatusResponse) string {
 		due := Dim("--")
 		if p.DueDate != nil {
 			if parsed, err := time.Parse("2006-01-02", *p.DueDate); err == nil {
-				due = RelativeDateStyled(parsed)
+				due = RelativeDateStyledFrom(parsed, now)
 			} else {
 				due = StyleFg.Render(*p.DueDate)
 			}

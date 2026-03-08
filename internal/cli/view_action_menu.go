@@ -51,11 +51,15 @@ func newActionMenuView(state *SharedState, itemID, title string, seq int) *actio
 		}
 	}
 
+	doneAction := menuAction{label: "Mark Done", key: "d", fn: v.actionMarkDone}
+	if v.item != nil && v.item.Status == domain.WorkItemDone {
+		doneAction = menuAction{label: "Reopen", key: "d", fn: v.actionReopen}
+	}
 	v.actions = []menuAction{
 		{label: "Start Timer", key: "s", fn: v.actionStart},
 		{label: "Log Past Session", key: "l", fn: v.actionLog},
 		{label: "Adjust Logged Time", key: "a", fn: v.actionAdjustLogged},
-		{label: "Mark Done", key: "d", fn: v.actionMarkDone},
+		doneAction,
 		{label: "Edit Details", key: "e", fn: v.actionEdit},
 		{label: "Delete", key: "x", fn: v.actionDelete},
 	}
@@ -265,4 +269,13 @@ func (v *actionMenuView) actionEdit() tea.Cmd {
 
 func (v *actionMenuView) actionDelete() tea.Cmd {
 	return execDeleteItem(v.state, v.itemID, v.itemTitle)
+}
+
+func (v *actionMenuView) actionReopen() tea.Cmd {
+	id, title, state := v.itemID, v.itemTitle, v.state
+	return func() tea.Msg {
+		return wrapAsWizardComplete(func() (string, error) {
+			return execReopen(context.Background(), state.App, id, title)
+		})
+	}
 }

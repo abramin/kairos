@@ -47,6 +47,8 @@ func (c *commandBar) executeCommand(input string) tea.Cmd {
 		return c.cmdStart(args)
 	case "finish":
 		return c.cmdFinish(args)
+	case "reopen":
+		return c.cmdReopen(args)
 	case "add":
 		return c.cmdAdd(args)
 	case "ask":

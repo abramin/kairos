@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/alexanderramin/kairos/internal/contract"
 	"github.com/alexanderramin/kairos/internal/domain"
@@ -194,7 +195,9 @@ func TestFormatStatus_Golden_MultiProject(t *testing.T) {
 		},
 	}
 
-	out := FormatStatus(resp)
+	// Fixed reference time matching the golden file (2026-03-02).
+	fixedNow := time.Date(2026, 3, 2, 12, 0, 0, 0, time.UTC)
+	out := FormatStatusAt(resp, fixedNow)
 	goldenTest(t, "status_multiproject", out)
 }
 

@@ -162,7 +162,7 @@ func (v *taskListView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return v, pushView(newActionMenuView(v.state, row.itemID, row.title, row.seq))
 				}
 			}
-		case "space":
+		case " ":
 			// Toggle done/todo for work items
 			if v.cursor < len(visible) {
 				row := visible[v.cursor]
@@ -470,8 +470,13 @@ func (v *taskListView) renderRow(row taskRow, isCursor bool, colWidth int) strin
 			seqStr = formatter.Dim(fmt.Sprintf("#%d ", row.seq))
 		}
 
-		line = fmt.Sprintf("%s%s%s %s%s%s",
-			cursor, indent, statusIcon, seqStr, row.title, progress,
+		due := ""
+		if row.dueDate != nil {
+			due = "  " + formatter.Dim(*row.dueDate)
+		}
+
+		line = fmt.Sprintf("%s%s%s %s%s%s%s",
+			cursor, indent, statusIcon, seqStr, row.title, progress, due,
 		)
 	}
 

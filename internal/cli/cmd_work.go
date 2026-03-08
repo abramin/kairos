@@ -190,6 +190,39 @@ func (c *commandBar) finishExecute(itemID string) tea.Cmd {
 	return outputCmd(msg)
 }
 
+// ── reopen command ───────────────────────────────────────────────────────────
+
+func (c *commandBar) cmdReopen(args []string) tea.Cmd {
+	var itemArg string
+	if len(args) > 0 {
+		itemArg = stripItemPrefix(args[0])
+	}
+
+	if itemArg != "" {
+		ctx := context.Background()
+		if resolved, err := resolveWorkItemID(ctx, c.state.App, itemArg, c.state.ActiveProjectID); err == nil {
+			return c.reopenExecute(resolved)
+		}
+	}
+
+	return c.ensureProject(func() tea.Cmd {
+		return c.resolveOrSelectItem("", []domain.WorkItemStatus{domain.WorkItemDone}, func(itemID string) tea.Cmd {
+			return c.reopenExecute(itemID)
+		})
+	})
+}
+
+func (c *commandBar) reopenExecute(itemID string) tea.Cmd {
+	ctx := context.Background()
+	title, _ := resolveItemTitle(ctx, c.state.App, itemID)
+
+	msg, err := execReopen(ctx, c.state.App, itemID, title)
+	if err != nil {
+		return outputCmd(shellError(err))
+	}
+	return outputCmd(msg)
+}
+
 // ── add command ──────────────────────────────────────────────────────────────
 
 func (c *commandBar) cmdAdd(args []string) tea.Cmd {

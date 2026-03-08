@@ -63,8 +63,13 @@ func RelativeDateFrom(t time.Time, now time.Time) string {
 
 // RelativeDateStyled returns RelativeDate with urgency coloring applied.
 func RelativeDateStyled(t time.Time) string {
-	text := RelativeDate(t)
-	days := int(math.Round(time.Until(t).Hours() / 24))
+	return RelativeDateStyledFrom(t, time.Now())
+}
+
+// RelativeDateStyledFrom returns a styled relative date string from a reference time.
+func RelativeDateStyledFrom(t time.Time, now time.Time) string {
+	text := RelativeDateFrom(t, now)
+	days := int(math.Round(t.Sub(now).Hours() / 24))
 
 	if days >= 0 && days <= 2 {
 		return StyleRed.Render(text)

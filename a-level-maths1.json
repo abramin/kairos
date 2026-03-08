@@ -1,0 +1,214 @@
+{
+    "project": {
+        "short_id": "AL-MATH",
+        "name": "A Level Mathematics Syllabus",
+        "domain": "education",
+        "start_date": "2026-09-01"
+    },
+    "defaults": {
+        "duration_mode": "estimate",
+        "session_policy": {
+            "min_session_min": 15,
+            "max_session_min": 120,
+            "default_session_min": 60,
+            "splittable": true
+        }
+    },
+    "nodes": [
+        {
+            "ref": "phase1",
+            "title": "Phase 1: Algebraic Foundations",
+            "kind": "stage",
+            "order": 1
+        },
+        {
+            "ref": "mod1",
+            "title": "Module 1: Indices and Surds",
+            "kind": "module",
+            "parent_ref": "phase1",
+            "order": 1
+        },
+        {
+            "ref": "mod2",
+            "title": "Module 2: Inequalities",
+            "kind": "module",
+            "parent_ref": "phase1",
+            "order": 2
+        },
+        {
+            "ref": "mod3",
+            "title": "Module 3: The Factor Theorem and Algebraic Division",
+            "kind": "module",
+            "parent_ref": "phase1",
+            "order": 3
+        },
+        {
+            "ref": "phase2",
+            "title": "Phase 2: Geometry and Functions",
+            "kind": "stage",
+            "order": 2
+        },
+        {
+            "ref": "mod4",
+            "title": "Module 4: Coordinate Geometry",
+            "kind": "module",
+            "parent_ref": "phase2",
+            "order": 4
+        },
+        {
+            "ref": "mod5",
+            "title": "Module 5: Transformation of Graphs and Curve Sketching",
+            "kind": "module",
+            "parent_ref": "phase2",
+            "order": 5
+        },
+        {
+            "ref": "phase3",
+            "title": "Phase 3: Applied Mathematics",
+            "kind": "stage",
+            "order": 3
+        },
+        {
+            "ref": "mod6",
+            "title": "Module 6: An Introduction to Mechanics",
+            "kind": "module",
+            "parent_ref": "phase3",
+            "order": 6
+        },
+        {
+            "ref": "mod7",
+            "title": "Module 7: An Introduction to Statistics",
+            "kind": "module",
+            "parent_ref": "phase3",
+            "order": 7
+        }
+    ],
+    "work_items": [
+        {
+            "ref": "mod1_indices_laws",
+            "node_ref": "mod1",
+            "title": "Understand and use laws of indices for rational exponents",
+            "type": "practice",
+            "planned_min": 180
+        },
+        {
+            "ref": "mod1_surds_manipulation",
+            "node_ref": "mod1",
+            "title": "Manipulate surds and rationalising the denominator",
+            "type": "practice",
+            "planned_min": 240
+        },
+        {
+            "ref": "mod2_linear_quad",
+            "node_ref": "mod2",
+            "title": "Solve linear and quadratic inequalities in a single variable",
+            "type": "practice",
+            "planned_min": 300
+        },
+        {
+            "ref": "mod2_notation",
+            "node_ref": "mod2",
+            "title": "Express solutions using number lines, set notation, and 'and/or'",
+            "type": "practice",
+            "planned_min": 120
+        },
+        {
+            "ref": "mod2_graphical_two_var",
+            "node_ref": "mod2",
+            "title": "Represent inequalities in two variables graphically",
+            "type": "practice",
+            "planned_min": 180
+        },
+        {
+            "ref": "mod3_factor_theorem",
+            "node_ref": "mod3",
+            "title": "Use factor theorem to write polynomials as products of factors",
+            "type": "practice",
+            "planned_min": 240
+        },
+        {
+            "ref": "mod3_division",
+            "node_ref": "mod3",
+            "title": "Polynomial division by equating coefficients",
+            "type": "practice",
+            "planned_min": 180
+        },
+        {
+            "ref": "mod4_circle_geometry",
+            "node_ref": "mod4",
+            "title": "Solve problems using coordinate geometry of the circle",
+            "type": "practice",
+            "planned_min": 300
+        },
+        {
+            "ref": "mod4_complete_square",
+            "node_ref": "mod4",
+            "title": "Complete the square to find centre and radius",
+            "type": "practice",
+            "planned_min": 120
+        },
+        {
+            "ref": "mod4_circle_properties",
+            "node_ref": "mod4",
+            "title": "Angle in semicircle, perpendicular to chord, and tangents",
+            "type": "practice",
+            "planned_min": 240
+        },
+        {
+            "ref": "mod5_sketching",
+            "node_ref": "mod5",
+            "title": "Curve sketching based on shapes and symmetries",
+            "type": "practice",
+            "planned_min": 210
+        },
+        {
+            "ref": "mod5_transformations",
+            "node_ref": "mod5",
+            "title": "Transformations: translations, reflections, and stretches",
+            "type": "practice",
+            "planned_min": 300
+        },
+        {
+            "ref": "mod6_definitions",
+            "node_ref": "mod6",
+            "title": "Interpret distance, speed, displacement, velocity, and acceleration",
+            "type": "reading",
+            "planned_min": 120
+        },
+        {
+            "ref": "mod6_graph_analysis",
+            "node_ref": "mod6",
+            "title": "Interpret motion graphs (gradients and areas)",
+            "type": "review",
+            "planned_min": 240
+        },
+        {
+            "ref": "mod6_suvat_derivation",
+            "node_ref": "mod6",
+            "title": "Derive and use constant acceleration formulae",
+            "type": "practice",
+            "planned_min": 300
+        },
+        {
+            "ref": "mod7_sampling",
+            "node_ref": "mod7",
+            "title": "Population, sample, and representative sampling techniques",
+            "type": "reading",
+            "planned_min": 150
+        },
+        {
+            "ref": "mod7_histograms",
+            "node_ref": "mod7",
+            "title": "Interpret histograms for univariate data inferences",
+            "type": "review",
+            "planned_min": 180
+        },
+        {
+            "ref": "mod7_bivariate",
+            "node_ref": "mod7",
+            "title": "Interpret scatter diagrams, regression, and correlation",
+            "type": "review",
+            "planned_min": 240
+        }
+    ]
+}

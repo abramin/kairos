@@ -117,7 +117,7 @@ func (v *checklistView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case "a":
 			return v, pushView(newAddTaskView(v.state))
-		case "space":
+		case " ":
 			if v.cursor < len(v.tasks) {
 				return v, v.markDoneCmd(v.tasks[v.cursor])
 			}

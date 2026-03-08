@@ -355,3 +355,83 @@ func newAddWorkItemView(state *SharedState, nodeID string) View {
 
 	return newWizardView(state, "Add Work Item", form, done)
 }
+
+// ── project edit ──────────────────────────────────────────────────────────────
+
+type projectEditFields struct {
+	name   string
+	domain string
+	due    string
+	status string
+}
+
+// newEditProjectView creates an interactive form for editing a project's metadata.
+func newEditProjectView(state *SharedState, projectID string) View {
+	ctx := context.Background()
+	p, err := state.App.Projects.GetByID(ctx, projectID)
+	if err != nil {
+		return wizardErrorView(state, "Edit Project", err)
+	}
+
+	f := &projectEditFields{
+		name:   p.Name,
+		domain: p.Domain,
+		status: string(p.Status),
+	}
+	if p.TargetDate != nil {
+		f.due = p.TargetDate.Format("2006-01-02")
+	}
+
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Name").
+				Value(&f.name).
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("name is required")
+					}
+					return nil
+				}),
+			huh.NewInput().
+				Title("Domain").
+				Value(&f.domain).
+				Validate(func(s string) error {
+					if s == "" {
+						return fmt.Errorf("domain is required")
+					}
+					return nil
+				}),
+			dateInput("Due Date (YYYY-MM-DD, blank to clear)", "", &f.due),
+			huh.NewSelect[string]().
+				Title("Status").
+				Value(&f.status).
+				Options(
+					huh.NewOption("Active", string(domain.ProjectActive)),
+					huh.NewOption("Paused", string(domain.ProjectPaused)),
+					huh.NewOption("Done", string(domain.ProjectDone)),
+					huh.NewOption("Archived", string(domain.ProjectArchived)),
+				),
+		),
+	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
+
+	done := func() tea.Cmd {
+		p.Name = f.name
+		p.Domain = f.domain
+		p.Status = domain.ProjectStatus(f.status)
+		p.UpdatedAt = time.Now()
+		if f.due == "" {
+			p.TargetDate = nil
+		} else if t, err := time.Parse("2006-01-02", f.due); err == nil {
+			p.TargetDate = &t
+		}
+		if err := state.App.Projects.Update(ctx, p); err != nil {
+			return func() tea.Msg { return formErrorOutput(err) }
+		}
+		return func() tea.Msg {
+			return formSuccessOutput(formatter.StyleGreen.Render("✔") + " Updated project " + p.Name + " [" + p.ShortID + "]")
+		}
+	}
+
+	return newWizardView(state, "Edit Project", form, done)
+}

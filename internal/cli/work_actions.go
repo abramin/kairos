@@ -82,6 +82,16 @@ func execMarkDone(ctx context.Context, app *App, state *SharedState,
 		formatter.Bold(title)), nil
 }
 
+// execReopen reopens a done work item, reverting it to todo status.
+func execReopen(ctx context.Context, app *App, itemID, title string) (string, error) {
+	if err := app.WorkItems.Reopen(ctx, itemID); err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%s Reopened: %s",
+		formatter.StyleYellow.Render("↩"),
+		formatter.Bold(title)), nil
+}
+
 // wizardCompleteError returns a wizardCompleteMsg that displays a formatted error.
 func wizardCompleteError(err error) tea.Msg {
 	return wizardCompleteMsg{nextCmd: outputCmd(shellError(err))}

@@ -89,6 +89,7 @@ func FormatShellHelp() string {
 			commands: [][]string{
 				{"draft [desc]", "Create a new project (wizard or AI draft)"},
 				{"project add", "Add a project manually"},
+				{"project edit <id>", "Edit a project interactively"},
 				{"project import <file>", "Import project from JSON"},
 				{"node add", "Add a plan node (wizard if flags omitted)"},
 				{"work add", "Add a work item (wizard if flags omitted)"},

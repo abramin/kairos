@@ -5,6 +5,13 @@ import (
 	"time"
 )
 
+// Session policy defaults applied when no explicit policy is set.
+const (
+	DefaultMinSessionMin     = 15
+	DefaultMaxSessionMin     = 60
+	DefaultDefaultSessionMin = 30
+)
+
 type WorkItem struct {
 	ID          string
 	NodeID      string

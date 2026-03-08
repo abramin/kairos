@@ -30,9 +30,11 @@ go.work.sum
 
 # binary
 kairos
+kairos-mcp
 
 # env file
 .env
+.mcp.json
 
 # Editor/IDE
 # .idea/
