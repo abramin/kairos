@@ -17,6 +17,7 @@ type App struct {
 	Sessions  service.SessionService
 	Workouts  service.WorkoutService
 	Tasks     service.TaskService
+	Habits    service.HabitService
 	Chart     service.ChartService
 	WhatNow   app.WhatNowUseCase
 	Status    app.StatusUseCase

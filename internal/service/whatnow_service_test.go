@@ -71,7 +71,7 @@ func TestWhatNow_CriticalDeadline_OnlyCriticalRecommended(t *testing.T) {
 	)
 	require.NoError(t, sessions.Create(ctx, sessB))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -127,7 +127,7 @@ func TestWhatNow_Balanced_IncludesSecondaryProject(t *testing.T) {
 	)
 	require.NoError(t, sessions.Create(ctx, sessB))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(90)
 	req.Now = &now
 
@@ -168,7 +168,7 @@ func TestWhatNow_ArchivedItemsExcluded(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wiArchived))
 	require.NoError(t, workItems.Archive(ctx, wiArchived.ID))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -200,7 +200,7 @@ func TestWhatNow_DeterministicOutput(t *testing.T) {
 		require.NoError(t, workItems.Create(ctx, wi))
 	}
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(90)
 	req.Now = &now
 
@@ -243,7 +243,7 @@ func TestWhatNow_BaselineFloor_PreventsSpuriousCritical(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wi))
 	// No sessions logged — recentDailyMin = 0
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -280,7 +280,7 @@ func TestWhatNow_BaselineZero_AllowsCritical(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wi))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -349,7 +349,7 @@ func TestWhatNow_BackLoadedProject_NotFalseCritical(t *testing.T) {
 	)
 	require.NoError(t, sessions.Create(ctx, sess))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -387,7 +387,7 @@ func TestWhatNow_DeadlineUpdate_ChangesRiskAndRanking(t *testing.T) {
 	require.NoError(t, sessions.Create(ctx, sess))
 
 	// First request: should be balanced (comfortable deadline, has recent activity)
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -454,7 +454,7 @@ func TestWhatNow_UserProfileWeightsAffectOrdering(t *testing.T) {
 	)
 	require.NoError(t, sessions.Create(ctx, sessB))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 
 	// --- Weight set 1: Heavy deadline pressure, zero spacing/variation ---
 	profile, err := profiles.Get(ctx)

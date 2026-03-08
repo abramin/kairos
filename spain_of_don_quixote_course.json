@@ -3,7 +3,8 @@
         "short_id": "UAMx-QuijoteEN",
         "name": "The Spain of Don Quixote",
         "domain": "education",
-        "start_date": "2026-03-03"
+        "start_date": "2026-03-03",
+        "due_data": "2026-07-12"
     },
     "defaults": {
         "duration_mode": "estimate",
@@ -19,62 +20,64 @@
             "ref": "welcome",
             "title": "Welcome to the Spain of Don Quixote",
             "kind": "stage",
-            "order": 1
+            "order": 1,
+            "due_date": "2026-03-22"
         },
         {
             "ref": "week1",
             "title": "1. Introduction: Time and Space",
             "kind": "stage",
             "order": 2,
-            "due_date": "2026-03-22"
+            "due_date": "2026-04-05"
         },
         {
             "ref": "week2",
             "title": "2. Everyday Life",
             "kind": "stage",
             "order": 3,
-            "due_date": "2026-04-10"
+            "due_date": "2026-04-19"
         },
         {
             "ref": "week3",
             "title": "3. Economy and Society",
             "kind": "stage",
             "order": 4,
-            "due_date": "2026-04-29"
+            "due_date": "2026-05-03"
         },
         {
             "ref": "week4",
             "title": "4. Policy, Religion and Inquisition",
             "kind": "stage",
             "order": 5,
-            "due_date": "2026-05-18"
+            "due_date": "2026-05-17"
         },
         {
             "ref": "week5",
             "title": "5. Literature",
             "kind": "stage",
             "order": 6,
-            "due_date": "2026-06-06"
+            "due_date": "2026-05-31"
         },
         {
             "ref": "week6",
             "title": "6. Fine Arts",
             "kind": "stage",
             "order": 7,
-            "due_date": "2026-06-25"
+            "due_date": "2026-06-14"
         },
         {
             "ref": "week7",
             "title": "7. Iconography of Don Quixote",
             "kind": "stage",
             "order": 8,
-            "due_date": "2026-07-13"
+            "due_date": "2026-06-28"
         },
         {
             "ref": "farewell",
             "title": "Farewell",
             "kind": "stage",
-            "order": 9
+            "order": 9,
+            "due_date": "2026-07-12"
         }
     ],
     "work_items": [
@@ -83,336 +86,384 @@
             "node_ref": "welcome",
             "title": "Introduction",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-03-22"
         },
         {
             "ref": "welcome_quixote_and_i",
             "node_ref": "welcome",
             "title": "Don Quixote and I",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-03-22"
         },
         {
             "ref": "welcome_syllabus",
             "node_ref": "welcome",
             "title": "Syllabus",
             "type": "review",
-            "planned_min": 15
+            "planned_min": 15,
+            "due_date": "2026-03-22"
         },
         {
             "ref": "week1_intro",
             "node_ref": "week1",
             "title": "Introduction",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-04-05"
         },
         {
             "ref": "week1_time",
             "node_ref": "week1",
             "title": "Time",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-04-05"
         },
         {
             "ref": "week1_space",
             "node_ref": "week1",
             "title": "Space",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-04-05"
         },
         {
             "ref": "week1_time_space_quixote",
             "node_ref": "week1",
             "title": "Time and Space in Don Quixote",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-04-05"
         },
         {
             "ref": "week1_eval",
             "node_ref": "week1",
             "title": "Evaluation Exercises (2 Questions)",
             "type": "assignment",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-04-05"
         },
         {
             "ref": "week1_exam",
             "node_ref": "week1",
             "title": "Weekly Exam",
             "type": "exam",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-04-05"
         },
         {
             "ref": "week2_intro",
             "node_ref": "week2",
             "title": "Introduction",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-04-19"
         },
         {
             "ref": "week2_private_life",
             "node_ref": "week2",
             "title": "Private Life",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-04-19"
         },
         {
             "ref": "week2_public_life",
             "node_ref": "week2",
             "title": "Public Life",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-04-19"
         },
         {
             "ref": "week2_everyday_quixote",
             "node_ref": "week2",
             "title": "Everyday Life in Don Quixote",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-04-19"
         },
         {
             "ref": "week2_eval",
             "node_ref": "week2",
             "title": "Evaluation Exercises (2 Questions)",
             "type": "assignment",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-04-19"
         },
         {
             "ref": "week2_exam",
             "node_ref": "week2",
             "title": "Weekly Exam",
             "type": "exam",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-04-19"
         },
         {
             "ref": "week3_intro",
             "node_ref": "week3",
             "title": "Introduction",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-05-03"
         },
         {
             "ref": "week3_economy",
             "node_ref": "week3",
             "title": "Economy",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-03"
         },
         {
             "ref": "week3_society",
             "node_ref": "week3",
             "title": "Society",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-03"
         },
         {
             "ref": "week3_society_quixote",
             "node_ref": "week3",
             "title": "Society in Don Quixote",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-05-03"
         },
         {
             "ref": "week3_eval",
             "node_ref": "week3",
             "title": "Evaluation Exercises (2 Questions)",
             "type": "assignment",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-05-03"
         },
         {
             "ref": "week3_exam",
             "node_ref": "week3",
             "title": "Weekly Exam",
             "type": "exam",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-03"
         },
         {
             "ref": "week4_intro",
             "node_ref": "week4",
             "title": "Introduction",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-05-17"
         },
         {
             "ref": "week4_policy",
             "node_ref": "week4",
             "title": "Policy",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-17"
         },
         {
             "ref": "week4_religion",
             "node_ref": "week4",
             "title": "Religion",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-17"
         },
         {
             "ref": "week4_inquisition",
             "node_ref": "week4",
             "title": "The Inquisition",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-17"
         },
         {
             "ref": "week4_policy_quixote",
             "node_ref": "week4",
             "title": "Policy in Don Quixote",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-05-17"
         },
         {
             "ref": "week4_eval",
             "node_ref": "week4",
             "title": "Evaluation Exercises (3 Questions)",
             "type": "assignment",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-17"
         },
         {
             "ref": "week4_exam",
             "node_ref": "week4",
             "title": "Weekly Exam",
             "type": "exam",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-17"
         },
         {
             "ref": "week5_intro",
             "node_ref": "week5",
             "title": "Introduction",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-05-31"
         },
         {
             "ref": "week5_authors",
             "node_ref": "week5",
             "title": "Authors",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-31"
         },
         {
             "ref": "week5_drama",
             "node_ref": "week5",
             "title": "Drama",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-31"
         },
         {
             "ref": "week5_literature_quixote",
             "node_ref": "week5",
             "title": "Literature in Don Quixote",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-05-31"
         },
         {
             "ref": "week5_eval",
             "node_ref": "week5",
             "title": "Evaluation Exercises (3 Questions)",
             "type": "assignment",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-31"
         },
         {
             "ref": "week5_exam",
             "node_ref": "week5",
             "title": "Weekly Exam",
             "type": "exam",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-05-31"
         },
         {
             "ref": "week6_intro",
             "node_ref": "week6",
             "title": "Introduction",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-06-14"
         },
         {
             "ref": "week6_architecture",
             "node_ref": "week6",
             "title": "Architecture",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-06-14"
         },
         {
             "ref": "week6_painting",
             "node_ref": "week6",
             "title": "Painting",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-06-14"
         },
         {
             "ref": "week6_music",
             "node_ref": "week6",
             "title": "Music",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-06-14"
         },
         {
             "ref": "week6_fine_arts_quixote",
             "node_ref": "week6",
             "title": "Fine Arts in Don Quixote",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-06-14"
         },
         {
             "ref": "week6_eval",
             "node_ref": "week6",
             "title": "Evaluation Exercises (3 Questions)",
             "type": "assignment",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-06-14"
         },
         {
             "ref": "week6_exam",
             "node_ref": "week6",
             "title": "Weekly Exam",
             "type": "exam",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-06-14"
         },
         {
             "ref": "week7_intro",
             "node_ref": "week7",
             "title": "Introduction",
             "type": "lesson",
-            "planned_min": 30
+            "planned_min": 30,
+            "due_date": "2026-06-28"
         },
         {
             "ref": "week7_iconography",
             "node_ref": "week7",
             "title": "Iconography of Don Quixote",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-06-28"
         },
         {
             "ref": "week7_national_adaptations",
             "node_ref": "week7",
             "title": "National Adaptations",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-06-28"
         },
         {
             "ref": "week7_film",
             "node_ref": "week7",
             "title": "Cervantes, Don Quixote and The Golden Age on Film",
             "type": "lesson",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-06-28"
         },
         {
             "ref": "week7_eval",
             "node_ref": "week7",
             "title": "Evaluation Exercises (3 Questions)",
             "type": "assignment",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-06-28"
         },
         {
             "ref": "week7_exam",
             "node_ref": "week7",
             "title": "Weekly Exam",
             "type": "exam",
-            "planned_min": 45
+            "planned_min": 45,
+            "due_date": "2026-06-28"
         },
         {
             "ref": "farewell_unit",
             "node_ref": "farewell",
             "title": "Farewell",
             "type": "lesson",
-            "planned_min": 15
+            "planned_min": 15,
+            "due_date": "2026-07-12"
         }
     ]
 }

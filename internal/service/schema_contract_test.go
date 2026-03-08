@@ -211,7 +211,7 @@ func assertWhatNowRecommends(
 ) {
 	t.Helper()
 
-	whatNowSvc := NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo)
+	whatNowSvc := NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo, nil)
 	now := time.Now().UTC()
 	req := contract.NewWhatNowRequest(90)
 	req.Now = &now

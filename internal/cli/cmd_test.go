@@ -37,7 +37,7 @@ func testApp(t *testing.T) *App {
 		Sessions:  service.NewSessionService(sessRepo, uow),
 		Workouts:  service.NewWorkoutService(workoutRepo),
 		Chart:     service.NewChartService(sessRepo, workoutRepo),
-		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo),
+		WhatNow:   service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo, nil),
 		Status:    service.NewStatusService(projRepo, wiRepo, sessRepo, profRepo),
 		Replan:    service.NewReplanService(projRepo, wiRepo, sessRepo, profRepo, uow),
 		// Templates and Import left nil — not tested here.
@@ -116,7 +116,7 @@ func testAppFull(t *testing.T) *App {
 		Nodes:         service.NewNodeService(nodeRepo, uow),
 		WorkItems:     service.NewWorkItemService(wiRepo, nodeRepo, uow),
 		Sessions:      sessionSvc,
-		WhatNow:       service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo),
+		WhatNow:       service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo, nil),
 		Status:        service.NewStatusService(projRepo, wiRepo, sessRepo, profRepo),
 		Replan:        service.NewReplanService(projRepo, wiRepo, sessRepo, profRepo, uow),
 		Templates:     templateSvc,

@@ -57,7 +57,7 @@ func TestDependencyBlocked_ChainABC(t *testing.T) {
 		SuccessorWorkItemID:   wiC.ID,
 	}))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 	req.ProjectScope = []string{proj.ID}
@@ -150,7 +150,7 @@ func TestDependencyBlocked_SkippedPredecessorUnblocks(t *testing.T) {
 		SuccessorWorkItemID:   wiB.ID,
 	}))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 	req.ProjectScope = []string{proj.ID}
@@ -213,7 +213,7 @@ func TestDependencyBlocked_DiamondDependency(t *testing.T) {
 		}))
 	}
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 	req.ProjectScope = []string{proj.ID}

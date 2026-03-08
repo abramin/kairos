@@ -39,6 +39,12 @@ type WorkSlice struct {
 	RiskLevel         domain.RiskLevel
 	Score             float64
 	Reasons           []RecommendationReason
+
+	// Habit-specific fields (zero/false for regular work items)
+	IsHabit      bool
+	HabitID      string
+	CadenceDays  int
+	DaysSinceLog int // 9999 if never logged
 }
 
 type RiskSummary struct {

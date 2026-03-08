@@ -122,6 +122,41 @@ type AddTaskRequest struct {
 	Description string
 }
 
+// AddHabitRequest holds parameters for creating a new habit.
+type AddHabitRequest struct {
+	Title         string
+	CadenceDays   int
+	TargetMin     int
+	MinSessionMin int
+	MaxSessionMin int
+}
+
+// LogHabitRequest holds parameters for logging a habit session.
+type LogHabitRequest struct {
+	HabitID string
+	Minutes int    // 0 = use habit's target_min
+	Note    string
+}
+
+// HabitStatus is a computed view of a habit's current state.
+type HabitStatus struct {
+	Habit        *domain.Habit
+	LastLog      *domain.HabitLog
+	DaysSinceLog int  // 9999 if never logged
+	DaysUntilDue int  // negative means overdue
+	DueToday     bool
+}
+
+// HabitService manages recurring habits.
+type HabitService interface {
+	Add(ctx context.Context, req AddHabitRequest) (*domain.Habit, error)
+	ListActive(ctx context.Context) ([]*domain.Habit, error)
+	GetStatus(ctx context.Context, now time.Time) ([]HabitStatus, error)
+	GetByID(ctx context.Context, id string) (*domain.Habit, error)
+	Archive(ctx context.Context, id string) error
+	LogSession(ctx context.Context, req LogHabitRequest) (*domain.HabitLog, error)
+}
+
 // TaskService manages the global standalone task checklist.
 type TaskService interface {
 	Add(ctx context.Context, req AddTaskRequest) (*domain.Task, error)

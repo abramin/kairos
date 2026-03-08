@@ -53,7 +53,7 @@ func TestArchiveProject_ExcludesFromScheduling(t *testing.T) {
 	}
 
 	// WhatNow should not recommend archived project items.
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 
@@ -150,7 +150,7 @@ func TestArchiveProject_UnarchiveRestoresScheduling(t *testing.T) {
 	assert.Len(t, candidates, 1, "item should reappear after unarchive")
 
 	// Verify WhatNow works.
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 	resp, err := whatNowSvc.Recommend(ctx, req)
@@ -319,7 +319,7 @@ func TestArchiveWorkItem_ExcludesFromSchedulingOnly(t *testing.T) {
 	assert.Equal(t, wiActive.ID, candidates[0].WorkItem.ID)
 
 	// WhatNow should only recommend the surviving item.
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 	resp, err := whatNowSvc.Recommend(ctx, req)

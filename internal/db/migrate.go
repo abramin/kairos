@@ -277,6 +277,30 @@ var migrations = []string{
 		updated_at  TEXT NOT NULL
 	)`,
 	`CREATE INDEX IF NOT EXISTS idx_tasks_order ON tasks(order_index) WHERE archived_at IS NULL`,
+
+	// Habits: open-ended recurring activities (not project-scoped)
+	`CREATE TABLE IF NOT EXISTS habits (
+		id              TEXT PRIMARY KEY,
+		title           TEXT NOT NULL,
+		cadence_days    INTEGER NOT NULL DEFAULT 1,
+		target_min      INTEGER NOT NULL DEFAULT 20,
+		min_session_min INTEGER NOT NULL DEFAULT 10,
+		max_session_min INTEGER NOT NULL DEFAULT 30,
+		archived_at     TEXT,
+		created_at      TEXT NOT NULL,
+		updated_at      TEXT NOT NULL
+	)`,
+
+	`CREATE TABLE IF NOT EXISTS habit_logs (
+		id           TEXT PRIMARY KEY,
+		habit_id     TEXT NOT NULL REFERENCES habits(id),
+		performed_at TEXT NOT NULL,
+		minutes      INTEGER NOT NULL CHECK (minutes > 0),
+		note         TEXT NOT NULL DEFAULT '',
+		created_at   TEXT NOT NULL
+	)`,
+	`CREATE INDEX IF NOT EXISTS idx_habit_logs_habit ON habit_logs(habit_id)`,
+	`CREATE INDEX IF NOT EXISTS idx_habit_logs_performed ON habit_logs(performed_at)`,
 }
 
 // migrateBackfillSeq assigns sequential IDs to existing nodes and work items

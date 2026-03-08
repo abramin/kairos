@@ -49,7 +49,7 @@ func TestE2E_WhatNow_AllBlockerStates(t *testing.T) {
 		require.NoError(t, workItems.Create(ctx, item))
 
 		// Request what-now
-		svc := NewWhatNowService(workItems, sessions, deps, profiles)
+		svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 		req := contract.NewWhatNowRequest(60)
 		req.Now = &now
 
@@ -103,7 +103,7 @@ func TestE2E_WhatNow_AllBlockerStates(t *testing.T) {
 		require.NoError(t, deps.Create(ctx, dep))
 
 		// Request what-now (predecessor not done yet)
-		svc := NewWhatNowService(workItems, sessions, deps, profiles)
+		svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 		req := contract.NewWhatNowRequest(120)
 		req.Now = &now
 
@@ -170,7 +170,7 @@ func TestE2E_WhatNow_AllBlockerStates(t *testing.T) {
 		require.NoError(t, workItems.Create(ctx, normalItem))
 
 		// Request what-now (should enter critical mode)
-		svc := NewWhatNowService(workItems, sessions, deps, profiles)
+		svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 		req := contract.NewWhatNowRequest(120)
 		req.Now = &now
 
@@ -223,7 +223,7 @@ func TestE2E_WhatNow_AllBlockerStates(t *testing.T) {
 		require.NoError(t, freshWorkItems.Create(freshCtx, item))
 
 		// Request what-now with only 30 min available (less than min_session_min=60)
-		svc := NewWhatNowService(freshWorkItems, freshSessions, freshDeps, freshProfiles)
+		svc := NewWhatNowService(freshWorkItems, freshSessions, freshDeps, freshProfiles, nil)
 		req := contract.NewWhatNowRequest(30)
 		req.Now = &now
 
@@ -267,7 +267,7 @@ func TestE2E_WhatNow_AllBlockerStates(t *testing.T) {
 		require.NoError(t, workItems.Create(ctx, item))
 
 		// Request what-now
-		svc := NewWhatNowService(workItems, sessions, deps, profiles)
+		svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 		req := contract.NewWhatNowRequest(60)
 		req.Now = &now
 

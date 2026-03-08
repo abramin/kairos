@@ -41,7 +41,7 @@ func TestSessionCompletion_ExcludesFromWhatNow(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wiRemaining))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	sessionSvc := NewSessionService(sessions, uow)
 
 	// Step 1: Both items should be schedulable.
@@ -122,7 +122,7 @@ func TestSessionCompletion_FullLifecycle(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wi))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	sessionSvc := NewSessionService(sessions, uow)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now

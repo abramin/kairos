@@ -72,7 +72,7 @@ func TestPersona_GradStudent_MixedCompletion(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wiC))
 	// No sessions for C — zero activity.
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	sessionSvc := NewSessionService(sessions, uow)
 
 	// === Phase 1: Initial query — C should trigger critical mode ===
@@ -243,7 +243,7 @@ func TestPersona_Freelancer_DeadlineCrunch(t *testing.T) {
 	sessD := testutil.NewTestSession(wiD.ID, 20, testutil.WithStartedAt(now.Add(-48*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sessD))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	sessionSvc := NewSessionService(sessions, uow)
 
 	// === Phase 1: Initial query — A and B are urgent, should drive mode ===
@@ -448,7 +448,7 @@ func TestPersona_FreshStart_AllNewProjects(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, resultC.WorkItemCount)
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	sessionSvc := NewSessionService(sessions, uow)
 
 	// === Phase 1: First-ever query — zero sessions everywhere ===
@@ -570,7 +570,7 @@ func TestPersona_NearlyDone_WindingDown(t *testing.T) {
 	sessC := testutil.NewTestSession(wiC.ID, 30, testutil.WithStartedAt(now.Add(-24*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sessC))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 
 	// === Phase 1: Initial query ===
 	req := contract.NewWhatNowRequest(60)
@@ -655,7 +655,7 @@ func TestPersona_SpacingEffect_AcrossDays(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wiB))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 
 	// === Day 0: Log session on A, query ===
 	day0 := now
@@ -746,7 +746,7 @@ func TestPersona_ProgressiveModeTransition(t *testing.T) {
 	sessB := testutil.NewTestSession(wiB.ID, 30, testutil.WithStartedAt(now.Add(-48*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sessB))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	sessionSvc := NewSessionService(sessions, uow)
 
 	// === Step 1: Initial query — should be critical (A has no sessions, due in 3 days) ===

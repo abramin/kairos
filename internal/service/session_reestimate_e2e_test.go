@@ -89,7 +89,7 @@ func TestSessionLogReEstimation_E2E(t *testing.T) {
 	originalPlannedMin := readingItem.PlannedMin
 
 	// === Step 2: What-now should recommend the project ===
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 	req.ProjectScope = []string{result.Project.ID}

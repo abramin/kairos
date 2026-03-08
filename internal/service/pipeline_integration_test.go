@@ -72,7 +72,7 @@ func TestDraftImportSchedulePipeline(t *testing.T) {
 	}, llm.NoopObserver{})
 
 	importSvc := NewImportService(uow)
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 
 	conv, err := draftSvc.Start(ctx, "Build a study plan for an upcoming exam.")
 	require.NoError(t, err)
@@ -173,7 +173,7 @@ func TestDraftImportSchedulePipeline_HTTPBoundary(t *testing.T) {
 
 	draftSvc := intelligence.NewProjectDraftService(llm.NewOllamaClient(cfg, llm.NoopObserver{}), llm.NoopObserver{})
 	importSvc := NewImportService(uow)
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 
 	conv, err := draftSvc.Start(ctx, "Build a study plan for an upcoming exam.")
 	require.NoError(t, err)
@@ -203,7 +203,7 @@ func TestTemplateInitSchedulePipeline(t *testing.T) {
 
 	templateDir := findTemplatesDir(t)
 	templateSvc := NewTemplateService(templateDir, uow)
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 
 	due := time.Now().UTC().AddDate(0, 2, 0).Format("2006-01-02")
 	proj, err := templateSvc.InitProject(ctx, "course_weekly_generic", "Template Pipeline", "TPL02", "2026-01-15", &due, map[string]string{

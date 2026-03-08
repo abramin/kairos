@@ -65,6 +65,7 @@ func run(args []string) error {
 	profileRepo := repository.NewSQLiteUserProfileRepo(database)
 	workoutRepo := repository.NewSQLiteWorkoutLogRepo(database)
 	taskRepo := repository.NewSQLiteTaskRepo(database)
+	habitRepo := repository.NewSQLiteHabitRepo(database)
 
 	// Wire unit of work for transactional operations
 	uow := db.NewSQLiteUnitOfWork(database)
@@ -89,8 +90,9 @@ func run(args []string) error {
 		Sessions:  sessionSvc,
 		Workouts:  workoutSvc,
 		Tasks:     service.NewTaskService(taskRepo),
+		Habits:    service.NewHabitService(habitRepo),
 		Chart:     chartSvc,
-		WhatNow:   service.NewWhatNowService(workItemRepo, sessionRepo, depRepo, profileRepo, useCaseObserver),
+		WhatNow:   service.NewWhatNowService(workItemRepo, sessionRepo, depRepo, profileRepo, habitRepo, useCaseObserver),
 		Status:    service.NewStatusService(projectRepo, workItemRepo, sessionRepo, profileRepo),
 		Replan:    service.NewReplanService(projectRepo, workItemRepo, sessionRepo, profileRepo, uow, useCaseObserver),
 		Templates: templateSvc,

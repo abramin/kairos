@@ -68,7 +68,7 @@ func TestDraftWizard_ImportSchema_ThenWhatNow_E2E(t *testing.T) {
 	assert.Equal(t, 6, result.WorkItemCount)
 
 	// Run what-now → verify items are schedulable.
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(90)
 
 	resp, err := whatNowSvc.Recommend(ctx, req)

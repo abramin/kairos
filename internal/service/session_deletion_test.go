@@ -199,7 +199,7 @@ func TestSessionDelete_ReplanConvergesAfterDeletion(t *testing.T) {
 
 	sessSvc := NewSessionService(sessRepo, uow)
 	replanSvc := NewReplanService(projRepo, wiRepo, sessRepo, profRepo, uow)
-	whatNowSvc := NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo)
+	whatNowSvc := NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo, nil)
 
 	// Log two sessions with units (triggers re-estimation each time).
 	sess1 := testutil.NewTestSession(wi.ID, 30, testutil.WithUnitsDelta(2))

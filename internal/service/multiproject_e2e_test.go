@@ -92,7 +92,7 @@ func TestE2E_MultiProjectWhatNow_FullPipeline(t *testing.T) {
 	require.NoError(t, err)
 
 	// === Phase 1: Critical mode — only project A recommended ===
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 
@@ -257,7 +257,7 @@ func TestE2E_WhatNow_AllocationInvariantsNeverViolated(t *testing.T) {
 			testutil.WithSessionBounds(15, 90, 45))
 		require.NoError(t, workItems.Create(ctx, wi))
 
-		svc := NewWhatNowService(workItems, sessions, deps, profiles)
+		svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 		req := contract.NewWhatNowRequest(60)
 		req.Now = &now
 
@@ -288,7 +288,7 @@ func TestE2E_WhatNow_AllocationInvariantsNeverViolated(t *testing.T) {
 			testutil.WithSessionBounds(60, 90, 75))
 		require.NoError(t, workItems.Create(ctx, wi))
 
-		svc := NewWhatNowService(workItems, sessions, deps, profiles)
+		svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 		req := contract.NewWhatNowRequest(30)
 		req.Now = &now
 
@@ -332,7 +332,7 @@ func TestE2E_WhatNow_AllocationInvariantsNeverViolated(t *testing.T) {
 		require.NoError(t, workItems.Create(ctx, wi1))
 		require.NoError(t, workItems.Create(ctx, wi2))
 
-		svc := NewWhatNowService(workItems, sessions, deps, profiles)
+		svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 		req := contract.NewWhatNowRequest(90)
 		req.Now = &now
 		req.EnforceVariation = true

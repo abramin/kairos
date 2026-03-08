@@ -125,6 +125,17 @@ type WorkoutLogRepo interface {
 	ListRecent(ctx context.Context, limit int) ([]domain.WorkoutLog, error)
 }
 
+// HabitRepo manages recurring habit persistence.
+type HabitRepo interface {
+	Create(ctx context.Context, h *domain.Habit) error
+	ListActive(ctx context.Context) ([]*domain.Habit, error)
+	GetByID(ctx context.Context, id string) (*domain.Habit, error)
+	Archive(ctx context.Context, id string, now time.Time) error
+	LogSession(ctx context.Context, log *domain.HabitLog) error
+	LastLog(ctx context.Context, habitID string) (*domain.HabitLog, error)
+	ListLogs(ctx context.Context, habitID string, limit int) ([]domain.HabitLog, error)
+}
+
 // TaskRepo manages global (non-project-scoped) task checklist persistence.
 type TaskRepo interface {
 	Create(ctx context.Context, t *domain.Task) error

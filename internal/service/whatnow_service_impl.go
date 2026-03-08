@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 type whatNowService struct {
 	loader   *ContextLoader
 	resolver *BlockResolver
+	habits   repository.HabitRepo
 	observer UseCaseObserver
 }
 
@@ -22,6 +24,7 @@ func NewWhatNowService(
 	sessions repository.SessionRepo,
 	deps repository.DependencyRepo,
 	profiles repository.UserProfileRepo,
+	habits repository.HabitRepo,
 	observers ...UseCaseObserver,
 ) WhatNowService {
 	return &whatNowService{
@@ -31,6 +34,7 @@ func NewWhatNowService(
 			profiles:  profiles,
 		},
 		resolver: &BlockResolver{deps: deps},
+		habits:   habits,
 		observer: useCaseObserverOrNoop(observers),
 	}
 }
@@ -85,8 +89,148 @@ func (s *whatNowService) Recommend(ctx context.Context, req app.WhatNowRequest) 
 	slices, allocBlockers := scheduler.AllocateSlices(scored, req.AvailableMin, maxSlices, req.EnforceVariation)
 	blockers = append(blockers, allocBlockers...)
 
+	// Merge habit suggestions inline (if habits repo is wired)
+	if s.habits != nil {
+		habitSlices, _ := scoreAndAllocateHabits(ctx, s.habits, rctx.Now, req.AvailableMin-totalAllocated(slices))
+		slices = mergeHabitSlices(slices, habitSlices, maxSlices)
+	}
+
 	resp = AssembleResponse(rctx.Now, mode, req.AvailableMin, slices, blockers, agg)
 	return resp, nil
+}
+
+// totalAllocated sums allocated minutes across all slices.
+func totalAllocated(slices []app.WorkSlice) int {
+	total := 0
+	for _, s := range slices {
+		total += s.AllocatedMin
+	}
+	return total
+}
+
+// scoreAndAllocateHabits loads active habits, scores them by cadence compliance,
+// and returns WorkSlice entries for any that are due. Habits already done today are excluded.
+func scoreAndAllocateHabits(ctx context.Context, repo repository.HabitRepo, now time.Time, remainingMin int) ([]app.WorkSlice, error) {
+	habits, err := repo.ListActive(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	today := truncateToDay(now)
+	var slices []app.WorkSlice
+
+	for _, h := range habits {
+		lastLog, err := repo.LastLog(ctx, h.ID)
+		if err != nil {
+			continue
+		}
+
+		daysSince := 9999
+		if lastLog != nil {
+			lastDay := truncateToDay(lastLog.PerformedAt)
+			daysSince = int(today.Sub(lastDay).Hours() / 24)
+		}
+
+		// Exclude habits already done today
+		if daysSince == 0 {
+			continue
+		}
+
+		daysUntilDue := h.CadenceDays - daysSince
+
+		// Only include habits that are due or due tomorrow
+		if daysUntilDue > 1 {
+			continue
+		}
+
+		// Score: more overdue = higher score
+		score := 8.0
+		if daysUntilDue <= 0 {
+			score = 20.0 + float64(-daysUntilDue)*5.0
+		}
+
+		// Build reason message
+		var reasonMsg string
+		switch {
+		case daysSince == 9999:
+			reasonMsg = "Never logged — start today!"
+		case daysUntilDue < 0:
+			reasonMsg = fmt.Sprintf("Overdue by %d day(s) (every %d days)", -daysUntilDue, h.CadenceDays)
+		case daysUntilDue == 0:
+			reasonMsg = fmt.Sprintf("Due today (every %d days)", h.CadenceDays)
+		default:
+			reasonMsg = fmt.Sprintf("Due tomorrow (every %d days)", h.CadenceDays)
+		}
+
+		minS := h.MinSessionMin
+		maxS := h.MaxSessionMin
+		target := h.TargetMin
+		if minS <= 0 {
+			minS = 5
+		}
+		if maxS <= 0 {
+			maxS = target + 10
+		}
+
+		if remainingMin < minS {
+			continue
+		}
+
+		upper := min(maxS, remainingMin)
+		allocated := clampInt(target, minS, upper)
+		if allocated <= 0 {
+			continue
+		}
+
+		slices = append(slices, app.WorkSlice{
+			HabitID:       h.ID,
+			IsHabit:       true,
+			Title:         h.Title,
+			AllocatedMin:  allocated,
+			MinSessionMin: minS,
+			MaxSessionMin: maxS,
+			DefaultSessionMin: target,
+			Score:         score,
+			CadenceDays:   h.CadenceDays,
+			DaysSinceLog:  daysSince,
+			Reasons: []app.RecommendationReason{
+				{Code: "HABIT_CADENCE", Message: reasonMsg},
+			},
+		})
+		remainingMin -= allocated
+	}
+
+	return slices, nil
+}
+
+// mergeHabitSlices inserts habit slices into the recommendation list sorted by score,
+// respecting the maxSlices cap. Habits compete on score with work items.
+func mergeHabitSlices(workSlices, habitSlices []app.WorkSlice, maxSlices int) []app.WorkSlice {
+	combined := make([]app.WorkSlice, 0, len(workSlices)+len(habitSlices))
+	combined = append(combined, workSlices...)
+	combined = append(combined, habitSlices...)
+
+	// Stable sort by score descending, habits treated equally to work items
+	for i := 1; i < len(combined); i++ {
+		for j := i; j > 0 && combined[j].Score > combined[j-1].Score; j-- {
+			combined[j], combined[j-1] = combined[j-1], combined[j]
+		}
+	}
+
+	if len(combined) > maxSlices {
+		combined = combined[:maxSlices]
+	}
+	return combined
+}
+
+func clampInt(val, lo, hi int) int {
+	if val < lo {
+		return lo
+	}
+	if val > hi {
+		return hi
+	}
+	return val
 }
 
 // --- Internal types and helpers used by ComputeAggregates ---

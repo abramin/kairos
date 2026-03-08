@@ -49,7 +49,7 @@ func TestMultiProject_ThreeProjectsMixedRisk_VariationEnforced(t *testing.T) {
 		testutil.WithPlannedMin(100), testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, workItems.Create(ctx, wiC))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 
 	// Phase 1: Critical mode — only project A should be recommended.
 	req := contract.NewWhatNowRequest(120)
@@ -121,7 +121,7 @@ func TestMultiProject_AllOnTrack_VariationDistributesWork(t *testing.T) {
 		require.NoError(t, sessions.Create(ctx, sess))
 	}
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(180) // 3 hours = plenty of time
 	req.Now = &now
 	req.EnforceVariation = true
@@ -178,7 +178,7 @@ func TestMultiProject_DependenciesAcrossRiskLevels(t *testing.T) {
 		SuccessorWorkItemID:   wiDependent.ID,
 	}))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 

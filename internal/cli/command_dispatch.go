@@ -81,6 +81,10 @@ func (c *commandBar) executeCommand(input string) tea.Cmd {
 		return outputCmd(formatter.FormatShellHelp())
 	case "tasks":
 		return pushView(newChecklistView(c.state))
+	case "habits":
+		return c.cmdHabits(args)
+	case "log-habit":
+		return c.cmdLogHabit(args)
 	case "clear":
 		return nil
 	case "exit", "quit":

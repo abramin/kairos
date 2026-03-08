@@ -35,7 +35,7 @@ func TestWhatNow_AllItemsBlocked_SessionMinExceedsAvail(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wi))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 
 	// Only 20 minutes available — less than min_session_min of 45.
 	req := contract.NewWhatNowRequest(20)
@@ -74,7 +74,7 @@ func TestWhatNow_AllItemsDone_NoCandidates(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wi))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -116,7 +116,7 @@ func TestWhatNow_MixedBlockedAndSchedulable(t *testing.T) {
 	)
 	require.NoError(t, workItems.Create(ctx, wiFits))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(30)
 	req.Now = &now
 
@@ -178,7 +178,7 @@ func TestWhatNow_DependencyBlocked(t *testing.T) {
 	}
 	require.NoError(t, deps.Create(ctx, dep))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 

@@ -436,7 +436,7 @@ func TestDraftWizard_FullPipeline(t *testing.T) {
 	assert.Equal(t, 7, importResult.WorkItemCount) // 3*2 regular + 1 exam prep
 
 	// Step 5: Verify items are schedulable via what-now.
-	whatNowSvc := service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo)
+	whatNowSvc := service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo, nil)
 	req := contract.NewWhatNowRequest(120)
 	resp, err := whatNowSvc.Recommend(ctx, req)
 	require.NoError(t, err)

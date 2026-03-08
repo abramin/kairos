@@ -53,7 +53,7 @@ func TestFullUserJourney_CreatePopulateScheduleLogReplan(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wiRead2))
 
 	// === Step 4: What-now recommendation ===
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 

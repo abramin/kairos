@@ -58,7 +58,7 @@ func TestImportWithDependencies_SchedulerRespectsDeps(t *testing.T) {
 	assert.Equal(t, 2, result.DependencyCount)
 
 	// Schedule: w2 and w3 should be dependency-blocked
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	now := time.Now().UTC()
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now

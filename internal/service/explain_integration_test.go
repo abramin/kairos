@@ -43,7 +43,7 @@ func TestExplainIntegration_RealTrace_DeterministicExplainNow(t *testing.T) {
 	require.NoError(t, workItems.Create(ctx, wi2))
 
 	// Step 1: Run what-now to get a real response.
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(60)
 	req.Now = &now
 
@@ -135,7 +135,7 @@ func TestExplainIntegration_WhyNot_BlockedByDependency(t *testing.T) {
 	}))
 
 	// Run what-now — dependent should be blocked.
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(120)
 	req.Now = &now
 

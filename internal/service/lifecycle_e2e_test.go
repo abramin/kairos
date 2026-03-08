@@ -37,7 +37,7 @@ func TestReplan_ThenRecommend_ReEstimationAffectsAllocation(t *testing.T) {
 		testutil.WithSessionBounds(15, 60, 30))
 	require.NoError(t, workItems.Create(ctx, wi))
 
-	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles)
+	whatNowSvc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	sessionSvc := NewSessionService(sessions, uow)
 	replanSvc := NewReplanService(projects, workItems, sessions, profiles, uow)
 
@@ -136,7 +136,7 @@ func TestStartFinish_ChangesNextRecommendation(t *testing.T) {
 		testutil.WithStartedAt(now.Add(-48*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sessA))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(90)
 	req.Now = &now
 
@@ -246,7 +246,7 @@ func TestStartFinish_MultiProject_ShiftsPriority(t *testing.T) {
 		testutil.WithStartedAt(now.Add(-48*time.Hour)))
 	require.NoError(t, sessions.Create(ctx, sessB))
 
-	svc := NewWhatNowService(workItems, sessions, deps, profiles)
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
 	req := contract.NewWhatNowRequest(90)
 	req.Now = &now
 

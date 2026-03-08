@@ -282,6 +282,32 @@ func wizardSelectWorkoutCategory(result *string) *huh.Form {
 	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
 }
 
+// wizardHabitAdd creates a huh form for adding a new habit.
+// title, cadenceDaysStr, targetMinStr are set on completion.
+func wizardHabitAdd(title, cadenceDaysStr, targetMinStr *string) *huh.Form {
+	*cadenceDaysStr = "1"
+	*targetMinStr = "20"
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Habit Name").
+				Description("e.g. French Novel Reading").
+				Placeholder("Enter habit title").
+				Value(title),
+			huh.NewInput().
+				Title("Cadence (days)").
+				Description("How many days between sessions? 1=daily, 7=weekly").
+				Placeholder("1").
+				Value(cadenceDaysStr),
+			huh.NewInput().
+				Title("Target Duration (minutes)").
+				Description("Desired session length in minutes").
+				Placeholder("20").
+				Value(targetMinStr),
+		),
+	).WithTheme(kairosHuhTheme()).WithShowHelp(false)
+}
+
 // wizardConfirm creates a huh form for a yes/no confirmation.
 func wizardConfirm(title string, result *bool) *huh.Form {
 	return huh.NewForm(
