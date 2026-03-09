@@ -14,8 +14,13 @@ const (
 	ReasonBoundsApplied     RecommendationReasonCode = "BOUNDS_APPLIED"
 	ReasonDependencyBlocked RecommendationReasonCode = "DEPENDENCY_BLOCKED"
 	ReasonOnTrackSafeMix    RecommendationReasonCode = "ON_TRACK_SAFE_MIX"
-	ReasonCriticalFocus     RecommendationReasonCode = "CRITICAL_FOCUS"
-	ReasonMomentum          RecommendationReasonCode = "MOMENTUM"
+	ReasonCriticalFocus            RecommendationReasonCode = "CRITICAL_FOCUS"
+	ReasonMomentum                 RecommendationReasonCode = "MOMENTUM"
+	ReasonHabitDue                 RecommendationReasonCode = "HABIT_DUE"
+	ReasonHabitOverdue             RecommendationReasonCode = "HABIT_OVERDUE"
+	ReasonHabitApproaching         RecommendationReasonCode = "HABIT_APPROACHING"
+	ReasonDomainVariationBonus     RecommendationReasonCode = "DOMAIN_VARIATION_BONUS"
+	ReasonDomainVariationPenalty   RecommendationReasonCode = "DOMAIN_VARIATION_PENALTY"
 )
 
 type RecommendationReason struct {

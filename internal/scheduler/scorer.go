@@ -1,6 +1,7 @@
 package scheduler
 
 import (
+	"math"
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/app"
@@ -49,6 +50,16 @@ type ScoringInput struct {
 	PlannedMin        int
 	LoggedMin         int
 	NodeID            string
+
+	// Habit-specific fields (zero/false for regular work items)
+	IsHabit          bool
+	HabitID          string // clean habit ID (without "habit:" prefix)
+	HabitCadenceDays int
+	HabitDaysSince   int // days since last completion
+
+	// Domain fields for domain-aware variation
+	ProjectDomain      string
+	DomainSlicesInPlan int
 }
 
 type ScoredCandidate struct {
@@ -82,9 +93,11 @@ func ScoreWorkItem(input ScoringInput) ScoredCandidate {
 		scoreBehindPace,
 		scoreSpacing,
 		scoreVariation,
+		scoreDomainVariation,
 		scoreMomentum,
 		scoreCriticalBonus,
 		scoreSafeMix,
+		scoreHabitUrgency,
 	}
 	for _, f := range factors {
 		delta, reason := f(input)
@@ -158,12 +171,13 @@ func scoreSpacing(input ScoringInput) (float64, *app.RecommendationReason) {
 		delta = -10.0 * input.Weights.Spacing
 		code = app.ReasonSpacingBlocked
 		msg = "Already worked on this project today"
-	case daysAgo >= 1 && daysAgo <= 3:
-		delta = 5.0 * input.Weights.Spacing
+	case daysAgo <= 7:
+		// Logarithmic bonus: rewards 2-3 day gaps more than 1-day
+		delta = (3.0 + 2.0*math.Log2(float64(daysAgo))) * input.Weights.Spacing
 		code = app.ReasonSpacingOK
 		msg = "Good spacing since last session"
-	default: // > 3 days ago
-		delta = 3.0 * input.Weights.Spacing
+	default: // > 7 days ago
+		delta = 8.0 * input.Weights.Spacing
 		code = app.ReasonSpacingOK
 		msg = "Haven't worked on this recently"
 	}
@@ -225,6 +239,67 @@ func scoreSafeMix(input ScoringInput) (float64, *app.RecommendationReason) {
 			Code:        app.ReasonOnTrackSafeMix,
 			Message:     "Project is on track, safe to include",
 			WeightDelta: &zero,
+		}
+	}
+	return 0, nil
+}
+
+func scoreHabitUrgency(input ScoringInput) (float64, *app.RecommendationReason) {
+	if !input.IsHabit {
+		return 0, nil
+	}
+	// fraction: 0.0 = just done, 1.0 = due now, >1.0 = overdue
+	fraction := float64(input.HabitDaysSince) / float64(input.HabitCadenceDays)
+	if input.HabitCadenceDays <= 0 {
+		fraction = float64(input.HabitDaysSince) // treat as daily
+	}
+
+	var delta float64
+	var code app.RecommendationReasonCode
+	var msg string
+
+	switch {
+	case fraction >= 1.5:
+		delta = 50.0
+		code = app.ReasonHabitOverdue
+		msg = "Habit significantly overdue"
+	case fraction >= 1.0:
+		delta = 30.0
+		code = app.ReasonHabitDue
+		msg = "Habit due today"
+	case fraction >= 0.8:
+		delta = 15.0
+		code = app.ReasonHabitApproaching
+		msg = "Habit due soon"
+	default:
+		return 0, nil // not due yet
+	}
+
+	return delta, &app.RecommendationReason{
+		Code:        code,
+		Message:     msg,
+		WeightDelta: &delta,
+	}
+}
+
+func scoreDomainVariation(input ScoringInput) (float64, *app.RecommendationReason) {
+	if input.ProjectDomain == "" {
+		return 0, nil
+	}
+	switch {
+	case input.DomainSlicesInPlan == 0:
+		delta := 5.0 * input.Weights.Variation
+		return delta, &app.RecommendationReason{
+			Code:        app.ReasonDomainVariationBonus,
+			Message:     "Adds variety across domains",
+			WeightDelta: &delta,
+		}
+	case input.DomainSlicesInPlan >= 2:
+		delta := -3.0 * input.Weights.Variation * float64(input.DomainSlicesInPlan)
+		return delta, &app.RecommendationReason{
+			Code:        app.ReasonDomainVariationPenalty,
+			Message:     "Domain already well-represented in plan",
+			WeightDelta: &delta,
 		}
 	}
 	return 0, nil

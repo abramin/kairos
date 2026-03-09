@@ -59,8 +59,12 @@ func AllocateSlices(
 		if remaining <= 0 {
 			break
 		}
-		workLeft := c.Input.PlannedMin - c.Input.LoggedMin
-		ceiling := min(c.Input.MaxSessionMin, workLeft)
+		// Habits have no work-remaining concept; cap at MaxSessionMin
+		ceiling := c.Input.MaxSessionMin
+		if !c.Input.IsHabit {
+			workLeft := c.Input.PlannedMin - c.Input.LoggedMin
+			ceiling = min(c.Input.MaxSessionMin, workLeft)
+		}
 		headroom := ceiling - slices[i].AllocatedMin
 		if headroom > 0 {
 			extend := min(headroom, remaining)
@@ -107,20 +111,23 @@ func tryAllocate(c ScoredCandidate, remaining int) (*app.WorkSlice, *app.Constra
 	upper := min(maxS, remaining)
 	allocated := clamp(defS, minS, upper)
 
-	// No remaining work — item is fully logged
-	workRemaining := c.Input.PlannedMin - c.Input.LoggedMin
-	if c.Input.PlannedMin > 0 && workRemaining <= 0 {
-		return nil, &app.ConstraintBlocker{
-			EntityType: "work_item",
-			EntityID:   c.Input.WorkItemID,
-			Code:       app.BlockerWorkComplete,
-			Message:    "No remaining work to allocate",
+	// Habits have no PlannedMin/LoggedMin — skip work-remaining checks
+	if !c.Input.IsHabit {
+		// No remaining work — item is fully logged
+		workRemaining := c.Input.PlannedMin - c.Input.LoggedMin
+		if c.Input.PlannedMin > 0 && workRemaining <= 0 {
+			return nil, &app.ConstraintBlocker{
+				EntityType: "work_item",
+				EntityID:   c.Input.WorkItemID,
+				Code:       app.BlockerWorkComplete,
+				Message:    "No remaining work to allocate",
+			}
 		}
-	}
 
-	// Don't over-allocate past remaining planned work
-	if workRemaining > 0 && workRemaining < allocated {
-		allocated = clamp(workRemaining, minS, upper)
+		// Don't over-allocate past remaining planned work
+		if workRemaining > 0 && workRemaining < allocated {
+			allocated = clamp(workRemaining, minS, upper)
+		}
 	}
 
 	// Safety net: never emit a zero-minute slice
@@ -165,6 +172,10 @@ func tryAllocate(c ScoredCandidate, remaining int) (*app.WorkSlice, *app.Constra
 		RiskLevel:         c.Input.ProjectRisk,
 		Score:             c.Score,
 		Reasons:           reasons,
+		IsHabit:           c.Input.IsHabit,
+		HabitID:           c.Input.HabitID,
+		CadenceDays:       c.Input.HabitCadenceDays,
+		DaysSinceLog:      c.Input.HabitDaysSince,
 	}
 
 	return slice, nil

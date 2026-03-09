@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexanderramin/kairos/internal/contract"
+	"github.com/alexanderramin/kairos/internal/app"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -31,7 +31,7 @@ func TestAllocateSlices_SessionBoundsNeverViolated(t *testing.T) {
 				NodeID:            "n-1",
 			},
 			Score:   50.0,
-			Reasons: []contract.RecommendationReason{},
+			Reasons: []app.RecommendationReason{},
 		},
 	}
 
@@ -63,7 +63,7 @@ func TestAllocateSlices_InsufficientTimeBlocked(t *testing.T) {
 
 	assert.Empty(t, slices)
 	assert.NotEmpty(t, blockers)
-	assert.Equal(t, contract.BlockerSessionMinExceedsAvail, blockers[0].Code)
+	assert.Equal(t, app.BlockerSessionMinExceedsAvail, blockers[0].Code)
 }
 
 func TestAllocateSlices_VariationPrefersMultipleProjects(t *testing.T) {
@@ -239,7 +239,7 @@ func TestAllocateSlices_FullyLoggedItemBlocked(t *testing.T) {
 
 	assert.Empty(t, slices, "fully logged item should not be allocated")
 	require.Len(t, blockers, 1)
-	assert.Equal(t, contract.BlockerWorkComplete, blockers[0].Code)
+	assert.Equal(t, app.BlockerWorkComplete, blockers[0].Code)
 }
 
 func TestAllocateSlices_OverLoggedItemBlocked(t *testing.T) {
@@ -265,7 +265,128 @@ func TestAllocateSlices_OverLoggedItemBlocked(t *testing.T) {
 
 	assert.Empty(t, slices, "over-logged item should not be allocated")
 	require.Len(t, blockers, 1)
-	assert.Equal(t, contract.BlockerWorkComplete, blockers[0].Code)
+	assert.Equal(t, app.BlockerWorkComplete, blockers[0].Code)
+}
+
+func TestAllocateSlices_HabitNotBlockedWhenWorkComplete(t *testing.T) {
+	// A habit with PlannedMin == LoggedMin should still be allocated because
+	// IsHabit=true skips the work-complete blocker in tryAllocate.
+	candidates := []ScoredCandidate{
+		{
+			Input: ScoringInput{
+				WorkItemID:        "habit:h-1",
+				ProjectID:         "habit:h-1",
+				ProjectName:       "Exercise",
+				Title:             "Exercise",
+				MinSessionMin:     10,
+				MaxSessionMin:     30,
+				DefaultSessionMin: 20,
+				PlannedMin:        0, // habits have no planned work
+				LoggedMin:         0,
+				IsHabit:           true,
+				HabitID:           "h-1",
+				HabitCadenceDays:  1,
+				HabitDaysSince:    2,
+			},
+			Score: 50.0,
+		},
+	}
+
+	slices, blockers := AllocateSlices(candidates, 60, 3, false)
+
+	assert.Empty(t, blockers, "habit should not be blocked by work-complete check")
+	require.Len(t, slices, 1)
+	assert.Equal(t, "habit:h-1", slices[0].WorkItemID)
+	assert.True(t, slices[0].IsHabit)
+}
+
+func TestAllocateSlices_HabitCeilingUsesMaxSessionMin(t *testing.T) {
+	// A habit's ceiling is MaxSessionMin only — no PlannedMin-LoggedMin constraint.
+	// With 60 min available and MaxSessionMin=25, habit gets at most 25.
+	candidates := []ScoredCandidate{
+		{
+			Input: ScoringInput{
+				WorkItemID:        "habit:h-1",
+				ProjectID:         "habit:h-1",
+				ProjectName:       "Reading",
+				Title:             "Reading",
+				MinSessionMin:     10,
+				MaxSessionMin:     25,
+				DefaultSessionMin: 20,
+				PlannedMin:        0,
+				LoggedMin:         0,
+				IsHabit:           true,
+				HabitID:           "h-1",
+				HabitCadenceDays:  7,
+				HabitDaysSince:    7,
+			},
+			Score: 60.0,
+		},
+	}
+
+	slices, blockers := AllocateSlices(candidates, 60, 3, false)
+
+	assert.Empty(t, blockers)
+	require.Len(t, slices, 1)
+	assert.LessOrEqual(t, slices[0].AllocatedMin, 25, "habit allocation must not exceed MaxSessionMin")
+	assert.GreaterOrEqual(t, slices[0].AllocatedMin, 10, "habit allocation must meet MinSessionMin")
+}
+
+func TestAllocateSlices_RegularItemBlockedWhenWorkComplete(t *testing.T) {
+	// Confirms the work-complete check still fires for non-habits.
+	candidates := []ScoredCandidate{
+		{
+			Input: ScoringInput{
+				WorkItemID:        "wi-1",
+				ProjectID:         "p-1",
+				ProjectName:       "A",
+				Title:             "Done Task",
+				MinSessionMin:     15,
+				MaxSessionMin:     60,
+				DefaultSessionMin: 30,
+				PlannedMin:        60,
+				LoggedMin:         60,
+				IsHabit:           false,
+			},
+			Score: 80.0,
+		},
+	}
+
+	slices, blockers := AllocateSlices(candidates, 60, 3, false)
+
+	assert.Empty(t, slices)
+	require.Len(t, blockers, 1)
+	assert.Equal(t, app.BlockerWorkComplete, blockers[0].Code)
+}
+
+func TestAllocateSlices_HabitSliceHasHabitFields(t *testing.T) {
+	// Verify WorkSlice output carries IsHabit, HabitID, CadenceDays, DaysSinceLog.
+	candidates := []ScoredCandidate{
+		{
+			Input: ScoringInput{
+				WorkItemID:        "habit:h-99",
+				ProjectID:         "habit:h-99",
+				ProjectName:       "Meditation",
+				Title:             "Meditation",
+				MinSessionMin:     10,
+				MaxSessionMin:     30,
+				DefaultSessionMin: 20,
+				IsHabit:           true,
+				HabitID:           "h-99",
+				HabitCadenceDays:  1,
+				HabitDaysSince:    3,
+			},
+			Score: 50.0,
+		},
+	}
+
+	slices, _ := AllocateSlices(candidates, 60, 3, false)
+
+	require.Len(t, slices, 1)
+	assert.True(t, slices[0].IsHabit)
+	assert.Equal(t, "h-99", slices[0].HabitID)
+	assert.Equal(t, 1, slices[0].CadenceDays)
+	assert.Equal(t, 3, slices[0].DaysSinceLog)
 }
 
 func TestAllocateSlices_ExtensionMultipleProjects(t *testing.T) {

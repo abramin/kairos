@@ -101,15 +101,7 @@ func (cl *ContextLoader) Load(ctx context.Context, req app.WhatNowRequest) (*Rec
 func ComputeAggregates(rctx *RecommendationContext) ProjectAggregates {
 	agg, idx := buildProjectIndex(rctx.Candidates, rctx.CompletedSummaries, rctx.RecentSessions, rctx.Now)
 	computeProjectRisks(&agg, idx, rctx.Now, rctx.BufferPct, rctx.BaselineDailyMin)
-	return ProjectAggregates{
-		Risks:      agg.risks,
-		Names:      agg.names,
-		Planned:    agg.planned,
-		Logged:     agg.logged,
-		RecentMin:  agg.recentMin,
-		TargetDate: agg.targetDate,
-		StartDate:  agg.startDate,
-	}
+	return agg
 }
 
 // DetermineMode returns Critical if any project has critical risk, otherwise Balanced.
@@ -226,6 +218,7 @@ func ScoreCandidates(
 			PlannedMin:          c.WorkItem.PlannedMin,
 			LoggedMin:           c.WorkItem.LoggedMin,
 			NodeID:              c.WorkItem.NodeID,
+			ProjectDomain:       c.ProjectDomain,
 		}
 
 		// Normalize session policy for items created before defaults were enforced.
@@ -263,6 +256,7 @@ func AssembleResponse(
 	agg ProjectAggregates,
 ) *app.WhatNowResponse {
 	var riskSummaries []app.RiskSummary
+	var policyMessages []string
 	for pid, risk := range agg.Risks {
 		var dueDateStr *string
 		if agg.TargetDate[pid] != nil {
@@ -284,18 +278,14 @@ func AssembleResponse(
 			SlackMinPerDay:    risk.SlackMinPerDay,
 			ProgressTimePct:   risk.ProgressTimePct,
 		})
+		if risk.Level == domain.RiskOnTrack {
+			policyMessages = append(policyMessages, fmt.Sprintf("%s is on track, secondary work is safe", agg.Names[pid]))
+		}
 	}
 
 	allocatedMin := 0
 	for _, sl := range slices {
 		allocatedMin += sl.AllocatedMin
-	}
-
-	var policyMessages []string
-	for pid, risk := range agg.Risks {
-		if risk.Level == domain.RiskOnTrack {
-			policyMessages = append(policyMessages, fmt.Sprintf("%s is on track, secondary work is safe", agg.Names[pid]))
-		}
 	}
 
 	return &app.WhatNowResponse{

@@ -34,6 +34,49 @@ func setupRepos(t *testing.T) (
 		testutil.NewTestUoW(database)
 }
 
+// habitRepoSetup returns all repos needed for habit-flavoured what-now tests.
+// The WhatNow service requires at least one schedulable work item; callers are
+// responsible for seeding one via the returned project/node/workItem repos.
+type habitRepoBundle struct {
+	projects  repository.ProjectRepo
+	nodes     repository.PlanNodeRepo
+	workItems repository.WorkItemRepo
+	sessions  repository.SessionRepo
+	deps      repository.DependencyRepo
+	profiles  repository.UserProfileRepo
+	habits    repository.HabitRepo
+}
+
+func setupReposWithHabits(t *testing.T) habitRepoBundle {
+	t.Helper()
+	database := testutil.NewTestDB(t)
+	return habitRepoBundle{
+		projects:  repository.NewSQLiteProjectRepo(database),
+		nodes:     repository.NewSQLitePlanNodeRepo(database),
+		workItems: repository.NewSQLiteWorkItemRepo(database),
+		sessions:  repository.NewSQLiteSessionRepo(database),
+		deps:      repository.NewSQLiteDependencyRepo(database),
+		profiles:  repository.NewSQLiteUserProfileRepo(database),
+		habits:    repository.NewSQLiteHabitRepo(database),
+	}
+}
+
+// seedMinimalWorkItem seeds the minimum scaffolding so the WhatNow loader
+// does not return NO_CANDIDATES. Returns the created work item.
+func seedMinimalWorkItem(t *testing.T, b habitRepoBundle) {
+	t.Helper()
+	ctx := context.Background()
+	proj := testutil.NewTestProject("Scaffold")
+	require.NoError(t, b.projects.Create(ctx, proj))
+	node := testutil.NewTestNode(proj.ID, "Node")
+	require.NoError(t, b.nodes.Create(ctx, node))
+	wi := testutil.NewTestWorkItem(node.ID, "Background task",
+		testutil.WithPlannedMin(120),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, b.workItems.Create(ctx, wi))
+}
+
 func TestWhatNow_CriticalDeadline_OnlyCriticalRecommended(t *testing.T) {
 	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
 	ctx := context.Background()
@@ -490,4 +533,95 @@ func TestWhatNow_UserProfileWeightsAffectOrdering(t *testing.T) {
 	// The key assertion: changing weights should change which project ranks first.
 	assert.NotEqual(t, firstProjectID1, firstProjectID2,
 		"changing scoring weights should change recommendation ordering")
+}
+
+// TestWhatNow_HabitAppearsInRecommendations verifies that an overdue habit is
+// promoted as a first-class scoring candidate and included in the result.
+func TestWhatNow_HabitAppearsInRecommendations(t *testing.T) {
+	b := setupReposWithHabits(t)
+	seedMinimalWorkItem(t, b)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	// Seed a habit that was never logged (treated as overdue)
+	h, err := NewHabitService(b.habits).Add(ctx, AddHabitRequest{
+		Title:         "Daily Exercise",
+		CadenceDays:   1,
+		TargetMin:     20,
+		MinSessionMin: 10,
+		MaxSessionMin: 30,
+	})
+	require.NoError(t, err)
+
+	svc := NewWhatNowService(b.workItems, b.sessions, b.deps, b.profiles, b.habits)
+	req := contract.NewWhatNowRequest(60)
+	req.Now = &now
+
+	resp, err := svc.Recommend(ctx, req)
+	require.NoError(t, err)
+
+	found := false
+	for _, rec := range resp.Recommendations {
+		if rec.IsHabit {
+			found = true
+			assert.Equal(t, "Daily Exercise", rec.Title)
+			assert.Equal(t, h.ID, rec.HabitID)
+			break
+		}
+	}
+	assert.True(t, found, "overdue habit should appear in recommendations")
+}
+
+// TestWhatNow_HabitExcludedWhenDoneToday verifies that a habit completed today
+// is suppressed from recommendations (daysSince == 0).
+func TestWhatNow_HabitExcludedWhenDoneToday(t *testing.T) {
+	b := setupReposWithHabits(t)
+	seedMinimalWorkItem(t, b)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	habitSvc := NewHabitService(b.habits)
+	h, err := habitSvc.Add(ctx, AddHabitRequest{
+		Title: "Morning routine", CadenceDays: 1, TargetMin: 15,
+	})
+	require.NoError(t, err)
+	_, err = habitSvc.LogSession(ctx, LogHabitRequest{HabitID: h.ID, Minutes: 15})
+	require.NoError(t, err)
+
+	svc := NewWhatNowService(b.workItems, b.sessions, b.deps, b.profiles, b.habits)
+	req := contract.NewWhatNowRequest(60)
+	req.Now = &now
+
+	resp, err := svc.Recommend(ctx, req)
+	require.NoError(t, err)
+
+	for _, rec := range resp.Recommendations {
+		assert.False(t, rec.IsHabit, "habit done today should not appear in recommendations")
+	}
+}
+
+// TestWhatNow_NilHabitRepo verifies that passing nil habits repo does not panic.
+func TestWhatNow_NilHabitRepo(t *testing.T) {
+	projects, nodes, workItems, deps, sessions, profiles, _ := setupRepos(t)
+	ctx := context.Background()
+	now := time.Now().UTC()
+
+	// Seed a work item so the loader has something to process.
+	proj := testutil.NewTestProject("Scaffold")
+	require.NoError(t, projects.Create(ctx, proj))
+	node := testutil.NewTestNode(proj.ID, "Node")
+	require.NoError(t, nodes.Create(ctx, node))
+	wi := testutil.NewTestWorkItem(node.ID, "Task",
+		testutil.WithPlannedMin(60),
+		testutil.WithSessionBounds(15, 60, 30),
+	)
+	require.NoError(t, workItems.Create(ctx, wi))
+
+	svc := NewWhatNowService(workItems, sessions, deps, profiles, nil)
+	req := contract.NewWhatNowRequest(60)
+	req.Now = &now
+
+	resp, err := svc.Recommend(ctx, req)
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
 }

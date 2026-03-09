@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/alexanderramin/kairos/internal/contract"
+	"github.com/alexanderramin/kairos/internal/app"
 	"github.com/alexanderramin/kairos/internal/domain"
 	"github.com/stretchr/testify/assert"
 )
@@ -34,7 +34,7 @@ func TestScoreWorkItem_DeadlinePressure(t *testing.T) {
 	// Should have deadline pressure reason
 	hasDeadlinePressure := false
 	for _, r := range result.Reasons {
-		if r.Code == contract.ReasonDeadlinePressure {
+		if r.Code == app.ReasonDeadlinePressure {
 			hasDeadlinePressure = true
 		}
 	}
@@ -83,7 +83,7 @@ func TestScoreWorkItem_CriticalModeBoostsCritical(t *testing.T) {
 
 	hasCriticalFocus := false
 	for _, r := range result.Reasons {
-		if r.Code == contract.ReasonCriticalFocus {
+		if r.Code == app.ReasonCriticalFocus {
 			hasCriticalFocus = true
 		}
 	}
@@ -113,7 +113,7 @@ func TestScoreWorkItem_SpacingBonus(t *testing.T) {
 
 	hasSpacingOK := false
 	for _, r := range result.Reasons {
-		if r.Code == contract.ReasonSpacingOK {
+		if r.Code == app.ReasonSpacingOK {
 			hasSpacingOK = true
 			assert.NotNil(t, r.WeightDelta)
 			assert.Greater(t, *r.WeightDelta, 0.0, "1-3 days spacing should give positive bonus")
@@ -143,7 +143,7 @@ func TestScoreWorkItem_SpacingPenalty_WorkedToday(t *testing.T) {
 
 	hasSpacingBlocked := false
 	for _, r := range result.Reasons {
-		if r.Code == contract.ReasonSpacingBlocked {
+		if r.Code == app.ReasonSpacingBlocked {
 			hasSpacingBlocked = true
 			assert.NotNil(t, r.WeightDelta)
 			assert.Less(t, *r.WeightDelta, 0.0, "worked today should have negative spacing delta")
@@ -173,7 +173,7 @@ func TestScoreWorkItem_VariationBonus(t *testing.T) {
 
 	hasVariationBonus := false
 	for _, r := range result.Reasons {
-		if r.Code == contract.ReasonVariationBonus {
+		if r.Code == app.ReasonVariationBonus {
 			hasVariationBonus = true
 			assert.NotNil(t, r.WeightDelta)
 			assert.Greater(t, *r.WeightDelta, 0.0, "first slice should get positive variation bonus")
@@ -203,11 +203,113 @@ func TestScoreWorkItem_VariationPenalty(t *testing.T) {
 
 	hasVariationPenalty := false
 	for _, r := range result.Reasons {
-		if r.Code == contract.ReasonVariationPenalty {
+		if r.Code == app.ReasonVariationPenalty {
 			hasVariationPenalty = true
 			assert.NotNil(t, r.WeightDelta)
 			assert.Less(t, *r.WeightDelta, 0.0, "3+ slices should get negative variation penalty")
 		}
 	}
 	assert.True(t, hasVariationPenalty, "should have VARIATION_PENALTY reason for overrepresented project")
+}
+
+func habitInput(cadenceDays, daysSince int) ScoringInput {
+	return ScoringInput{
+		WorkItemID:       "habit:h-1",
+		ProjectID:        "habit:h-1",
+		ProjectName:      "Exercise",
+		Title:            "Exercise",
+		Now:              time.Date(2025, 3, 15, 12, 0, 0, 0, time.UTC),
+		Weights:          defaultWeights(),
+		Mode:             domain.ModeBalanced,
+		MinSessionMin:    10,
+		MaxSessionMin:    30,
+		DefaultSessionMin: 20,
+		IsHabit:          true,
+		HabitID:          "h-1",
+		HabitCadenceDays: cadenceDays,
+		HabitDaysSince:   daysSince,
+	}
+}
+
+func hasReasonCode(reasons []app.RecommendationReason, code app.RecommendationReasonCode) bool {
+	for _, r := range reasons {
+		if r.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+// TestScoreWorkItem_HabitUrgency covers all five tiers of scoreHabitUrgency.
+func TestScoreWorkItem_HabitUrgency(t *testing.T) {
+	tests := []struct {
+		name         string
+		cadenceDays  int
+		daysSince    int
+		wantBlocked  bool
+		wantMinScore float64
+		wantReason   app.RecommendationReasonCode
+	}{
+		{
+			name:         "overdue (fraction >= 1.5)",
+			cadenceDays:  4, daysSince: 7, // 7/4 = 1.75
+			wantBlocked:  false,
+			wantMinScore: 50.0,
+			wantReason:   app.ReasonHabitOverdue,
+		},
+		{
+			name:         "due today (fraction >= 1.0)",
+			cadenceDays:  7, daysSince: 7, // 7/7 = 1.0
+			wantBlocked:  false,
+			wantMinScore: 30.0,
+			wantReason:   app.ReasonHabitDue,
+		},
+		{
+			name:         "approaching (fraction >= 0.8)",
+			cadenceDays:  5, daysSince: 4, // 4/5 = 0.8
+			wantBlocked:  false,
+			wantMinScore: 15.0,
+			wantReason:   app.ReasonHabitApproaching,
+		},
+		{
+			name:         "not yet due (fraction < 0.8)",
+			cadenceDays:  7, daysSince: 2, // 2/7 ≈ 0.29
+			wantBlocked:  false,
+			wantMinScore: 0.0,
+			wantReason:   "",
+		},
+		{
+			name:         "zero cadence treated as daily",
+			cadenceDays:  0, daysSince: 2, // fraction = 2 (>= 1.5)
+			wantBlocked:  false,
+			wantMinScore: 50.0,
+			wantReason:   app.ReasonHabitOverdue,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := ScoreWorkItem(habitInput(tc.cadenceDays, tc.daysSince))
+			assert.Equal(t, tc.wantBlocked, result.Blocked)
+			assert.GreaterOrEqual(t, result.Score, tc.wantMinScore)
+			if tc.wantReason != "" {
+				assert.True(t, hasReasonCode(result.Reasons, tc.wantReason),
+					"expected reason %s in %v", tc.wantReason, result.Reasons)
+			} else {
+				assert.False(t, hasReasonCode(result.Reasons, app.ReasonHabitDue))
+				assert.False(t, hasReasonCode(result.Reasons, app.ReasonHabitOverdue))
+				assert.False(t, hasReasonCode(result.Reasons, app.ReasonHabitApproaching))
+			}
+		})
+	}
+}
+
+// TestScoreWorkItem_HabitIsNotAffectedByWorkItemFactors verifies that non-habit
+// scoring factors (deadline, variation, spacing) do not fire for habit inputs
+// that lack the corresponding fields.
+func TestScoreWorkItem_HabitIsNotAffectedByWorkItemFactors(t *testing.T) {
+	result := ScoreWorkItem(habitInput(1, 2)) // overdue daily habit
+
+	assert.False(t, hasReasonCode(result.Reasons, app.ReasonDeadlinePressure))
+	assert.False(t, hasReasonCode(result.Reasons, app.ReasonBehindPace))
 }
