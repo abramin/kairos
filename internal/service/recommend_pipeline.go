@@ -64,12 +64,6 @@ func (cl *ContextLoader) Load(ctx context.Context, req app.WhatNowRequest) (*Rec
 		return nil, fmt.Errorf("loading schedulable items: %w", err)
 	}
 	candidates = filterCandidatesByScope(candidates, req.ProjectScope)
-	if len(candidates) == 0 {
-		return nil, &app.WhatNowError{
-			Code:    app.ErrNoCandidates,
-			Message: "no schedulable work items found",
-		}
-	}
 
 	recentSessions, err := cl.sessions.ListRecent(ctx, 7)
 	if err != nil {

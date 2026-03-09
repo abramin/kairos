@@ -10,12 +10,13 @@ import (
 
 // FormatWhatNow formats a WhatNowResponse into a styled CLI dashboard string.
 func FormatWhatNow(resp *contract.WhatNowResponse) string {
-	return FormatWhatNowWithProjectIDs(resp, nil)
+	return FormatWhatNowWithProjectIDs(resp, nil, nil)
 }
 
-// FormatWhatNowWithProjectIDs formats WhatNow output and replaces internal project IDs
-// with user-facing IDs when a map entry is available.
-func FormatWhatNowWithProjectIDs(resp *contract.WhatNowResponse, projectIDs map[string]string) string {
+// FormatWhatNowWithProjectIDs formats WhatNow output, replacing internal project IDs with
+// project names when available, and rendering per-item natural language summaries instead of
+// REASON lines when itemSummaries is provided.
+func FormatWhatNowWithProjectIDs(resp *contract.WhatNowResponse, projectNames map[string]string, itemSummaries map[string]string) string {
 	var b strings.Builder
 
 	// Mode indicator.
@@ -63,9 +64,9 @@ func FormatWhatNowWithProjectIDs(resp *contract.WhatNowResponse, projectIDs map[
 			}
 			b.WriteString(titleLine + "\n")
 
-			// Project info with user-facing short ID when available (not shown for habits).
+			// Project info with name when available (not shown for habits).
 			if rec.ProjectID != "" {
-				b.WriteString(fmt.Sprintf("   %s %s\n", Dim("Project:"), renderProjectID(rec.ProjectID, projectIDs)))
+				b.WriteString(fmt.Sprintf("   %s %s\n", Dim("Project:"), renderProjectID(rec.ProjectID, projectNames)))
 			}
 
 			// Due date with relative styling.
@@ -79,12 +80,18 @@ func FormatWhatNowWithProjectIDs(resp *contract.WhatNowResponse, projectIDs map[
 				}
 			}
 
-			// Reason lines.
-			for _, reason := range rec.Reasons {
-				b.WriteString(fmt.Sprintf("   %s %s\n",
-					StyleYellow.Render("REASON:"),
-					Dim(reason.Message),
-				))
+			// Natural language summary when available, otherwise fall back to REASON lines.
+			if itemSummaries != nil {
+				if summary := itemSummaries[rec.WorkItemID]; summary != "" {
+					b.WriteString(fmt.Sprintf("   %s\n", Dim(summary)))
+				}
+			} else {
+				for _, reason := range rec.Reasons {
+					b.WriteString(fmt.Sprintf("   %s %s\n",
+						StyleYellow.Render("REASON:"),
+						Dim(reason.Message),
+					))
+				}
 			}
 
 			// Blank line between recommendations.

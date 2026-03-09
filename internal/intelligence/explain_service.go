@@ -7,6 +7,21 @@ import (
 	"github.com/alexanderramin/kairos/internal/llm"
 )
 
+// itemSummariesResponse is the expected JSON shape from the LLM for SummarizeItems.
+type itemSummariesResponse struct {
+	Summaries map[string]string `json:"summaries"`
+}
+
+// summarizeItemPayload is the per-item data sent to the LLM.
+type summarizeItemPayload struct {
+	ID          string            `json:"work_item_id"`
+	Title       string            `json:"title"`
+	ProjectName string            `json:"project,omitempty"`
+	DueDate     *string           `json:"due_date,omitempty"`
+	RiskLevel   string            `json:"risk_level"`
+	Reasons     []ReasonTraceItem `json:"reasons"`
+}
+
 // ExplainService generates faithful narrative explanations from engine traces.
 type ExplainService interface {
 	// ExplainNow generates an explanation for a what-now recommendation.
@@ -17,6 +32,10 @@ type ExplainService interface {
 
 	// WeeklyReview generates a summary of the past week.
 	WeeklyReview(ctx context.Context, trace WeeklyReviewTrace) (*LLMExplanation, error)
+
+	// SummarizeItems generates a short natural-language summary for each recommended item.
+	// Returns a map of work_item_id → 1-2 sentence explanation.
+	SummarizeItems(ctx context.Context, trace RecommendationTrace, projectNames map[string]string) (map[string]string, error)
 }
 
 type explainService struct {
@@ -55,6 +74,68 @@ func (s *explainService) WeeklyReview(ctx context.Context, trace WeeklyReviewTra
 		ctx, weeklyReviewSystemPrompt, trace, trace.WeeklyTraceKeys(),
 		func() *LLMExplanation { return DeterministicWeeklyReview(trace) },
 	)
+}
+
+func (s *explainService) SummarizeItems(ctx context.Context, trace RecommendationTrace, projectNames map[string]string) (map[string]string, error) {
+	// Build the per-item payload, filtering out generic reasons.
+	items := make([]summarizeItemPayload, 0, len(trace.Recommendations))
+	for _, rec := range trace.Recommendations {
+		payload := summarizeItemPayload{
+			ID:          rec.WorkItemID,
+			Title:       rec.Title,
+			ProjectName: projectNames[rec.ProjectID],
+			DueDate:     rec.DueDate,
+			RiskLevel:   rec.RiskLevel,
+		}
+		for _, r := range rec.Reasons {
+			if !genericReasonCode[r.Code] {
+				payload.Reasons = append(payload.Reasons, r)
+			}
+		}
+		items = append(items, payload)
+	}
+
+	dataJSON, err := json.MarshalIndent(map[string]any{"items": items}, "", "  ")
+	if err != nil {
+		return DeterministicSummarizeItems(trace, projectNames), nil
+	}
+
+	resp, err := s.client.Generate(ctx, llm.GenerateRequest{
+		Task:         llm.TaskExplain,
+		SystemPrompt: summarizeItemsSystemPrompt,
+		UserPrompt:   string(dataJSON),
+	})
+	if err != nil {
+		return DeterministicSummarizeItems(trace, projectNames), nil
+	}
+
+	parsed, err := llm.ExtractJSON[itemSummariesResponse](resp.Text, nil)
+	if err != nil {
+		return DeterministicSummarizeItems(trace, projectNames), nil
+	}
+
+	// Validate: all returned keys must be real trace item IDs.
+	validIDs := make(map[string]bool, len(trace.Recommendations))
+	for _, rec := range trace.Recommendations {
+		validIDs[rec.WorkItemID] = true
+	}
+	for id := range parsed.Summaries {
+		if !validIDs[id] {
+			return DeterministicSummarizeItems(trace, projectNames), nil
+		}
+	}
+
+	return parsed.Summaries, nil
+}
+
+// genericReasonCode lists reason codes that add no unique per-item signal.
+var genericReasonCode = map[string]bool{
+	"VARIATION_BONUS":        true,
+	"DOMAIN_VARIATION_BONUS": true,
+	"ON_TRACK_SAFE_MIX":      true,
+	"BOUNDS_APPLIED":         true,
+	"SPACING_OK":             true,
+	"SPACING_BLOCKED":        true,
 }
 
 // generateExplanation is the shared pipeline: marshal → LLM call → extract JSON → validate evidence.

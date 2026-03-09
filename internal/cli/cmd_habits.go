@@ -162,12 +162,12 @@ func execHabitList(ctx context.Context, app *App) (string, error) {
 		switch {
 		case s.DaysSinceLog == 0:
 			status = formatter.StyleGreen.Render("done today")
+		case s.DaysSinceLog == 9999:
+			status = formatter.StyleYellow.Render("never done")
 		case s.DaysUntilDue < 0:
 			status = formatter.StyleYellow.Render(fmt.Sprintf("overdue %d days", -s.DaysUntilDue))
 		case s.DaysUntilDue == 0:
 			status = formatter.StyleYellow.Render("due today")
-		case s.DaysSinceLog == 9999:
-			status = formatter.StyleYellow.Render("never done")
 		default:
 			status = formatter.Dim(fmt.Sprintf("due in %d days", s.DaysUntilDue))
 		}

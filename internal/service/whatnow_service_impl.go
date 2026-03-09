@@ -90,6 +90,13 @@ func (s *whatNowService) Recommend(ctx context.Context, req app.WhatNowRequest) 
 		scored = append(scored, habitScored...)
 	}
 
+	if len(scored) == 0 && len(blockers) == 0 {
+		return nil, &app.WhatNowError{
+			Code:    app.ErrNoCandidates,
+			Message: "no schedulable work items or habits found",
+		}
+	}
+
 	scheduler.CanonicalSort(scored)
 
 	slices, allocBlockers := scheduler.AllocateSlices(scored, req.AvailableMin, maxSlices, req.EnforceVariation)
@@ -149,11 +156,17 @@ func (s *whatNowService) scoreHabitCandidates(
 			maxS = target + 10
 		}
 
+		// Compute a virtual due date so CanonicalSort interleaves habits
+		// alongside work items by urgency rather than placing all nil-DueDate
+		// items last. A habit due today gets today; overdue gets a past date.
+		virtualDue := now.AddDate(0, 0, daysUntilDue)
+
 		input := scheduler.ScoringInput{
 			WorkItemID:        "habit:" + h.ID,
 			ProjectID:         "habit:" + h.ID,
 			ProjectName:       h.Title,
 			Title:             h.Title,
+			DueDate:           &virtualDue,
 			Now:               now,
 			Weights:           weights,
 			Mode:              mode,

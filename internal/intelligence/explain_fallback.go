@@ -1,6 +1,9 @@
 package intelligence
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // DeterministicExplainNow builds an explanation directly from trace data
 // without using the LLM. Used as a fallback when Ollama is unavailable or
@@ -122,6 +125,44 @@ func directionFromDelta(delta *float64) string {
 		return "push_against"
 	}
 	return "push_for"
+}
+
+// DeterministicSummarizeItems builds per-item summaries from reason codes without using the LLM.
+// Generic reasons (variety, safe-mix, spacing) are filtered out; only specific signals remain.
+func DeterministicSummarizeItems(trace RecommendationTrace, projectNames map[string]string) map[string]string {
+	summaries := make(map[string]string, len(trace.Recommendations))
+	for _, rec := range trace.Recommendations {
+		summaries[rec.WorkItemID] = deterministicItemSummary(rec, projectNames[rec.ProjectID])
+	}
+	return summaries
+}
+
+func deterministicItemSummary(rec RecommendationTraceItem, projectName string) string {
+	var parts []string
+	var fallback string
+
+	for _, r := range rec.Reasons {
+		if genericReasonCode[r.Code] {
+			continue
+		}
+		if fallback == "" {
+			fallback = r.Message
+		}
+		parts = append(parts, r.Message)
+	}
+
+	if len(parts) == 0 {
+		if fallback != "" {
+			return fallback + "."
+		}
+		return "Recommended for this session."
+	}
+
+	sentence := strings.Join(parts, ". ")
+	if !strings.HasSuffix(sentence, ".") {
+		sentence += "."
+	}
+	return sentence
 }
 
 func riskToImpact(risk string) string {

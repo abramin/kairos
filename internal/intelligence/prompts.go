@@ -160,6 +160,19 @@ CRITICAL RULES:
 3. Include sensible session_policy defaults appropriate for the activity type
 4. Output ONLY the JSON template object, no markdown, no explanation`
 
+// summarizeItemsSystemPrompt instructs the LLM to generate per-item summaries for a session plan.
+const summarizeItemsSystemPrompt = `You are a scheduling assistant for a project planner called Kairos.
+You will receive a JSON list of recommended tasks. For each task, write 1-2 concise sentences explaining why it is worth doing in this session. Focus on what is specific and unique to each task: upcoming deadlines, project risk, overdue habits, or in-progress momentum. Do not use generic phrases like "adds variety" or "safe to include".
+
+Output ONLY a JSON object with this shape:
+{"summaries": {"<work_item_id>": "<1-2 sentence explanation>", ...}}
+
+CRITICAL RULES:
+1. Include an entry for every item in the input
+2. Use only the work_item_id values from the input as keys
+3. Keep each summary under 2 sentences
+4. Output ONLY the JSON object, no markdown`
+
 // buildExplanationSystemPrompt returns the system prompt for plain-text intent explanations.
 const buildExplanationSystemPrompt = `You are a helpful assistant for a CLI project planner called Kairos.
 Given the user's original question and the action that will be performed, write 2-3 plain English sentences explaining what will happen and what the user can expect. Be concrete. If the action has a non-obvious effect, include a brief example. Do not use markdown. Do not repeat the command name.`
