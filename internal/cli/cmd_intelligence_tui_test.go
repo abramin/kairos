@@ -68,7 +68,7 @@ func TestCommandBar_AskAutoExecuteReadOnlyIntent(t *testing.T) {
 	}
 
 	output := execCmdAsync(cb, "ask what should i work on")
-	assert.Contains(t, output, "Intent:")
+	assert.Contains(t, output, "I understood:")
 	assert.Contains(t, output, "MODE:")
 }
 
@@ -142,7 +142,7 @@ func TestCommandBar_AskExecutedStatusIntent(t *testing.T) {
 
 	output := execCmdAsync(cb, "ask show me status")
 	require.NotEmpty(t, output)
-	assert.Contains(t, output, "Intent:")
+	assert.Contains(t, output, "I understood:")
 	assert.Contains(t, output, "status")
 }
 

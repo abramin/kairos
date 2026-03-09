@@ -196,6 +196,7 @@ type AskResolution struct {
 	ParsedIntent     *ParsedIntent  `json:"parsed_intent"`
 	ExecutionState   ExecutionState `json:"execution_state"`
 	ExecutionMessage string         `json:"execution_message"`
+	Explanation      string         `json:"explanation,omitempty"`
 	CommandHint      string         `json:"command_hint,omitempty"`
 }
 

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/alexanderramin/kairos/internal/intelligence"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // FormatExplanation renders an LLMExplanation for terminal output.
@@ -49,41 +48,78 @@ func FormatExplanation(e *intelligence.LLMExplanation) string {
 	return RenderBox("Explanation", b.String())
 }
 
-// FormatAskResolution renders the result of an `ask` command.
+// intentLabels maps intent names to human-readable descriptions used as fallback
+// when the LLM does not populate the Rationale field.
+var intentLabels = map[intelligence.IntentName]string{
+	intelligence.IntentWhatNow:             "show current recommendations",
+	intelligence.IntentStatus:              "show project status",
+	intelligence.IntentReplan:              "rebalance and reorder your project items",
+	intelligence.IntentProjectAdd:          "add a new project",
+	intelligence.IntentProjectImport:       "import a project from a file",
+	intelligence.IntentProjectUpdate:       "update a project",
+	intelligence.IntentProjectArchive:      "archive a project",
+	intelligence.IntentProjectRemove:       "remove a project",
+	intelligence.IntentNodeAdd:             "add a node to a project",
+	intelligence.IntentNodeUpdate:          "update a project node",
+	intelligence.IntentNodeRemove:          "remove a project node",
+	intelligence.IntentWorkAdd:             "add a work item",
+	intelligence.IntentWorkUpdate:          "update a work item",
+	intelligence.IntentWorkDone:            "mark a work item as done",
+	intelligence.IntentWorkRemove:          "remove a work item",
+	intelligence.IntentSessionLog:          "log a work session",
+	intelligence.IntentSessionRemove:       "remove a session log entry",
+	intelligence.IntentTemplateList:        "list available templates",
+	intelligence.IntentTemplateShow:        "show a template",
+	intelligence.IntentTemplateDraft:       "draft a new template",
+	intelligence.IntentTemplateValidate:    "validate a template",
+	intelligence.IntentProjectInitFromTmpl: "create a project from a template",
+	intelligence.IntentExplainNow:          "explain the current recommendations",
+	intelligence.IntentExplainWhyNot:       "explain why an item wasn't recommended",
+	intelligence.IntentReviewWeekly:        "review your weekly progress",
+	intelligence.IntentSimulate:            "simulate a scenario",
+}
+
+// FormatAskResolution renders the result of an `ask` command in natural language.
 func FormatAskResolution(r *intelligence.AskResolution) string {
 	var b strings.Builder
-
 	intent := r.ParsedIntent
-	b.WriteString(fmt.Sprintf("  Intent:     %s\n", StyleBold.Render(string(intent.Intent))))
-	b.WriteString(fmt.Sprintf("  Risk:       %s\n", riskStyle(intent.Risk).Render(string(intent.Risk))))
-	b.WriteString(fmt.Sprintf("  Confidence: %.0f%%\n", intent.Confidence*100))
-
-	if len(intent.Arguments) > 0 {
-		b.WriteString(fmt.Sprintf("  Arguments:  %s\n", formatArgs(intent.Arguments)))
-	}
-
-	if r.CommandHint != "" {
-		b.WriteString(fmt.Sprintf("  Command:    %s\n", StyleGreen.Render(r.CommandHint)))
-	}
-
-	b.WriteString("\n")
 
 	switch r.ExecutionState {
-	case intelligence.StateExecuted:
-		b.WriteString(StyleGreen.Render("  Auto-executing (read-only, high confidence)"))
-	case intelligence.StateNeedsConfirmation:
-		b.WriteString(StyleYellow.Render("  Write operation — run the command above to execute."))
 	case intelligence.StateNeedsClarification:
-		b.WriteString(StyleYellow.Render("  Low confidence. Did you mean:"))
-		b.WriteString("\n")
+		b.WriteString(fmt.Sprintf("  %s\n", StyleYellow.Render("I wasn't sure what you meant. Did you mean:")))
 		for i, opt := range intent.ClarificationOptions {
 			b.WriteString(fmt.Sprintf("    %d. %s\n", i+1, opt))
 		}
 	case intelligence.StateRejected:
-		b.WriteString(StyleRed.Render(fmt.Sprintf("  Rejected: %s", r.ExecutionMessage)))
+		b.WriteString(fmt.Sprintf("  %s\n", StyleRed.Render(fmt.Sprintf("I couldn't do that: %s", r.ExecutionMessage))))
+	default:
+		understood := intent.Rationale
+		if understood == "" {
+			if label, ok := intentLabels[intent.Intent]; ok {
+				understood = label
+			} else {
+				understood = string(intent.Intent)
+			}
+		}
+		b.WriteString(fmt.Sprintf("  %s %s\n", StyleBold.Render("I understood:"), understood))
+
+		if r.Explanation != "" {
+			b.WriteString("\n")
+			b.WriteString(fmt.Sprintf("  %s\n", r.Explanation))
+		}
+
+		if intent.Confidence < 0.80 {
+			b.WriteString(Dim(fmt.Sprintf("  Low confidence: %.0f%%\n", intent.Confidence*100)))
+		}
+
+		if r.CommandHint != "" && r.ExecutionState == intelligence.StateNeedsConfirmation {
+			b.WriteString("\n")
+			b.WriteString(fmt.Sprintf("  %s\n", StyleGreen.Render("Run: "+r.CommandHint)))
+			b.WriteString("\n")
+			b.WriteString(fmt.Sprintf("  %s\n", StyleYellow.Render("This will modify your data. Run the command above to confirm.")))
+		}
 	}
 
-	b.WriteString("\n")
 	return RenderBox("Ask", b.String())
 }
 
@@ -135,17 +171,3 @@ func FormatTemplateDraft(d *intelligence.TemplateDraft) string {
 	return RenderBox("Template Draft", b.String())
 }
 
-func riskStyle(risk intelligence.IntentRisk) lipgloss.Style {
-	if risk == intelligence.RiskWrite {
-		return StyleYellow
-	}
-	return StyleGreen
-}
-
-func formatArgs(args map[string]interface{}) string {
-	data, err := json.Marshal(args)
-	if err != nil {
-		return "{}"
-	}
-	return Dim(string(data))
-}

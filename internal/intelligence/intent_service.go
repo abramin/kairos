@@ -3,6 +3,7 @@ package intelligence
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/alexanderramin/kairos/internal/llm"
 )
@@ -61,11 +62,29 @@ func (s *intentService) Parse(ctx context.Context, text string) (*AskResolution,
 	state := s.policy.Evaluate(&intent)
 	msg := executionMessage(state, &intent)
 
+	explanation := ""
+	if state != StateRejected && state != StateNeedsClarification {
+		explanation = s.generateExplanation(ctx, text, &intent)
+	}
+
 	return &AskResolution{
 		ParsedIntent:     &intent,
 		ExecutionState:   state,
 		ExecutionMessage: msg,
+		Explanation:      explanation,
 	}, nil
+}
+
+func (s *intentService) generateExplanation(ctx context.Context, userText string, intent *ParsedIntent) string {
+	resp, err := s.client.Generate(ctx, llm.GenerateRequest{
+		Task:         llm.TaskHelp,
+		SystemPrompt: buildExplanationSystemPrompt,
+		UserPrompt:   buildExplanationUserPrompt(userText, intent),
+	})
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(resp.Text)
 }
 
 // validateParsedIntent is a schema validator for ExtractJSON.

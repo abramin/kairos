@@ -57,9 +57,9 @@ func TestFormatAskResolution_IncludesCommandHint(t *testing.T) {
 	}
 
 	out := FormatAskResolution(r)
-	assert.Contains(t, out, "project_import")
+	assert.Contains(t, out, "import a project from a file")
 	assert.Contains(t, out, "project import spanish_a2_b1.json")
-	assert.Contains(t, out, "Write operation")
+	assert.Contains(t, out, "modify your data")
 	assert.NotContains(t, out, "Proceed? [Y/n]")
 }
 
@@ -76,8 +76,9 @@ func TestFormatAskResolution_AutoExecuteReadOnly(t *testing.T) {
 	}
 
 	out := FormatAskResolution(r)
-	assert.Contains(t, out, "Auto-executing")
-	assert.Contains(t, out, "what-now --minutes 60")
+	assert.Contains(t, out, "I understood:")
+	assert.Contains(t, out, "show current recommendations")
+	assert.NotContains(t, out, "Auto-executing")
 }
 
 func TestFormatExplanation_OmitsDuplicateDetailedSummary(t *testing.T) {

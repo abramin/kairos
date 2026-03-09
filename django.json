@@ -1,0 +1,363 @@
+{
+    "project": {
+        "short_id": "ULT-DJ01",
+        "name": "The Ultimate Django Series (Complete Part 1-3)",
+        "domain": "software engineering",
+        "start_date": "2026-03-08"
+    },
+    "defaults": {
+        "duration_mode": "estimate",
+        "session_policy": {
+            "min_session_min": 15,
+            "max_session_min": 60,
+            "default_session_min": 30,
+            "splittable": true
+        }
+    },
+    "nodes": [
+        {
+            "ref": "p1_s1",
+            "title": "Part 1: Getting Started",
+            "kind": "module",
+            "order": 1
+        },
+        {
+            "ref": "p1_s2",
+            "title": "Part 1: Django Fundamentals",
+            "kind": "module",
+            "order": 2
+        },
+        {
+            "ref": "p1_s3",
+            "title": "Part 1: Building a Data Model",
+            "kind": "module",
+            "order": 3
+        },
+        {
+            "ref": "p1_s4",
+            "title": "Part 1: Setting Up the Database",
+            "kind": "module",
+            "order": 4
+        },
+        {
+            "ref": "p1_s5",
+            "title": "Part 1: Django ORM",
+            "kind": "module",
+            "order": 5
+        },
+        {
+            "ref": "p1_s6",
+            "title": "Part 1: The Admin Site",
+            "kind": "module",
+            "order": 6
+        },
+        {
+            "ref": "p2_s1",
+            "title": "Part 2: Getting Started",
+            "kind": "module",
+            "order": 7
+        },
+        {
+            "ref": "p2_s2",
+            "title": "Part 2: Building RESTful APIs with Django REST Framework",
+            "kind": "module",
+            "order": 8
+        },
+        {
+            "ref": "p2_s3",
+            "title": "Part 2: Advanced API Concepts",
+            "kind": "module",
+            "order": 9
+        },
+        {
+            "ref": "p2_s4",
+            "title": "Part 2: Designing and Implementing a Shopping Cart API",
+            "kind": "module",
+            "order": 10
+        },
+        {
+            "ref": "p2_s5",
+            "title": "Part 2: Django Authentication System",
+            "kind": "module",
+            "order": 11
+        },
+        {
+            "ref": "p2_s6",
+            "title": "Part 2: Securing APIs",
+            "kind": "module",
+            "order": 12
+        },
+        {
+            "ref": "p2_s7",
+            "title": "Part 2: Designing and Building the Orders API",
+            "kind": "module",
+            "order": 13
+        },
+        {
+            "ref": "p3_s1",
+            "title": "Part 3: Getting Started",
+            "kind": "module",
+            "order": 14
+        },
+        {
+            "ref": "p3_s2",
+            "title": "Part 3: Uploading Files",
+            "kind": "module",
+            "order": 15
+        },
+        {
+            "ref": "p3_s3",
+            "title": "Part 3: Sending Emails",
+            "kind": "module",
+            "order": 16
+        },
+        {
+            "ref": "p3_s4",
+            "title": "Part 3: Running Background Tasks",
+            "kind": "module",
+            "order": 17
+        },
+        {
+            "ref": "p3_s5",
+            "title": "Part 3: Automated Testing",
+            "kind": "module",
+            "order": 18
+        },
+        {
+            "ref": "p3_s6",
+            "title": "Part 3: Performance Testing",
+            "kind": "module",
+            "order": 19
+        },
+        {
+            "ref": "p3_s7",
+            "title": "Part 3: Caching",
+            "kind": "module",
+            "order": 20
+        },
+        {
+            "ref": "p3_s8",
+            "title": "Part 3: Preparing for Production",
+            "kind": "module",
+            "order": 21
+        },
+        {
+            "ref": "p3_s9",
+            "title": "Part 3: Deployment",
+            "kind": "module",
+            "order": 22
+        }
+    ],
+    "work_items": [
+        {
+            "ref": "p1_s1_w1",
+            "node_ref": "p1_s1",
+            "title": "1- Introduction",
+            "type": "video",
+            "planned_min": 1
+        },
+        {
+            "ref": "p1_s1_w2",
+            "node_ref": "p1_s1",
+            "title": "2- Prerequisites",
+            "type": "video",
+            "planned_min": 1
+        },
+        {
+            "ref": "p1_s1_w3",
+            "node_ref": "p1_s1",
+            "title": "3- How to Take this Course",
+            "type": "video",
+            "planned_min": 1
+        },
+        {
+            "ref": "p1_s1_w4",
+            "node_ref": "p1_s1",
+            "title": "4- Supplementary Materials",
+            "type": "reading",
+            "planned_min": 5
+        },
+        {
+            "ref": "p1_s2_w5",
+            "node_ref": "p1_s2",
+            "title": "5- Creating Your First Django Project",
+            "type": "video",
+            "planned_min": 6
+        },
+        {
+            "ref": "p1_s2_w11",
+            "node_ref": "p1_s2",
+            "title": "11- Debugging Django Applications in VSCode",
+            "type": "video",
+            "planned_min": 8
+        },
+        {
+            "ref": "p1_s3_w5",
+            "node_ref": "p1_s3",
+            "title": "5- Creating Models",
+            "type": "video",
+            "planned_min": 7
+        },
+        {
+            "ref": "p1_s3_w11",
+            "node_ref": "p1_s3",
+            "title": "11- Generic Relationships",
+            "type": "video",
+            "planned_min": 7
+        },
+        {
+            "ref": "p1_s4_w3",
+            "node_ref": "p1_s4",
+            "title": "3- Creating Migrations",
+            "type": "video",
+            "planned_min": 8
+        },
+        {
+            "ref": "p1_s5_w13",
+            "node_ref": "p1_s5",
+            "title": "13- Selecting Related Objects",
+            "type": "video",
+            "planned_min": 9
+        },
+        {
+            "ref": "p2_s2_w7",
+            "node_ref": "p2_s2",
+            "title": "7- Creating API Views",
+            "type": "video",
+            "planned_min": 8
+        },
+        {
+            "ref": "p2_s2_w11",
+            "node_ref": "p2_s2",
+            "title": "11- Serializing Relationships",
+            "type": "video",
+            "planned_min": 9
+        },
+        {
+            "ref": "p2_s2_w15",
+            "node_ref": "p2_s2",
+            "title": "15- Saving Objects",
+            "type": "video",
+            "planned_min": 8
+        },
+        {
+            "ref": "p2_s3_w7",
+            "node_ref": "p2_s3",
+            "title": "7- Routers",
+            "type": "video",
+            "planned_min": 9
+        },
+        {
+            "ref": "p2_s3_w9",
+            "node_ref": "p2_s3",
+            "title": "9- Nested Routers",
+            "type": "video",
+            "planned_min": 10
+        },
+        {
+            "ref": "p2_s4_w5",
+            "node_ref": "p2_s4",
+            "title": "5- Getting a Cart",
+            "type": "video",
+            "planned_min": 10
+        },
+        {
+            "ref": "p2_s4_w8",
+            "node_ref": "p2_s4",
+            "title": "8- Adding a Cart Item",
+            "type": "video",
+            "planned_min": 12
+        },
+        {
+            "ref": "p2_s5_w4",
+            "node_ref": "p2_s5",
+            "title": "4- Extending the User Model",
+            "type": "video",
+            "planned_min": 11
+        },
+        {
+            "ref": "p2_s5_w5",
+            "node_ref": "p2_s5",
+            "title": "5- Creating user Profiles",
+            "type": "video",
+            "planned_min": 7
+        },
+        {
+            "ref": "p2_s6_w4",
+            "node_ref": "p2_s6",
+            "title": "4- Registering Users",
+            "type": "video",
+            "planned_min": 9
+        },
+        {
+            "ref": "p2_s6_w12",
+            "node_ref": "p2_s6",
+            "title": "12- Applying Custom Permissions",
+            "type": "video",
+            "planned_min": 7
+        },
+        {
+            "ref": "p2_s7_w11",
+            "node_ref": "p2_s7",
+            "title": "11- Signals",
+            "type": "video",
+            "planned_min": 8
+        },
+        {
+            "ref": "p3_s2_w9",
+            "node_ref": "p3_s2",
+            "title": "9- Managing Images in the Admin",
+            "type": "video",
+            "planned_min": 9
+        },
+        {
+            "ref": "p3_s4_w6",
+            "node_ref": "p3_s4",
+            "title": "6- Setting Up Celery",
+            "type": "video",
+            "planned_min": 5
+        },
+        {
+            "ref": "p3_s5_w12",
+            "node_ref": "p3_s5",
+            "title": "12- Fixtures",
+            "type": "video",
+            "planned_min": 8
+        },
+        {
+            "ref": "p3_s5_w13",
+            "node_ref": "p3_s5",
+            "title": "13- Creating Model Instances",
+            "type": "video",
+            "planned_min": 9
+        },
+        {
+            "ref": "p3_s6_w4",
+            "node_ref": "p3_s6",
+            "title": "4- Creating a Test Script",
+            "type": "video",
+            "planned_min": 8
+        },
+        {
+            "ref": "p3_s6_w8",
+            "node_ref": "p3_s6",
+            "title": "8- Profiling with Silk",
+            "type": "video",
+            "planned_min": 8
+        },
+        {
+            "ref": "p3_s8_w8",
+            "node_ref": "p3_s8",
+            "title": "8- Managing Development and Production Settings",
+            "type": "video",
+            "planned_min": 7
+        },
+        {
+            "ref": "p3_s9_w13",
+            "node_ref": "p3_s9",
+            "title": "13- Dockerizing the App",
+            "type": "video",
+            "planned_min": 10
+        }
+    ]
+}

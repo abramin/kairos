@@ -21,21 +21,18 @@ func OpenDB(path string) (*sql.DB, error) {
 		}
 	}
 
-	db, err := sql.Open("sqlite", path)
+	// Embed foreign_keys and WAL mode in the DSN so they apply to every
+	// connection in the pool, not just the first one opened by sql.Open.
+	dsn := path
+	if path != ":memory:" {
+		dsn = path + "?_pragma=foreign_keys(1)&_pragma=journal_mode(WAL)"
+	} else {
+		dsn = path + "?_pragma=foreign_keys(1)"
+	}
+
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
-	}
-
-	// Enable WAL mode for better concurrent read performance
-	if _, err := db.Exec("PRAGMA journal_mode = WAL"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("setting WAL mode: %w", err)
-	}
-
-	// Enable foreign key enforcement
-	if _, err := db.Exec("PRAGMA foreign_keys = ON"); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("enabling foreign keys: %w", err)
 	}
 
 	if err := Migrate(db); err != nil {

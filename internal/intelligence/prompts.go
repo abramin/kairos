@@ -1,5 +1,10 @@
 package intelligence
 
+import (
+	"fmt"
+	"strings"
+)
+
 // buildParseSystemPrompt generates the intent-parsing system prompt from the IntentRegistry.
 func buildParseSystemPrompt() string {
 	return `You are a command parser for a CLI project planner called Kairos.
@@ -154,3 +159,30 @@ CRITICAL RULES:
 2. All IDs with repeats MUST include loop variable placeholders like {i}
 3. Include sensible session_policy defaults appropriate for the activity type
 4. Output ONLY the JSON template object, no markdown, no explanation`
+
+// buildExplanationSystemPrompt returns the system prompt for plain-text intent explanations.
+const buildExplanationSystemPrompt = `You are a helpful assistant for a CLI project planner called Kairos.
+Given the user's original question and the action that will be performed, write 2-3 plain English sentences explaining what will happen and what the user can expect. Be concrete. If the action has a non-obvious effect, include a brief example. Do not use markdown. Do not repeat the command name.`
+
+// buildExplanationUserPrompt constructs the user prompt for intent explanation.
+func buildExplanationUserPrompt(text string, intent *ParsedIntent) string {
+	var b strings.Builder
+	b.WriteString("User asked: ")
+	b.WriteString(text)
+	b.WriteString("\nIntent: ")
+	b.WriteString(string(intent.Intent))
+	if len(intent.Arguments) > 0 {
+		b.WriteString("\nArguments:")
+		for k, v := range intent.Arguments {
+			b.WriteString("\n  ")
+			b.WriteString(k)
+			b.WriteString(": ")
+			b.WriteString(fmt.Sprintf("%v", v))
+		}
+	}
+	if intent.Rationale != "" {
+		b.WriteString("\nRationale: ")
+		b.WriteString(intent.Rationale)
+	}
+	return b.String()
+}

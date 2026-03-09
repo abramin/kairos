@@ -15,13 +15,15 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-// parseShellFlags extracts --key value pairs and positional args from a shell arg list.
+// parseShellFlags extracts --key value and --key=value pairs and positional args from a shell arg list.
 func parseShellFlags(args []string) (positional []string, flags map[string]string) {
 	flags = make(map[string]string)
 	for i := 0; i < len(args); i++ {
 		if strings.HasPrefix(args[i], "--") {
 			key := strings.TrimPrefix(args[i], "--")
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
+			if eqIdx := strings.IndexByte(key, '='); eqIdx >= 0 {
+				flags[key[:eqIdx]] = key[eqIdx+1:]
+			} else if i+1 < len(args) && !strings.HasPrefix(args[i+1], "--") {
 				flags[key] = args[i+1]
 				i++
 			} else {
@@ -39,7 +41,7 @@ func parseShellFlags(args []string) (positional []string, flags map[string]strin
 // entityGroupHelp returns usage text for a bare entity group command.
 func entityGroupHelp(group string) string {
 	subs := map[string]string{
-		"project":  "list, inspect, add, edit, update, archive, unarchive, remove, init, import, draft",
+		"project":  "list, inspect, add, edit, update, pause, resume, archive, unarchive, remove, init, import, draft",
 		"node":     "add, inspect, update, remove",
 		"work":     "add, inspect, update, done, archive, remove",
 		"session":  "log, list, remove",
@@ -220,6 +222,44 @@ func (c *commandBar) dispatchProject(ctx context.Context, sub string, pos []stri
 			return "", err
 		}
 		return fmt.Sprintf("%s Unarchived project", formatter.StyleGreen.Render("✔")), nil
+
+	case "pause":
+		if len(pos) == 0 {
+			return "", fmt.Errorf("usage: project pause <id>")
+		}
+		projectID, err := resolveProjectID(ctx, app, pos[0])
+		if err != nil {
+			return "", err
+		}
+		p, err := app.Projects.GetByID(ctx, projectID)
+		if err != nil {
+			return "", err
+		}
+		p.Status = domain.ProjectPaused
+		p.UpdatedAt = time.Now()
+		if err := app.Projects.Update(ctx, p); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%s Paused project %s [%s]", formatter.StyleGreen.Render("✔"), p.Name, p.ShortID), nil
+
+	case "resume":
+		if len(pos) == 0 {
+			return "", fmt.Errorf("usage: project resume <id>")
+		}
+		projectID, err := resolveProjectID(ctx, app, pos[0])
+		if err != nil {
+			return "", err
+		}
+		p, err := app.Projects.GetByID(ctx, projectID)
+		if err != nil {
+			return "", err
+		}
+		p.Status = domain.ProjectActive
+		p.UpdatedAt = time.Now()
+		if err := app.Projects.Update(ctx, p); err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("%s Resumed project %s [%s]", formatter.StyleGreen.Render("✔"), p.Name, p.ShortID), nil
 
 	case "remove":
 		if len(pos) == 0 {
