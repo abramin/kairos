@@ -85,7 +85,7 @@ func run(args []string) error {
 
 	app := &cli.App{
 		Projects:  service.NewProjectService(projectRepo),
-		Nodes:     service.NewNodeService(nodeRepo, uow),
+		Nodes:     service.NewNodeService(nodeRepo, depRepo, uow),
 		WorkItems: service.NewWorkItemService(workItemRepo, nodeRepo, uow),
 		Sessions:  sessionSvc,
 		Workouts:  workoutSvc,

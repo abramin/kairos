@@ -132,6 +132,7 @@ type HabitRepo interface {
 	GetByID(ctx context.Context, id string) (*domain.Habit, error)
 	Archive(ctx context.Context, id string, now time.Time) error
 	LogSession(ctx context.Context, log *domain.HabitLog) error
+	DeleteLog(ctx context.Context, logID string) error
 	LastLog(ctx context.Context, habitID string) (*domain.HabitLog, error)
 	ListLogs(ctx context.Context, habitID string, limit int) ([]domain.HabitLog, error)
 }

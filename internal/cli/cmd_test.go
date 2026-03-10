@@ -32,7 +32,7 @@ func testApp(t *testing.T) *App {
 
 	return &App{
 		Projects:  service.NewProjectService(projRepo),
-		Nodes:     service.NewNodeService(nodeRepo, uow),
+		Nodes:     service.NewNodeService(nodeRepo, depRepo, uow),
 		WorkItems: service.NewWorkItemService(wiRepo, nodeRepo, uow),
 		Sessions:  service.NewSessionService(sessRepo, uow),
 		Workouts:  service.NewWorkoutService(workoutRepo),
@@ -113,7 +113,7 @@ func testAppFull(t *testing.T) *App {
 
 	return &App{
 		Projects:      service.NewProjectService(projRepo),
-		Nodes:         service.NewNodeService(nodeRepo, uow),
+		Nodes:         service.NewNodeService(nodeRepo, depRepo, uow),
 		WorkItems:     service.NewWorkItemService(wiRepo, nodeRepo, uow),
 		Sessions:      sessionSvc,
 		WhatNow:       service.NewWhatNowService(wiRepo, sessRepo, depRepo, profRepo, nil),

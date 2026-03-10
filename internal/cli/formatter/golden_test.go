@@ -86,7 +86,7 @@ func TestFormatWhatNow_Golden_CriticalMode(t *testing.T) {
 
 	out := FormatWhatNowWithProjectIDs(resp, map[string]string{
 		"p-urgent": "URG01",
-	})
+	}, nil)
 	goldenTest(t, "whatnow_critical", out)
 }
 
@@ -144,7 +144,7 @@ func TestFormatWhatNow_Golden_BalancedMode(t *testing.T) {
 	out := FormatWhatNowWithProjectIDs(resp, map[string]string{
 		"p-study":   "STD01",
 		"p-leisure": "LEI01",
-	})
+	}, nil)
 	goldenTest(t, "whatnow_balanced", out)
 }
 

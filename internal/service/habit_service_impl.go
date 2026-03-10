@@ -128,6 +128,10 @@ func (s *habitService) LogSession(ctx context.Context, req LogHabitRequest) (*do
 	return log, nil
 }
 
+func (s *habitService) UndoLog(ctx context.Context, logID string) error {
+	return s.habits.DeleteLog(ctx, logID)
+}
+
 // truncateToDay returns t truncated to midnight UTC.
 func truncateToDay(t time.Time) time.Time {
 	return t.UTC().Truncate(24 * time.Hour)

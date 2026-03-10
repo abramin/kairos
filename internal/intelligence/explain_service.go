@@ -77,6 +77,10 @@ func (s *explainService) WeeklyReview(ctx context.Context, trace WeeklyReviewTra
 }
 
 func (s *explainService) SummarizeItems(ctx context.Context, trace RecommendationTrace, projectNames map[string]string) (map[string]string, error) {
+	fallback := func() (map[string]string, error) {
+		return DeterministicSummarizeItems(trace, projectNames), nil
+	}
+
 	// Build the per-item payload, filtering out generic reasons.
 	items := make([]summarizeItemPayload, 0, len(trace.Recommendations))
 	for _, rec := range trace.Recommendations {
@@ -89,7 +93,11 @@ func (s *explainService) SummarizeItems(ctx context.Context, trace Recommendatio
 		}
 		for _, r := range rec.Reasons {
 			if !genericReasonCode[r.Code] {
-				payload.Reasons = append(payload.Reasons, r)
+				// Strip weight_delta to prevent LLM from parroting technical jargon.
+				payload.Reasons = append(payload.Reasons, ReasonTraceItem{
+					Code:    r.Code,
+					Message: r.Message,
+				})
 			}
 		}
 		items = append(items, payload)
@@ -97,7 +105,7 @@ func (s *explainService) SummarizeItems(ctx context.Context, trace Recommendatio
 
 	dataJSON, err := json.MarshalIndent(map[string]any{"items": items}, "", "  ")
 	if err != nil {
-		return DeterministicSummarizeItems(trace, projectNames), nil
+		return fallback()
 	}
 
 	resp, err := s.client.Generate(ctx, llm.GenerateRequest{
@@ -106,12 +114,12 @@ func (s *explainService) SummarizeItems(ctx context.Context, trace Recommendatio
 		UserPrompt:   string(dataJSON),
 	})
 	if err != nil {
-		return DeterministicSummarizeItems(trace, projectNames), nil
+		return fallback()
 	}
 
 	parsed, err := llm.ExtractJSON[itemSummariesResponse](resp.Text, nil)
 	if err != nil {
-		return DeterministicSummarizeItems(trace, projectNames), nil
+		return fallback()
 	}
 
 	// Validate: all returned keys must be real trace item IDs.
@@ -121,7 +129,7 @@ func (s *explainService) SummarizeItems(ctx context.Context, trace Recommendatio
 	}
 	for id := range parsed.Summaries {
 		if !validIDs[id] {
-			return DeterministicSummarizeItems(trace, projectNames), nil
+			return fallback()
 		}
 	}
 

@@ -99,6 +99,14 @@ func (r *SQLiteHabitRepo) LogSession(ctx context.Context, log *domain.HabitLog) 
 	return nil
 }
 
+func (r *SQLiteHabitRepo) DeleteLog(ctx context.Context, logID string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM habit_logs WHERE id = ?`, logID)
+	if err != nil {
+		return fmt.Errorf("deleting habit log: %w", err)
+	}
+	return nil
+}
+
 func (r *SQLiteHabitRepo) LastLog(ctx context.Context, habitID string) (*domain.HabitLog, error) {
 	query := `SELECT id, habit_id, performed_at, minutes, note, created_at
 		FROM habit_logs

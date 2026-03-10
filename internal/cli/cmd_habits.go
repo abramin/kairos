@@ -26,16 +26,7 @@ func (c *commandBar) cmdHabits(args []string) tea.Cmd {
 
 	switch sub {
 	case "list", "":
-		return tea.Batch(
-			loadingCmd("Loading habits..."),
-			asyncOutputCmd(func() string {
-				result, err := execHabitList(context.Background(), c.state.App)
-				if err != nil {
-					return shellError(err)
-				}
-				return result
-			}),
-		)
+		return pushView(newHabitListView(c.state))
 	case "add":
 		return c.cmdHabitAdd()
 	case "delete", "remove", "archive":

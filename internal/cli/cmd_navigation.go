@@ -100,7 +100,7 @@ func (c *commandBar) cmdWhatNow(args []string) tea.Cmd {
 	if err != nil {
 		return outputCmd(shellError(err))
 	}
-	return outputCmd(formatter.FormatWhatNow(resp))
+	return outputCmd(formatWhatNowResponse(ctx, c.state.App, resp))
 }
 
 func (c *commandBar) cmdContext(args []string) tea.Cmd {

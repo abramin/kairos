@@ -38,6 +38,10 @@ func (s *stubExplainTUI) WeeklyReview(_ context.Context, _ intelligence.WeeklyRe
 	return s.weeklyReviewRes, nil
 }
 
+func (s *stubExplainTUI) SummarizeItems(_ context.Context, _ intelligence.RecommendationTrace, _ map[string]string) (map[string]string, error) {
+	return nil, nil
+}
+
 func TestCommandBar_AskUsageAndDisabled(t *testing.T) {
 	app := testApp(t)
 	cb := testCommandBar(t, app)

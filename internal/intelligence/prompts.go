@@ -171,7 +171,8 @@ CRITICAL RULES:
 1. Include an entry for every item in the input
 2. Use only the work_item_id values from the input as keys
 3. Keep each summary under 2 sentences
-4. Output ONLY the JSON object, no markdown`
+4. Write in plain, natural English — avoid technical jargon like "weight delta", "score factor", or internal field names
+5. Output ONLY the JSON object, no markdown`
 
 // buildExplanationSystemPrompt returns the system prompt for plain-text intent explanations.
 const buildExplanationSystemPrompt = `You are a helpful assistant for a CLI project planner called Kairos.

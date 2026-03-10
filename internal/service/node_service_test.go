@@ -17,7 +17,8 @@ func setupNodeService(t *testing.T) (NodeService, repository.ProjectRepo, reposi
 	uow := testutil.NewTestUoW(db)
 	projRepo := repository.NewSQLiteProjectRepo(db)
 	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
-	return NewNodeService(nodeRepo, uow), projRepo, nodeRepo
+	depRepo := repository.NewSQLiteDependencyRepo(db)
+	return NewNodeService(nodeRepo, depRepo, uow), projRepo, nodeRepo
 }
 
 func TestNodeService_Create(t *testing.T) {
@@ -137,6 +138,51 @@ func TestNodeService_Delete(t *testing.T) {
 	require.NoError(t, svc.Delete(ctx, node.ID))
 	_, err := svc.GetByID(ctx, node.ID)
 	assert.Error(t, err)
+}
+
+// TestNodeService_Delete_CleansCrossNodeDependencies verifies that deleting a
+// node removes dependencies where its work items are predecessors to items in
+// other nodes. This prevents orphaned dependency rows from blocking scheduling.
+func TestNodeService_Delete_CleansCrossNodeDependencies(t *testing.T) {
+	db := testutil.NewTestDB(t)
+	uow := testutil.NewTestUoW(db)
+	ctx := context.Background()
+
+	projRepo := repository.NewSQLiteProjectRepo(db)
+	nodeRepo := repository.NewSQLitePlanNodeRepo(db)
+	wiRepo := repository.NewSQLiteWorkItemRepo(db)
+	depRepo := repository.NewSQLiteDependencyRepo(db)
+
+	svc := NewNodeService(nodeRepo, depRepo, uow)
+
+	proj := testutil.NewTestProject("CrossNodeDeps")
+	require.NoError(t, projRepo.Create(ctx, proj))
+
+	nodeA := testutil.NewTestNode(proj.ID, "Node A")
+	nodeB := testutil.NewTestNode(proj.ID, "Node B")
+	require.NoError(t, nodeRepo.Create(ctx, nodeA))
+	require.NoError(t, nodeRepo.Create(ctx, nodeB))
+
+	wiA := testutil.NewTestWorkItem(nodeA.ID, "Predecessor in A")
+	wiB := testutil.NewTestWorkItem(nodeB.ID, "Successor in B")
+	require.NoError(t, wiRepo.Create(ctx, wiA))
+	require.NoError(t, wiRepo.Create(ctx, wiB))
+
+	dep := &domain.Dependency{PredecessorWorkItemID: wiA.ID, SuccessorWorkItemID: wiB.ID}
+	require.NoError(t, depRepo.Create(ctx, dep))
+
+	// Verify the dependency blocks wiB.
+	blocked, err := depRepo.ListBlockedWorkItemIDs(ctx, []string{wiB.ID})
+	require.NoError(t, err)
+	assert.True(t, blocked[wiB.ID], "wiB should be blocked before nodeA deletion")
+
+	// Delete nodeA — should clean up the cross-node dependency.
+	require.NoError(t, svc.Delete(ctx, nodeA.ID))
+
+	// wiB should no longer be blocked.
+	blocked, err = depRepo.ListBlockedWorkItemIDs(ctx, []string{wiB.ID})
+	require.NoError(t, err)
+	assert.False(t, blocked[wiB.ID], "wiB should not be blocked after nodeA deletion")
 }
 
 func TestNodeService_Create_SeqNotConsumedOnInsertFailure(t *testing.T) {

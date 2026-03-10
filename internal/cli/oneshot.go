@@ -45,7 +45,7 @@ func oneshotWhatNow(ctx context.Context, a *App, args []string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(formatter.FormatWhatNow(resp))
+	fmt.Println(formatWhatNowResponse(ctx, a, resp))
 	return nil
 }
 

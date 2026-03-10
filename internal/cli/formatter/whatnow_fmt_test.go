@@ -24,7 +24,7 @@ func TestFormatWhatNowWithProjectIDs_UsesFriendlyProjectID(t *testing.T) {
 
 	out := FormatWhatNowWithProjectIDs(resp, map[string]string{
 		"39f351b6-2b6e-4f0e-a1d2-b8e3a40b1f07": "OU01",
-	})
+	}, nil)
 
 	assert.Contains(t, out, "Project:")
 	assert.Contains(t, out, "OU01")
@@ -45,7 +45,7 @@ func TestFormatWhatNowWithProjectIDs_FallsBackToTruncatedID(t *testing.T) {
 		},
 	}
 
-	out := FormatWhatNowWithProjectIDs(resp, nil)
+	out := FormatWhatNowWithProjectIDs(resp, nil, nil)
 
 	assert.Contains(t, out, "Project:")
 	assert.Contains(t, out, "12345678")
@@ -61,7 +61,7 @@ func TestFormatWhatNowWithProjectIDs_NoRecommendations_ShowsFallbackAndWarnings(
 		PolicyMessages: []string{"On-track projects may include secondary work."},
 	}
 
-	out := FormatWhatNowWithProjectIDs(resp, nil)
+	out := FormatWhatNowWithProjectIDs(resp, nil, nil)
 
 	assert.Contains(t, out, "No recommendations available.")
 	assert.Contains(t, out, "No eligible tasks due to constraints")
@@ -84,6 +84,6 @@ func TestFormatWhatNowWithProjectIDs_InvalidDueDateFallsBackToRawValue(t *testin
 		},
 	}
 
-	out := FormatWhatNowWithProjectIDs(resp, nil)
+	out := FormatWhatNowWithProjectIDs(resp, nil, nil)
 	assert.Contains(t, out, "Due: tomorrow-ish")
 }

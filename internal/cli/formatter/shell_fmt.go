@@ -106,6 +106,15 @@ func FormatShellHelp() string {
 			},
 		},
 		{
+			title: "Habits",
+			commands: [][]string{
+				{"habits", "List active habits and status"},
+				{"habits add", "Add a recurring habit (wizard)"},
+				{"log-habit <name> [min]", "Log a habit session"},
+				{"habits delete <name>", "Archive a habit"},
+			},
+		},
+		{
 			title: "Intelligence",
 			commands: [][]string{
 				{"ask <question>", "Natural language command (requires LLM)"},

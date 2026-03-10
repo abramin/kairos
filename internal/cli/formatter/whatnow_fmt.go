@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alexanderramin/kairos/internal/contract"
+	"github.com/alexanderramin/kairos/internal/domain"
 )
 
 // FormatWhatNow formats a WhatNowResponse into a styled CLI dashboard string.
@@ -34,6 +35,7 @@ func FormatWhatNowWithProjectIDs(resp *contract.WhatNowResponse, projectNames ma
 		b.WriteString(Dim("No recommendations available."))
 		b.WriteString("\n")
 	} else {
+		now := time.Now()
 		for i, rec := range resp.Recommendations {
 			num := fmt.Sprintf("%d.", i+1)
 
@@ -48,7 +50,7 @@ func FormatWhatNowWithProjectIDs(resp *contract.WhatNowResponse, projectNames ma
 					StylePurple.Render("HABIT"),
 				)
 			} else {
-				riskBadge := RiskIndicator(rec.RiskLevel)
+				riskBadge := itemRiskBadge(rec.RiskLevel, rec.DueDate, now)
 				seqLabel := ""
 				if rec.WorkItemSeq > 0 {
 					seqLabel = StyleDim.Render(fmt.Sprintf("#%d ", rec.WorkItemSeq))
@@ -64,19 +66,24 @@ func FormatWhatNowWithProjectIDs(resp *contract.WhatNowResponse, projectNames ma
 			}
 			b.WriteString(titleLine + "\n")
 
-			// Project info with name when available (not shown for habits).
-			if rec.ProjectID != "" {
-				b.WriteString(fmt.Sprintf("   %s %s\n", Dim("Project:"), renderProjectID(rec.ProjectID, projectNames)))
-			}
+			if rec.IsHabit {
+				// Habit-specific info: cadence and last-done status.
+				cadence := formatHabitCadence(rec.CadenceDays)
+				status := formatHabitDueSince(rec.DaysSinceLog, rec.CadenceDays)
+				b.WriteString(fmt.Sprintf("   %s %s\n", Dim(cadence+" •"), status))
+			} else {
+				// Project info with name when available.
+				if rec.ProjectID != "" {
+					b.WriteString(fmt.Sprintf("   %s %s\n", Dim("Project:"), renderProjectID(rec.ProjectID, projectNames)))
+				}
 
-			// Due date with relative styling.
-			if rec.DueDate != nil {
-				if parsed, err := time.Parse(time.RFC3339, *rec.DueDate); err == nil {
-					b.WriteString(fmt.Sprintf("   %s %s\n", Dim("Due:"), RelativeDateStyled(parsed)))
-				} else if parsed, err := time.Parse("2006-01-02", *rec.DueDate); err == nil {
-					b.WriteString(fmt.Sprintf("   %s %s\n", Dim("Due:"), RelativeDateStyled(parsed)))
-				} else {
-					b.WriteString(fmt.Sprintf("   %s\n", Dim(fmt.Sprintf("Due: %s", *rec.DueDate))))
+				// Due date with relative styling.
+				if rec.DueDate != nil {
+					if parsed, ok := parseDueDate(*rec.DueDate); ok {
+						b.WriteString(fmt.Sprintf("   %s %s\n", Dim("Due:"), RelativeDateStyled(parsed)))
+					} else {
+						b.WriteString(fmt.Sprintf("   %s\n", Dim(fmt.Sprintf("Due: %s", *rec.DueDate))))
+					}
 				}
 			}
 
@@ -128,6 +135,56 @@ func FormatWhatNowWithProjectIDs(resp *contract.WhatNowResponse, projectNames ma
 	}
 
 	return RenderBox("Session Plan", b.String())
+}
+
+func formatHabitCadence(cadenceDays int) string {
+	switch cadenceDays {
+	case 1:
+		return "Daily"
+	case 7:
+		return "Weekly"
+	default:
+		return fmt.Sprintf("Every %dd", cadenceDays)
+	}
+}
+
+func formatHabitDueSince(daysSinceLog, cadenceDays int) string {
+	if daysSinceLog >= 9999 {
+		return StyleYellow.Render("never done")
+	}
+	overdue := daysSinceLog - cadenceDays
+	switch {
+	case overdue > 0:
+		return StyleYellow.Render(fmt.Sprintf("overdue %dd", overdue))
+	case overdue == 0:
+		return StyleYellow.Render("due today")
+	default:
+		return StyleGreen.Render(fmt.Sprintf("%dd ago", daysSinceLog))
+	}
+}
+
+// parseDueDate tries RFC3339 then date-only format, returning zero time on failure.
+func parseDueDate(raw string) (time.Time, bool) {
+	if t, err := time.Parse(time.RFC3339, raw); err == nil {
+		return t, true
+	}
+	if t, err := time.Parse("2006-01-02", raw); err == nil {
+		return t, true
+	}
+	return time.Time{}, false
+}
+
+// itemRiskBadge returns the risk badge for a work item, upgrading to AT RISK
+// when the project is ON TRACK but the item's own due date is past due.
+func itemRiskBadge(risk domain.RiskLevel, dueDate *string, now time.Time) string {
+	if risk == domain.RiskOnTrack && dueDate != nil {
+		if parsed, ok := parseDueDate(*dueDate); ok {
+			if parsed.Before(now.Truncate(24 * time.Hour)) {
+				return StyleYellow.Render("● AT RISK")
+			}
+		}
+	}
+	return RiskIndicator(risk)
 }
 
 func renderProjectID(projectID string, projectIDs map[string]string) string {

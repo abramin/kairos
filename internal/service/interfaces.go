@@ -155,6 +155,7 @@ type HabitService interface {
 	GetByID(ctx context.Context, id string) (*domain.Habit, error)
 	Archive(ctx context.Context, id string) error
 	LogSession(ctx context.Context, req LogHabitRequest) (*domain.HabitLog, error)
+	UndoLog(ctx context.Context, logID string) error
 }
 
 // TaskService manages the global standalone task checklist.

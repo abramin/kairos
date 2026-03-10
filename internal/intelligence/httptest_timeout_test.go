@@ -121,6 +121,48 @@ func TestExplainService_ExplainNow_Timeout_DeterministicFallback(t *testing.T) {
 		"fallback explanation should have content")
 }
 
+// TestHelpService_Ask_Timeout_DeterministicFallback verifies that HelpService
+// gracefully falls back to deterministic help when the LLM times out via real
+// HTTP transport. This ensures users always get help, even if the LLM is slow.
+func TestHelpService_Ask_Timeout_DeterministicFallback(t *testing.T) {
+	// Slow server that respects context cancellation
+	srv := newHTTPTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-time.After(10 * time.Second):
+		case <-r.Context().Done():
+			return
+		}
+	}))
+	defer srv.Close()
+
+	cfg := llm.DefaultConfig()
+	cfg.Endpoint = srv.URL
+	cfg.MaxRetries = 0
+
+	// Override Help task timeout to 500ms
+	helpTask := cfg.Tasks[llm.TaskHelp]
+	helpTask.TimeoutMs = 500
+	cfg.Tasks[llm.TaskHelp] = helpTask
+
+	client := llm.NewOllamaClient(cfg, llm.NoopObserver{})
+	svc := NewHelpService(client, llm.NoopObserver{})
+
+	start := time.Now()
+	answer, err := svc.Ask(context.Background(), "how do I check status?", testHelpCommandSpec)
+	elapsed := time.Since(start)
+
+	// HelpService.Ask never returns errors — it falls back to deterministic.
+	require.NoError(t, err, "Ask should fall back gracefully, not error")
+	assert.Less(t, elapsed, 2*time.Second,
+		"should fall back to deterministic help quickly on timeout")
+
+	// Verify the fallback produced meaningful output.
+	assert.Equal(t, "deterministic", answer.Source,
+		"should fall back to deterministic source on LLM timeout")
+	assert.NotEmpty(t, answer.Answer, "deterministic fallback should have an answer")
+	assert.NotEmpty(t, answer.Examples, "deterministic fallback should suggest examples")
+}
+
 // TestLLMClient_Timeout_ContextCancellation verifies that the LLM client
 // respects context cancellation in addition to configured timeout. This ensures
 // users can interrupt long-running LLM calls (e.g., Ctrl+C in CLI).
